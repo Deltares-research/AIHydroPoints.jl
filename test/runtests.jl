@@ -1,6 +1,6 @@
 
 using Test
-using series_ml
+using AIHydroPoints
 
 #clear cache
 cache_dir = joinpath(pwd(),".cache")

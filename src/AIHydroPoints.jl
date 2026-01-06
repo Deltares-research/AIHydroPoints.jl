@@ -1,4 +1,4 @@
-module series_ml
+module AIHydroPoints
 
 # Packages used
 using Dates
