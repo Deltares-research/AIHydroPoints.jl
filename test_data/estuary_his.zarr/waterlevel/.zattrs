@@ -1,0 +1,1 @@
+{"units":"m","coordinates":"station_x_coordinate station_y_coordinate station_name","add_offset":0.0,"long_name":"water level","_ARRAY_DIMENSIONS":["time","stations"],"scale_factor":0.001,"standard_name":"sea_surface_height","_FillValue":-999.0}
