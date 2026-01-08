@@ -73,7 +73,7 @@ function ZarrTimeSeries(url_or_filename::String, quantity::String, source::Strin
         AWS.global_aws_config(mc) # set the global config to the minio server
         zarr_url = "$(uri_or_path.scheme):/$(uri_or_path.path)"
         println("Zarr URL: $(zarr_url)")
-    elseif uri_or_path.scheme == "" # Local file path
+    elseif uri_or_path.scheme == "" || uri_or_path.scheme == "C" # Local file path
         zarr_url = uri_or_path.path
         if !isdir(zarr_url)
             error("Zarr folder $(zarr_url) does not exist.")
@@ -89,7 +89,11 @@ function ZarrTimeSeries(url_or_filename::String, quantity::String, source::Strin
         error("Failed to open Zarr file or url at $(zarr_url) which originated from $(url_or_filename): $(e)")
     end
     if length(source)==0
-        source = "Zarr file: $(zarr_url)"
+        if uri_or_path.scheme == "C"
+            source = "Zarr file: $(uri_or_path.scheme * ":" * zarr_url)"
+        else
+            source = "Zarr file: $(zarr_url)"
+        end
     end
     # cache some metadata
     println("Reading metadata from Zarr file...")

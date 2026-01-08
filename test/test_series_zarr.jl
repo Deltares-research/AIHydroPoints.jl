@@ -182,7 +182,7 @@ else
     println("Skipping test_zarr_timeseries_over_s3: Deltares S3 server not reachable.")
 end
 
-if check_server("http://s3.nl-ams.scw.cloud/") # Points to Scaleway S3 server which responds with a simple text
+if check_server("http://s3.nl-ams.scw.cloud/") && AIHydroPoints.has_aws_credentials() # Points to Scaleway S3 server which responds with a simple text
     try # TODO somehow zarr tests can give an error within a unit test, so we catch it here
         test_zarr_timeseries_over_s3_scaleway()
     catch e
