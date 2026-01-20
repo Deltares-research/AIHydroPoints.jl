@@ -70,7 +70,7 @@ use: indices = collect_station_indices(["Station A", "Station C","Station D"], [
 Returns a vector of indices corresponding to the station names.
 If a station name is not found, then a -1 is returned for that station.
 """
-function find_location_indices(location_selection::Vector{String},all_location_names::Vector{String})
+function find_location_index(location_selection::Vector{String},all_location_names::Vector{String})
     indices = Vector{Int}()
     for name in location_selection
         index = find_location_index(name, all_location_names)
@@ -79,3 +79,20 @@ function find_location_indices(location_selection::Vector{String},all_location_n
     return indices
 end
 
+# function find_time_index(time::DateTime, all_times::Vector{DateTime})
+#     result = findfirst(x->x==time, all_times)
+#     if isnothing(result)
+#         return -1
+#     else
+#         return result   
+#     end
+# end
+
+# function find_time_index(times::Vector{DateTime}, all_times::Vector{DateTime})
+#     indices = Vector{Int}()
+#     for time in times
+#         index = find_time_index(time, all_times)
+#         push!(indices, index)
+#     end
+#     return indices
+# end
