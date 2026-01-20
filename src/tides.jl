@@ -45,12 +45,11 @@ Struct that stores parameters for creating and training a model for tides.
 end
 
 """
-    prepare_tide_data!(ts::TimeSeries, settings::TideSettings)
+    prepare_train_data(ts::TimeSeries, settings::TideSettings)
 
 Prepare training data for tide model from a TimeSeries.
 Returns a vector of onehot encoded input stations and doodson numbers as training input,
 and waterlevels as training targets.
-Also sets `nstations` in the `settings` struct.
 
 # Arguments
 
@@ -62,8 +61,6 @@ function prepare_train_data(ts::TimeSeries, settings::TideSettings)
     times = get_times(ts)
     waterlevel = get_values(ts)
 
-    nstations = settings.nstations
-
     station_index = collect(1:nstations)
 
     x_station, x_doodson = prepare_inputs(settings, station_index, times)
@@ -71,6 +68,19 @@ function prepare_train_data(ts::TimeSeries, settings::TideSettings)
 
     return (x_station, x_doodson, y_waterlevel)
 end
+
+"""
+    prepare_inputs(settings::TideSettings, station_index, times)
+
+Creates the tide model input arrays based on the index of the station in the data set,
+and an array of times.
+
+# Arguments
+
+- `settings::TideSettings`: Tide model settings.
+- `station_index`: Index/Indices of stations to prep data for.
+- `times`: Times used as input.
+"""
 
 function prepare_inputs(settings::TideSettings, station_index, times)
     nstations = settings.nstations
@@ -93,6 +103,11 @@ end
 # Custom Input layer
 ####################
 
+"""
+    struct TideInputLayer{T}
+
+Input layer to the tide model encoding the station indices and doodson pars.
+"""
 struct TideInputLayer{T} 
     station_params1::T
     doodson_params1::T
@@ -101,6 +116,18 @@ struct TideInputLayer{T}
 end
 
 # Constructor
+"""
+    TideInputLayer(nstations, nfreqs, nfeats)
+
+TideInputLayer constructor using the number of stations, number of tidal frequencies,
+and number of hidden features in the layer.
+
+# Arguments
+
+- `nstations`: Number of stations in the training data
+- `nfreqs`: Number of tidal frequencies used during training
+- `nfeats`: Number of hidden features in the layer
+"""
 TideInputLayer(nstations, nfreqs, nfeats) = TideInputLayer(
     Dense(nstations => nfeats, identity; bias=false),
     Dense((2*nfreqs) => nfeats, identity; bias=false),
@@ -126,12 +153,33 @@ Flux.@layer TideInputLayer
 # Custom Tide layer
 ###################
 
+"""
+    struct TideLayer{T}
+
+Processing layer used in tide model with two branches
+"""
 struct TideLayer{T} 
     direct::T
     for_product::T
 end
 
 # Constructor
+"""
+    TideLayer(n1_in, n1_out, n2_in, n2_out; kwargs...)
+
+Constructor function to build a TideLayer using a Dense layer in each branch.
+# Arguments
+
+- `n1_in`: Number of input features in first branch
+- `n1_out`: Number of output features in first branch
+- `n2_in`: Number of input features in second branch
+- `n2_out`: Number of output features in second branch
+
+# Keywords
+
+- `activation`: Dense layer activation function
+    (**Default**: `relu`)
+"""
 TideLayer(n1_in, n1_out, n2_in, n2_out; activation=relu) = TideLayer(
     Dense(n1_in => n1_out, activation),
     Dense(n2_in => n2_out, activation)
@@ -149,13 +197,14 @@ end
 Flux.@layer TideLayer
 
 """
-    create_tide_model(settings::TideSettings) -> Return type
+    create_tide_model(settings::TideSettings)
 
-Description of the function
+Create a default Tide Model based on hyperparameters defined in the settings
+and using the TideInputLayer, TideLayer defined previously.
 
 # Arguments
 
-- `settings::TideSettings`: Argument description
+- `settings::TideSettings`: settings for the TideModel
 """
 function create_tide_model(settings::TideSettings)
     nstations = settings.nstations
