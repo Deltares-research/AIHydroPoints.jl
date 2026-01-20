@@ -1,7 +1,7 @@
 # netcdf_utils.jl
-# 
-# using NetCDF
-# using Dates
+
+using NetCDF
+using Dates
 
 const NAME_LEN_MAX = 256
 
@@ -42,10 +42,10 @@ waterlevel(stations,time):
 """
 function waterlevel_series_to_netcdf(filename, times, waterlevels, station_names,station_x=nothing,station_y=nothing)
     # check for station coordinates
-    if station_x==nothing
+    if isnothing(station_x)
         station_x=zeros(Float32,length(station_names))
     end
-    if station_y==nothing
+    if isnothing(station_y)
         station_y=zeros(Float32,length(station_names))
     end
     # check for file
@@ -94,21 +94,3 @@ function waterlevel_series_to_netcdf(filename, times, waterlevels, station_names
         NetCDF.putvar(nc, "station_name", nc_string2char(station_names))
     end
 end
-
-function netcdf_test()
-    filename="test.nc"
-    tfirst=DateTime(2025,3,12,12,0,0)
-    tlast=DateTime(2025,3,12,22,0,0)   
-    tstep=Dates.Second(3600)
-    times=collect(tfirst:tstep:tlast)
-    waterlevels=rand(2,length(times))
-    station_names=["station1","station2"]
-    station_x=[1,2]
-    station_y=[10.20]
-    if isfile(filename)
-        rm(filename)
-    end
-    waterlevel_series_to_netcdf(filename, times, waterlevels, station_names,station_x,station_y)
-end
-
-#netcdf_test()

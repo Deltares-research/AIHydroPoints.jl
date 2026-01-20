@@ -77,9 +77,9 @@ function select_location_by_name(ts::AbstractTimeSeries, location_name::String)
     return select_location_by_id(ts, index)
 end
 
-function select_timespan(ts::AbstractTimeSeries, start_time::DateTime, end_time::DateTime)
+function select_timespan(ts::AbstractTimeSeries, start_time::Union{DateTime, String}, end_time::Union{DateTime, String})
     times = get_times(ts)
-    time_indices = findall(t -> t >= start_time && t <= end_time, times)
+    time_indices = findall(t -> t >= DateTime(start_time) && t <= DateTime(end_time), times)
     if isempty(time_indices)
         error("No time steps found in the specified timespan.")
     end

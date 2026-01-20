@@ -31,3 +31,6 @@ JuliaLocalPreferences.toml
 
 test/.cache
 test/temp
+
+*_model_*
+models/

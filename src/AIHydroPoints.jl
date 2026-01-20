@@ -30,6 +30,17 @@ include("series_noos.jl")
 export NoosTimeSeriesCollection, write_single_noos_file, read_single_noos_file
 export get_sources, get_source_quantity_keys, get_quantities, get_series_from_collection
 
+include("tidal_comps.jl")
+export primary_frequencies_as_doodson, get_doodson_eqvals
+
+include("netcdf_utils.jl")
+export waterlevel_series_to_netcdf
+
+include("training.jl")
+include("tides.jl")
+export save_settings, load_settings, save_model, load_model, load_run, ModelSettings, prepare_train_data, predict, train_model, plot_losses
+export TideSettings, create_tide_model, prepare_train_data!, plot_series
+
 
 # Methods in the interface for time series
 # getters for the fields
