@@ -1,6 +1,5 @@
 using Flux
 using CUDA
-using ProgressMeter: Progress, next!
 using Statistics
 
 """
@@ -35,7 +34,7 @@ Struct that stores parameters for creating and training a model for tides.
     learning_rate = 1.0e-3
     weight_reg = 1.0e-4
     use_gpu = false
-    nstations = nothing
+    nstations = nothing # Set per training run from train data
     freqs = ["SSA","K1","O1","Q1","P1","M2","S2","N2","K2","H"]
     model_pars = Dict(
         "nlayers" => 1,
@@ -61,7 +60,7 @@ function prepare_train_data(ts::TimeSeries, settings::TideSettings)
     times = get_times(ts)
     waterlevel = get_values(ts)
 
-    station_index = collect(1:nstations)
+    station_index = collect(1:settings.nstations)
 
     x_station, x_doodson = prepare_inputs(settings, station_index, times)
     y_waterlevel = reshape(waterlevel, 1, :)
@@ -281,7 +280,7 @@ function plot_series(model, settings::TideSettings, ts::TimeSeries, series_name;
         h_hat = prediction[ind,:]
         err = errors[ind,:]
         rmse = rmses[ind]
-        p1 = plot(times, h, label="Measured", xlabel="Time", ylabel="Waterlevel", title="Station $(station) RMSE=$(rmse)")
+        p1 = plot(times, h, label="Ground Truth", xlabel="Time", ylabel="Waterlevel", title="Station $(station) RMSE=$(rmse)")
         p2 = plot(times, h_hat, label="Predicted")
         p3 = plot(times, err, label="Residual")
         plot(p1,p2,p3,layout=(3,1))
