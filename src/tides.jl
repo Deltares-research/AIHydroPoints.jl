@@ -10,6 +10,10 @@ Struct that stores parameters for creating and training a model for tides.
 
 # Arguments
 
+- `model_name`: Name of the model.
+    (**Default**: `MyTideModel`)
+- `model_dir`: Path to directory where files generated during the run will be saved.
+    (**Default**: `MyTideModel`)
 - `nepochs`: Number of epochs used during training.
     (**Default**: `100`)
 - `nbatches`: Number of batches to split the training datat into.
@@ -20,7 +24,7 @@ Struct that stores parameters for creating and training a model for tides.
     (**Default**: `1.0-e4`)
 - `use_gpu`: Whether to train on gpu
     (**Default**: `false`)
-- `nstation`: Number of stations used for training. Is deduced from training data when prepared, otherwise `nothing` to throw errors.
+- `nstation`: Number of waterlevel stations used for training. Is deduced from training data when prepared, otherwise `nothing` to throw errors.
     (**Default**: `nothing`)
 - `freqs`: Named tidal constituents used for training.
     (**Default**: `["SSA","K1","O1","Q1","P1","M2","S2","N2","K2","H"]`)
@@ -284,7 +288,7 @@ function plot_series(model, settings::TideSettings, ts::TimeSeries, series_name;
         p1 = plot(times, h, label="Ground Truth", xlabel="Time", ylabel="Waterlevel", title="Station $(station) RMSE=$(rmse)")
         plot!(p1, times, h_hat, label="Predicted")
         p2 = plot(times, err, label="Residual")
-        
+
         plot(p1,p2,layout=(2,1))
         savefig(joinpath(settings.model_dir, "$(station)_$(series_name).png"))
     end

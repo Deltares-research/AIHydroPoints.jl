@@ -4,6 +4,37 @@ using Statistics
 using IterTools
 using JLD2
 
+
+"""
+    struct SurgeSettings
+
+Struct that stores parameters for creating and training a model for surges.
+
+# Arguments
+
+- `model_name`: Name of the model.
+    (**Default**: `MySurgeModel`)
+- `model_dir`: Path to directory where files generated during the run will be saved.
+    (**Default**: `MySurgeModel`)
+- `nepochs`: Number of epochs used during training.
+    (**Default**: `100`)
+- `nbatches`: Number of batches to split the training datat into.
+    (**Default**: `1024`)
+- `learning_rate`: Learning rate of the Adam optimizer used.
+    (**Default**: `1.0e-3`)
+- `weight_reg`: Weight Decay parameter
+    (**Default**: `1.0-e4`)
+- `use_gpu`: Whether to train on gpu
+    (**Default**: `false`)
+- `nstation`: Number of waterlevel stations used for training. Is deduced from training data when prepared, otherwise `nothing` to throw errors.
+    (**Default**: `nothing`)
+- `nwind`: Number of wind stations used for training. Is deduced from training data when prepared, otherwise `nothing` to throw errors.
+    (**Default**: `nothing`)
+- `nlags`: Number of previous timesteps used as input in the model.
+    (*Default**: `16`)
+- `model_pars`: Dict of model parameters used to construct the surge model. The Default is set to work with the `create_surge_model` function.
+    (**Default**: `Dict("channels=>[32,32,32,1], "filter"=>2, "stride"=>2)`)
+"""
 @kwdef mutable struct SurgeSettings <: AbstractModelSettings
     model_name = "MySurgeModel"
     model_dir = "MySurgeModel"
@@ -26,6 +57,22 @@ end
 # Input Preparation
 ###################
 
+
+"""
+    prepare_train_data(ts_waterlevel::TimeSeries, ts_wind_x::TimeSeries, ts_wind_y::TimeSeries, ts_press::TimeSeries, settings::SurgeSettings)
+
+Prepare training data for surge model from waterlevel, wind stress, and pressure TimeSeries.
+Returns a vector of onehot encoded input stations and wind stress and pressure at previous timesteps as input,
+and waterlevel (surge) as training targets.
+
+# Arguments
+
+- `ts_waterlevel::TimeSeries`: TimeSeries containing waterlevel (surge) data.
+- `ts_wind_x::TimeSeries`: TimeSeries containing wind stress (x-direction) data.
+- `ts_wind_y::TimeSeries`: TimeSeries containing wind stress (y-direction) data.
+- `ts_press::TimeSeries`: TimeSeries containing pressure data.
+- `settings::SurgeSettings`: Surge model settings.
+"""
 function prepare_train_data(ts_waterlevel::TimeSeries, ts_wind_x::TimeSeries, ts_wind_y::TimeSeries, ts_press::TimeSeries, settings::SurgeSettings)
     times = get_times(ts_waterlevel)
 
@@ -43,6 +90,20 @@ function prepare_train_data(ts_waterlevel::TimeSeries, ts_wind_x::TimeSeries, ts
     return x_station, x_stress_press, y_waterlevel
 end
 
+"""
+    prepare_inputs(settings::SurgeSettings, station_index, times, stress_x, stress_y, press)
+
+Create surge model inputs based on station indices, time, wind stress, pressure.
+
+# Arguments
+
+- `settings::SurgeSettings`: Surge model settings
+- `station_index`: Indices of waterlevel stations to prep data for.
+- `times`: Input times.
+- `stress_x`: Wind stress (x-direction)
+- `stress_y`: Wind stress (y-direction)
+- `press`: Pressure
+"""
 function prepare_inputs(settings::SurgeSettings, station_index, times, stress_x, stress_y, press)
     nlags = settings.nlags
     time_idx = nlags:length(times)
@@ -79,11 +140,28 @@ end
 # Custom Input Layer
 ####################
 
+"""
+    struct WindInputLayer{T}
+
+Input layer to surge model encoding the station indices
+"""
 struct WindInputLayer{T}
     station_params::T
 end
 
 # Constructor
+"""
+    WindInputLayer(nstations, nlags, npars)
+
+WindInputLayer constructor using number of stations, number of previous timesteps,
+and number of input paramters.
+
+# Arguments
+
+- `nstations`: Number of input waterlevel stations
+- `nlags`: Number of previous timesteps seen by model
+- `npars`: Total number of input parameters (=features) of the input layer
+"""
 WindInputLayer(nstations, nlags, npars) = WindInputLayer(
     Dense(nstations => (nlags*npars), identity; bias=false)
 )
@@ -101,6 +179,16 @@ end
 
 Flux.@layer WindInputLayer
 
+"""
+    create_surge_model(settings::SurgeSettings) 
+
+Create a default Surge Model based on model parameters stored in `settings.model_pars`,
+using WindInputLayer and Conv layers.
+
+# Arguments
+
+- `settings::SurgeSettings`: Surge model settings
+"""
 function create_surge_model(settings::SurgeSettings)
     nstations = settings.nstations
     nlags = settings.nlags
