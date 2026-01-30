@@ -2,6 +2,7 @@ using Flux
 using CUDA
 using Statistics
 using IterTools
+using JLD2
 
 @kwdef mutable struct SurgeSettings <: AbstractModelSettings
     model_name = "MySurgeModel"
@@ -190,32 +191,30 @@ function plot_series(model, settings::SurgeSettings, ts_h::TimeSeries,
         rmse = rmses[ind]
 
         p1 = plot(times, h, label="Ground Truth", xlabel="Time", ylabel="Waterlevel", title="Station $station RMSE=$rmse")
-        # p2 = plot(times, h_hat, label="Predicted")
         plot!(p1, times, h_hat, label="Predicted")
-        p3 = plot(times, err, label="Residual")
+        p2 = plot(times, err, label="Residual")
 
-        plot(p1,p3, layout=(2,1))
-        # plot(p1,p2,p3, layout=(3,1))
+        plot(p1,p2, layout=(2,1))
         savefig(joinpath(settings.model_dir, "$(station)_$(series_name).png"))
     end
 
     if write_series
-        fn_pred = joinpath(settings.model_dir, "$(series_name)_surge.nc")
-        fn_res = joinpath(settings.model_dir, "$(series_name)_residual.nc")
+        fn_pred = joinpath(settings.model_dir, "$(series_name)_surge")
+        fn_res = joinpath(settings.model_dir, "$(series_name)_residual")
         station_x = Float64.(get_longitudes(ts_h))
         station_y = Float64.(get_latitudes(ts_h))
 
         if write_format == "netcdf"
-
-            waterlevel_series_to_netcdf(fn_pred, times, prediction, stations, station_x, station_y)
-            waterlevel_series_to_netcdf(fn_res, times, errors, stations, station_x, station_y)
+            ext = ".nc"
+            waterlevel_series_to_netcdf(fn_pred*ext, times, prediction, stations, station_x, station_y)
+            waterlevel_series_to_netcdf(fn_res*ext, times, errors, stations, station_x, station_y)
 
         else
             if write_format != "jld2"
                 @warn "Unknown writing format $(write_format), using defaulft format JLD2."
             end 
-
-            save(joinpath(settings.model_dir, "$(series_name)_surge.jld2"),
+            ext = ".jld2"
+            save(fn_pred*ext,
                 Dict(
                     "station_x_coordinate" => station_x,
                     "station_y_coordinate" => station_y,
@@ -224,7 +223,7 @@ function plot_series(model, settings::SurgeSettings, ts_h::TimeSeries,
                     "surge" => prediction
                 )    
             )
-            save(joinpath(settings.model_dir, "$(series_name)_residual.jld2"),
+            save(fn_res*ext,
                 Dict(
                     "station_x_coordinate" => station_x,
                     "station_y_coordinate" => station_y,

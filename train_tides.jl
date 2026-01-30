@@ -30,8 +30,8 @@ settings = TideSettings(model_name=name, nepochs=nepochs, learning_rate=learning
 
 
 # Load and prepare data
-train_series = JLD2TimeSeries(training_file)
-test_series = JLD2TimeSeries(testing_file)
+train_series = JLD2TimeSeries(training_file, varname="waterlevel")
+test_series = JLD2TimeSeries(testing_file, varname="waterlevel")
 
 settings.nstations = length(get_names(train_series))
 

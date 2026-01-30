@@ -6,17 +6,21 @@ Pkg.activate(".")
 using AIHydroPoints
 
 labels=["training","validation","testing"]
+tide_model = "TestTideModel"
 filenames=Dict()
 
-filenames["training"]=Dict(
-    "waterlevel"=>"tide_model_317stations_3tl_3yr_1024batch_0p0001reg_64nodes_100epochs/tide_model_317stations_3tl_3yr_1024batch_0p0001reg_64nodes_100epochs_training_surge.jld2",
-    "wind"=>"era5_wind_stress_2008_training.jld2")
-filenames["validation"]=Dict(
-    "waterlevel"=>"tide_model_317stations_3tl_3yr_1024batch_0p0001reg_64nodes_100epochs/tide_model_317stations_3tl_3yr_1024batch_0p0001reg_64nodes_100epochs_testing_surge.jld2",
-    "wind"=>"era5_wind_stress_2011_testing.jld2")
-filenames["testing"]=Dict(
-    "waterlevel"=>"tide_model_317stations_3tl_3yr_1024batch_0p0001reg_64nodes_100epochs/tide_model_317stations_3tl_3yr_1024batch_0p0001reg_64nodes_100epochs_testing_surge.jld2",
-    "wind"=>"era5_wind_stress_2011_testing.jld2")
+filenames["training"] = Dict(
+    "waterlevel" => joinpath("models", tide_model, "training_surge.jld2"),
+    "wind" => "era5_wind_stress_2008_training.jld2"
+)
+filenames["testing"] = Dict(
+    "waterlevel" => joinpath("models", tide_model, "testing_surge.jld2"),
+    "wind" => "era5_wind_stress_2011_testing.jld2"
+)
+filenames["validation"] = Dict(
+    "waterlevel" => joinpath("models", tide_model, "testing_surge.jld2"),
+    "wind" => "era5_wind_stress_2011_testing.jld2"
+)
 
 # Use default options for everything
 # Or overrise using kwargs
