@@ -1,13 +1,13 @@
 
 # A series approach to forecasting tides and storm-surges
 
-The purpose of this time-series based AI model is to have a simple and fast benchmark model. The inputs are a few time-series of winds and air-pressiure, from ERA5 in the examples in this repository. The outputs are timeseries of tides, surge and interaction at a number of locations. For now, the model is trained on output of a numerical model. In principle, measurements can also be used for training.
+The purpose of this time-series based AI model is to have a simple and fast benchmark model. The inputs are a few time-series of winds and air-pressure, from ERA5 in the examples in this repository. The outputs are timeseries of tides, surge and interaction at a number of locations. For now, the model is trained on output of a numerical model. In principle, measurements can also be used for training.
 
 The AI model in this folder contains 3 modules for forecasting, tides, surges and their interaction. 
 - Tides: takes only time and location name as input, and should be trained on a multi year dataset of multiple time-series
 - Surge: takes winds and pressure at a few points around the North Sea as input, and should be trained with several years of timeseries for a collection of stations.
 - Tide-Surge Interation: takes the output of the previous two modules as input and outputs time-series for the non-linear interation. 
-This should summed together result in time-series for the total waterlevel as well as for the individual components. The architecture considers the dynamics to be in part local and in part generic, which is reflected in specific inputs per location and common layers. For example to compute the tide level at the second location a one-hot vector `[0,1,0,...]` is used with as length the number of locations. The other inputs are Doodson phases at that data and time.
+This should be summed together result in time-series for the total waterlevel as well as for the individual components. The architecture considers the dynamics to be in part local and in part generic, which is reflected in specific inputs per location and common layers. For example to compute the tide level at the second location a one-hot vector `[0,1,0,...]` is used with as length the number of locations. The other inputs are Doodson phases at that data and time.
 The model uses three components and no internal state to achieve a reliable behavior for long lead times. The model is as easily fed with forecasted winds as with winds from a reanalysis for reconstruction of a historical event. Our understanding of the physics of the phenomena has been included in multiple ways into the architecture.
 
 The inputs for winds and air-pressure are sampled at a few relevant locations. In the examples ERA5 fields from the Copernicus Climate Data Store (CDS) are used. Tides require Doodson phases as input, but these are easily computed from the times. The outputs in the examples are from the DCSM-FM model.
