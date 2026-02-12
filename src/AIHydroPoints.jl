@@ -44,6 +44,9 @@ export TideSettings, create_tide_model
 include("surge.jl")
 export SurgeSettings, create_surge_model
 
+include("interaction.jl")
+export InteractionSettings, create_interaction_model
+
 
 # Methods in the interface for time series
 # getters for the fields
