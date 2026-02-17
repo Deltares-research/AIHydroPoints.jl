@@ -36,6 +36,7 @@ Struct that stores parameters for creating and training a model for tides.
     model_dir = "MyTideModel"
     nepochs = 100
     nbatches = 1024
+    patience = 5
     learning_rate = 1.0e-3
     weight_reg = 1.0e-4
     use_gpu = false

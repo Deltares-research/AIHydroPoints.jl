@@ -6,6 +6,7 @@
 using TOML
 using JLD2
 using Plots
+using Statistics
 using ProgressMeter: Progress, next!
 
 """
@@ -195,6 +196,8 @@ function train_model(model, settings::AbstractModelSettings, train_data, test_da
     learning_rate = settings.learning_rate
     weight_reg = settings.weight_reg
     use_gpu = settings.use_gpu
+    
+    patience = settings.patience
 
     if use_gpu && CUDA.has_cuda()
         @info "Training on GPU"
@@ -207,6 +210,8 @@ function train_model(model, settings::AbstractModelSettings, train_data, test_da
     train_losses = []
     test_losses = []
     acc_losses = []
+
+    tmp_losses = 1e3*ones(patience)
 
     model = model |> device
 
@@ -241,6 +246,13 @@ function train_model(model, settings::AbstractModelSettings, train_data, test_da
                 ("Test loss", test_loss)
             ]
         )
+
+        if test_loss <= mean(tmp_losses)
+            tmp_losses .= [tmp_losses[2:end]..., test_loss]
+        else
+            @warn "test loss $test_loss bigger than mean of prev $patience epochs $(mean(tmp_losses)), ending train loop"
+            break
+        end
 
     end
 

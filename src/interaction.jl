@@ -8,6 +8,7 @@ using IterTools
     model_dir = "MyInteractionModel"
     nepochs = 100
     nbatches = 1024
+    patience = 5
     learning_rate = 1.0e-3
     weight_reg = 1.0e-4
     use_gpu = false
