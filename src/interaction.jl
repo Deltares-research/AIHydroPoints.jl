@@ -8,7 +8,8 @@ using IterTools
     model_dir = "MyInteractionModel"
     nepochs = 100
     nbatches = 1024
-    patience = 5
+    checkpoints = nothing
+    val_daterange = nothing
     learning_rate = 1.0e-3
     weight_reg = 1.0e-4
     use_gpu = false
@@ -26,7 +27,12 @@ end
 # Input Preparation
 ###################
 
-function prepare_train_data(ts_waterlevel::TimeSeries, ts_tides::TimeSeries, ts_surge::TimeSeries, settings::InteractionSettings)
+function prepare_train_data(data_dict::Dict{String, <:AbstractTimeSeries}, settings::InteractionSettings)
+
+    ts_waterlevel = data_dict["waterlevel"]
+    ts_tides = data_dict["tide"]
+    ts_surge = data_dict["surge"]
+
     # times = get_times(ts_waterlevel)[16:end]
     times = get_times(ts_waterlevel)
 
@@ -160,11 +166,14 @@ function predict(model, settings::InteractionSettings, ts_waterlevel::TimeSeries
     return reshape(y_hat, nstations, length(times)-nlags+1)
 end
 
-function plot_series(model, settings::InteractionSettings, ts_waterlevel::TimeSeries,
-    ts_tides::TimeSeries, ts_surge::TimeSeries, series_name;
+function plot_series(model, settings::InteractionSettings, data_dict::Dict{String, <:AbstractTimeSeries}, series_name;
     timerange::Union{Vector{DateTime}, Vector{String}, Nothing}=nothing,
     station_names::Union{Vector{String}, Nothing}=nothing,
     write_series=false, write_format="jld2")
+
+    ts_waterlevel = data_dict["waterlevel"]
+    ts_tides = data_dict["tide"]
+    ts_surge = data_dict["surge"]
 
     if !isnothing(station_names)
         ts_waterlevel = select_locations_by_names(ts_waterlevel, station_names)

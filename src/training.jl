@@ -124,7 +124,7 @@ Create training data from a TimeSeries ts using the hyperparameters in settings.
 - `ts::TimeSeries`: Input time series
 - `settings::AbstractModelSettings`: settings containing hyperparameters
 """
-function prepare_train_data(ts::TimeSeries, settings::AbstractModelSettings)
+function prepare_train_data(data_dict::Dict{String, <:AbstractTimeSeries}, settings::AbstractModelSettings)
     error("Function prepare_data not defined for settings $(typeof(settings))")
 end
 
@@ -190,14 +190,15 @@ for the relevant settings type
 - `train_data`: Prepared train data
 - `test_data`: Prepared test data
 """
-function train_model(model, settings::AbstractModelSettings, train_data, test_data)
+function train_model(model, settings::AbstractModelSettings, train_dict::Dict{String, <:AbstractTimeSeries}, test_dict::Dict{String, <:AbstractTimeSeries})
     nepochs = settings.nepochs
     nbatches = settings.nbatches
     learning_rate = settings.learning_rate
     weight_reg = settings.weight_reg
     use_gpu = settings.use_gpu
     
-    patience = settings.patience
+    checkpoints = settings.checkpoints
+    val_daterange = settings.val_daterange
 
     if use_gpu && CUDA.has_cuda()
         @info "Training on GPU"
@@ -211,7 +212,8 @@ function train_model(model, settings::AbstractModelSettings, train_data, test_da
     test_losses = []
     acc_losses = []
 
-    tmp_losses = 1e3*ones(patience)
+    train_data = prepare_train_data(train_dict, settings)
+    test_data = prepare_train_data(test_dict, settings)
 
     model = model |> device
 
@@ -247,11 +249,16 @@ function train_model(model, settings::AbstractModelSettings, train_data, test_da
             ]
         )
 
-        if test_loss <= mean(tmp_losses)
-            tmp_losses .= [tmp_losses[2:end]..., test_loss]
-        else
-            @warn "test loss $test_loss bigger than mean of prev $patience epochs $(mean(tmp_losses)), ending train loop"
-            break
+        if !isnothing(checkpoints) && epoch in checkpoints
+            @info "Creating checkpoint $epoch"
+            tmp_settings =  deepcopy(settings)
+            tmp_settings.model_dir = joinpath(settings.model_dir, "checkpoints", "checkpoint_$epoch")
+            if !isdir(tmp_settings.model_dir)
+                mkpath(tmp_settings.model_dir)
+            end
+            save_model(model|>cpu, tmp_settings)
+            plot_series(model|>cpu, tmp_settings, test_dict, "chk_$epoch";  write_series=false)
+            plot_series(model|>cpu, tmp_settings, test_dict, "chk_$(epoch)_short"; write_series=false, timerange=val_daterange)
         end
 
     end
@@ -281,6 +288,9 @@ Plot train and test losses
 function plot_losses(train_losses, test_losses, settings::AbstractModelSettings; istart=1)
     plot(train_losses[istart:end], label="Train Loss", xlabel="Epoch", ylabel="Loss")
     plot!(test_losses[istart:end], label="Test Loss")
+    if !isnothing(settings.checkpoints)
+        vline!(settings.checkpoints, label="Checkpoints", ls=:dot, lc=:red)
+    end
     savefig(joinpath(settings.model_dir, "train_test_losses.png"))
 end
 
@@ -310,6 +320,6 @@ Compare and plot prediction from model with data in TimeSeries ts
 - `ts::TimeSeries`: time series with relevant input data and ground truth
 - `settings::AbstractModelSettings`: settings containing hyperparameters, used for dispatch
 """
-function plot_series(model, ts::TimeSeries, settings::AbstractModelSettings)
+function plot_series(model, data_dict::Dict{String, <:AbstractTimeSeries}, settings::AbstractModelSettings, series_name)
     error("Function plot_series not implemented for settings $(typeof(settings))")
 end

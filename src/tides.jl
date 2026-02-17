@@ -36,7 +36,8 @@ Struct that stores parameters for creating and training a model for tides.
     model_dir = "MyTideModel"
     nepochs = 100
     nbatches = 1024
-    patience = 5
+    checkpoints = nothing
+    val_daterange = nothing
     learning_rate = 1.0e-3
     weight_reg = 1.0e-4
     use_gpu = false
@@ -61,8 +62,10 @@ and waterlevels as training targets.
 - `ts::TimeSeries`: TimeSeries containing the training data.
 - `settings::TideSettings`: Settings used here for the tidal frequencies used during training.
 """
-function prepare_train_data(ts::TimeSeries, settings::TideSettings)
+function prepare_train_data(data_dict::Dict{String, <:AbstractTimeSeries}, settings::TideSettings)
    
+    ts = data_dict["waterlevel"]
+
     times = get_times(ts)
     waterlevel = get_values(ts)
 
@@ -259,12 +262,13 @@ function predict(model, settings::TideSettings, ts::TimeSeries)
     return reshape(y_hat, length(stations), length(times))
 end
 
-function plot_series(model, settings::TideSettings, ts::TimeSeries, series_name; 
+function plot_series(model, settings::TideSettings, data_dict::Dict{String, TimeSeries}, series_name; 
     timerange::Union{Vector{DateTime}, Vector{String}, Nothing}=nothing,
     station_names::Union{Vector{String}, Nothing}=nothing, 
     write_series=false, write_format="jld2")
 
-    
+    ts = data_dict["waterlevel"]
+
     if !isnothing(station_names)
         ts = select_locations_by_names(ts, station_names)
     end

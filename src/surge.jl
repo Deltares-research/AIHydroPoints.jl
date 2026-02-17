@@ -40,7 +40,8 @@ Struct that stores parameters for creating and training a model for surges.
     model_dir = "MySurgeModel"
     nepochs = 100
     nbatches = 1024
-    patience = 5
+    checkpoints = nothing
+    val_daterange = nothing
     learning_rate = 1.0e-3
     weight_reg = 1.0e-4
     use_gpu = false
@@ -74,7 +75,13 @@ and waterlevel (surge) as training targets.
 - `ts_press::TimeSeries`: TimeSeries containing pressure data.
 - `settings::SurgeSettings`: Surge model settings.
 """
-function prepare_train_data(ts_waterlevel::TimeSeries, ts_wind_x::TimeSeries, ts_wind_y::TimeSeries, ts_press::TimeSeries, settings::SurgeSettings)
+function prepare_train_data(data_dict::Dict{String, <:AbstractTimeSeries}, settings::SurgeSettings)
+
+    ts_waterlevel = data_dict["waterlevel"]
+    ts_wind_x = data_dict["wind_x"]
+    ts_wind_y = data_dict["wind_y"]
+    ts_press = data_dict["pressure"]
+
     times = get_times(ts_waterlevel)
 
     waterlevel = get_values(ts_waterlevel)
@@ -247,11 +254,15 @@ function predict(model, settings::SurgeSettings, ts_h::TimeSeries, ts_wind_x::Ti
     return reshape(y_hat, nstations, length(times)-nlags+1)
 end
 
-function plot_series(model, settings::SurgeSettings, ts_h::TimeSeries,
-    ts_wind_x::TimeSeries, ts_wind_y::TimeSeries, ts_press::TimeSeries, series_name;
+function plot_series(model, settings::SurgeSettings, data_dict::Dict{String, <:AbstractTimeSeries}, series_name;
     timerange::Union{Vector{DateTime}, Vector{String}, Nothing}=nothing,
     station_names::Union{Vector{String}, Nothing}=nothing,
     write_series=false, write_format="jld2")
+
+    ts_h = data_dict["waterlevel"]
+    ts_wind_x = data_dict["wind_x"]
+    ts_wind_y = data_dict["wind_y"]
+    ts_press = data_dict["pressure"]
     
     if !isnothing(station_names)
         ts_h = select_locations_by_names(ts_h, station_names)
