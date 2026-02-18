@@ -38,6 +38,8 @@ function JLD2TimeSeries(filename::String; varname="values")
     if !haskey(d, "quantity")
         @warn "JLD2 file $(filename) does not contain key for variable description. Using name $varname"
         quantity = varname
+    else
+        quantity = d["quantity"]
     end
 
     data= d[varname][:, :] #load the data into memory

@@ -7,7 +7,7 @@ using NetCDF
 # Abstract data type for time series at multiple locations
 include("abstract_series.jl")
 export AbstractTimeSeries
-export find_location_index, find_location_indices
+export find_location_index
 
 # Time series tools
 include("series.jl")

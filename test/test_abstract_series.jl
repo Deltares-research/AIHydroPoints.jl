@@ -12,7 +12,7 @@ function test_abstract_series()
 
     # Test find_location_indices
     location_selection = ["Station A", "Station C", "Station D"]
-    indices = find_location_indices(location_selection, location_names)
+    indices = find_location_index(location_selection, location_names)
     @test indices == [1, 3, -1]
 end
 
