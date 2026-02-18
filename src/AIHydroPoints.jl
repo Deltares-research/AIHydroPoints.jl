@@ -38,8 +38,14 @@ export waterlevel_series_to_netcdf
 
 include("training.jl")
 include("tides.jl")
-export save_settings, load_settings, save_model, load_model, load_run, ModelSettings, prepare_train_data, predict, train_model, plot_losses
-export TideSettings, create_tide_model, prepare_train_data!, plot_series
+export save_settings, load_settings, save_model, load_model, load_run, ModelSettings, prepare_train_data, predict, train_model, plot_losses, plot_series
+export TideSettings, create_tide_model
+
+include("surge.jl")
+export SurgeSettings, create_surge_model
+
+include("interaction.jl")
+export InteractionSettings, create_interaction_model
 
 
 # Methods in the interface for time series

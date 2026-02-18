@@ -20,7 +20,7 @@ The JLD2 file should contain the following keys:
 - `<values>`: a matrix of Float32 values with rows as stations and columns as time steps. The name should match the `quantity` key, e.g., "waterlevel".
 - `source`: a String representing the source of the data (optional, defaults to "JLD2 file: <filename>")
 """
-function JLD2TimeSeries(filename::String)
+function JLD2TimeSeries(filename::String; varname="values")
     # Does the file have jld2 extension?
     if !endswith(filename, ".jld2")
         error("Filename $(filename) does not have a .jld2 extension.")
@@ -32,21 +32,15 @@ function JLD2TimeSeries(filename::String)
     # read the JLD2 file
     d=load(filename)
     # Check for variables in the JLD2 file
-    quantity="waterlevel"
-    values_name="values"
-    if !haskey(d,"quantity") # older files may not have this key
-        if haskey(d,"waterlevel")
-            quantity = "waterlevel"
-            values_name="waterlevel"
-        else
-            error("JLD2 file $(filename) does not contain the 'quantity' key.")
-        end
+    if !haskey(d, varname)
+        error("JLD2 file $(filename) does not contain the $(varname) key")
     end
-    # look for the values
-    if !haskey(d,values_name)
-        error("JLD2 file $(filename) does not contain the values at the expected key '$(values_name)'.")
+    if !haskey(d, "quantity")
+        @warn "JLD2 file $(filename) does not contain key for variable description. Using name $varname"
+        quantity = varname
     end
-    data= d[values_name][:, :] #load the data into memory
+
+    data= d[varname][:, :] #load the data into memory
     if !haskey(d,"source")
         source = "JLD2 file: $(filename)"
     else
@@ -56,16 +50,20 @@ function JLD2TimeSeries(filename::String)
         error("JLD2 file $(filename) does not contain the 'times' key.")
     end
     times = d["times"]
-    names_key= "station_names"
+
+    nstations = length(data)÷length(times)
+    names = []
     if !haskey(d,"station_names")
         if !haskey(d,"names")
-            error("JLD2 file $(filename) does not contain the 'names' key.")
+            @warn "JLD2 file $(filename) does not contain a key for station names. Generating station names based on detected $nstations stations."
+            names = ["station_$i" for i in 1:nstations]
         else
-            names_key = "names"
+            # names_key = "names"
+            names = d["names"]
         end
+    else
+        names = d["station_names"]
     end
-    names = d[names_key]
-    nstations = length(names)
     if haskey(d,"station_x_coordinate")
         longitudes = d["station_x_coordinate"]
     else
