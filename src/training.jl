@@ -8,6 +8,7 @@ using JLD2
 using Plots
 using Statistics
 using ProgressMeter: Progress, next!
+using ParameterSchedulers: Constant, Step
 
 """
     AbstractModelSettings
@@ -194,11 +195,18 @@ function train_model(model, settings::AbstractModelSettings, train_dict::Dict{St
     nepochs = settings.nepochs
     nbatches = settings.nbatches
     learning_rate = settings.learning_rate
+    lr_decay_factor = settings.lr_decay_factor
+    lr_decay_rate = settings.lr_decay_rate
     weight_reg = settings.weight_reg
     use_gpu = settings.use_gpu
     
     checkpoints = settings.checkpoints
     val_daterange = settings.val_daterange
+
+    lr_schedule = Constant(learning_rate)
+    if !isnothing(lr_decay_factor) && !isnothing(lr_decay_rate)
+        lr_schedule = Step(start=learning_rate, decay=lr_decay_factor, step_sizes=lr_decay_rate)
+    end    
 
     if use_gpu && CUDA.has_cuda()
         @info "Training on GPU"
@@ -245,7 +253,8 @@ function train_model(model, settings::AbstractModelSettings, train_dict::Dict{St
                 ("Epoch", epoch),
                 ("Accumulated loss", loss),
                 ("Train loss", train_loss),
-                ("Test loss", test_loss)
+                ("Test loss", test_loss),
+                ("Learning rate", lr_schedule(epoch))
             ]
         )
 
@@ -259,6 +268,10 @@ function train_model(model, settings::AbstractModelSettings, train_dict::Dict{St
             save_model(model|>cpu, tmp_settings)
             plot_series(model|>cpu, tmp_settings, test_dict, "chk_$epoch";  write_series=false)
             plot_series(model|>cpu, tmp_settings, test_dict, "chk_$(epoch)_short"; write_series=false, timerange=val_daterange)
+        end
+
+        if !isnothing(lr_schedule)
+            Optimisers.adjust!(opt_state, eta=lr_schedule(epoch+1))
         end
 
     end
@@ -291,6 +304,14 @@ function plot_losses(train_losses, test_losses, settings::AbstractModelSettings;
     if !isnothing(settings.checkpoints)
         vline!(settings.checkpoints, label="Checkpoints", ls=:dot, lc=:red)
     end
+    if !isnothing(settings.lr_decay_factor) && !isnothing(settings.lr_decay_rate)
+        schedule = Step(start=settings.learning_rate, decay=settings.lr_decay_factor, step_sizes=settings.lr_decay_rate)
+        y_lims = (floor(log10(schedule(settings.nepochs))), ceil(log10(schedule(1))))
+        println(y_lims)
+        plot!(twinx(), 1:settings.nepochs, log10.(schedule.(1:settings.nepochs)), label=false, lc=:black, 
+            ylims=y_lims, yaxis="Learning Rate (log10)")
+    end
+    plot!(legend=:topright)
     savefig(joinpath(settings.model_dir, "train_test_losses.png"))
 end
 

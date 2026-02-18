@@ -5,6 +5,7 @@ Pkg.activate(".")
 
 using AIHydroPoints
 using Statistics
+using ParameterSchedulers
 
 labels=["training","validation","testing"]
 tide_model = "TestTideModel"
@@ -64,6 +65,9 @@ end
 
 settings.nstations = length(get_names(data["training"]["waterlevel"]))
 
+settings.lr_decay_factor = 0.5
+settings.lr_decay_rate = 25
+
 # Define model using default function
 # Or construct your own and save required hyperparameters
 # for constructing the model in settings.model_pars as a Dict
@@ -93,7 +97,6 @@ function hyperpar_search(nlayers, nfeats, lrs, weight_regs)
         settings.model_pars = model_pars
         settings.learning_rate = lr
         settings.weight_reg = weight_reg
-
 
         model = create_tide_model(settings)
 

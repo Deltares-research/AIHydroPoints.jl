@@ -39,6 +39,8 @@ Struct that stores parameters for creating and training a model for tides.
     checkpoints = nothing
     val_daterange = nothing
     learning_rate = 1.0e-3
+    lr_decay_factor = nothing
+    lr_decay_rate = nothing
     weight_reg = 1.0e-4
     use_gpu = false
     nstations = nothing # Set per training run from train data
