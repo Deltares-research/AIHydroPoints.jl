@@ -1,7 +1,7 @@
 using Flux
 using CUDA
-using ProgressMeter: Progress, next!
 using Statistics
+using JLD2
 
 """
     struct TideSettings
@@ -10,6 +10,10 @@ Struct that stores parameters for creating and training a model for tides.
 
 # Arguments
 
+- `model_name`: Name of the model.
+    (**Default**: `MyTideModel`)
+- `model_dir`: Path to directory where files generated during the run will be saved.
+    (**Default**: `MyTideModel`)
 - `nepochs`: Number of epochs used during training.
     (**Default**: `100`)
 - `nbatches`: Number of batches to split the training datat into.
@@ -20,7 +24,7 @@ Struct that stores parameters for creating and training a model for tides.
     (**Default**: `1.0-e4`)
 - `use_gpu`: Whether to train on gpu
     (**Default**: `false`)
-- `nstation`: Number of stations used for training. Is deduced from training data when prepared, otherwise `nothing` to throw errors.
+- `nstation`: Number of waterlevel stations used for training. Is deduced from training data when prepared, otherwise `nothing` to throw errors.
     (**Default**: `nothing`)
 - `freqs`: Named tidal constituents used for training.
     (**Default**: `["SSA","K1","O1","Q1","P1","M2","S2","N2","K2","H"]`)
@@ -32,10 +36,14 @@ Struct that stores parameters for creating and training a model for tides.
     model_dir = "MyTideModel"
     nepochs = 100
     nbatches = 1024
+    checkpoints = nothing
+    val_daterange = nothing
     learning_rate = 1.0e-3
+    lr_decay_factor = nothing
+    lr_decay_rate = nothing
     weight_reg = 1.0e-4
     use_gpu = false
-    nstations = nothing
+    nstations = nothing # Set per training run from train data
     freqs = ["SSA","K1","O1","Q1","P1","M2","S2","N2","K2","H"]
     model_pars = Dict(
         "nlayers" => 1,
@@ -56,12 +64,14 @@ and waterlevels as training targets.
 - `ts::TimeSeries`: TimeSeries containing the training data.
 - `settings::TideSettings`: Settings used here for the tidal frequencies used during training.
 """
-function prepare_train_data(ts::TimeSeries, settings::TideSettings)
+function prepare_train_data(data_dict::Dict{String, <:AbstractTimeSeries}, settings::TideSettings)
    
+    ts = data_dict["waterlevel"]
+
     times = get_times(ts)
     waterlevel = get_values(ts)
 
-    station_index = collect(1:nstations)
+    station_index = collect(1:settings.nstations)
 
     x_station, x_doodson = prepare_inputs(settings, station_index, times)
     y_waterlevel = reshape(waterlevel, 1, :)
@@ -254,12 +264,13 @@ function predict(model, settings::TideSettings, ts::TimeSeries)
     return reshape(y_hat, length(stations), length(times))
 end
 
-function plot_series(model, settings::TideSettings, ts::TimeSeries, series_name; 
+function plot_series(model, settings::TideSettings, data_dict::Dict{String, TimeSeries}, series_name; 
     timerange::Union{Vector{DateTime}, Vector{String}, Nothing}=nothing,
     station_names::Union{Vector{String}, Nothing}=nothing, 
-    write_series=false)
+    write_series=false, write_format="jld2")
 
-    
+    ts = data_dict["waterlevel"]
+
     if !isnothing(station_names)
         ts = select_locations_by_names(ts, station_names)
     end
@@ -281,21 +292,48 @@ function plot_series(model, settings::TideSettings, ts::TimeSeries, series_name;
         h_hat = prediction[ind,:]
         err = errors[ind,:]
         rmse = rmses[ind]
-        p1 = plot(times, h, label="Measured", xlabel="Time", ylabel="Waterlevel", title="Station $(station) RMSE=$(rmse)")
-        p2 = plot(times, h_hat, label="Predicted")
-        p3 = plot(times, err, label="Residual")
-        plot(p1,p2,p3,layout=(3,1))
+        p1 = plot(times, h, label="Ground Truth", xlabel="Time", ylabel="Waterlevel", title="Station $(station) RMSE=$(rmse)")
+        plot!(p1, times, h_hat, label="Predicted")
+        p2 = plot(times, err, label="Residual")
+
+        plot(p1,p2,layout=(2,1))
         savefig(joinpath(settings.model_dir, "$(station)_$(series_name).png"))
     end
 
     if write_series
-        fn_pred = joinpath(settings.model_dir, "$(series_name)_tides.nc")
-        fn_res = joinpath(settings.model_dir, "$(series_name)_surge.nc")
+        fn_pred = joinpath(settings.model_dir, "$(series_name)_tides")
+        fn_res = joinpath(settings.model_dir, "$(series_name)_surge")
         station_x = Float64.(get_longitudes(ts))
         station_y = Float64.(get_latitudes(ts))
 
-        waterlevel_series_to_netcdf(fn_pred, times, prediction, stations, station_x, station_y)
-        waterlevel_series_to_netcdf(fn_res, times, errors, stations, station_x, station_y)
+        if write_format == "netcdf"
+            ext = ".nc"
+            waterlevel_series_to_netcdf(fn_pred*ext, times, prediction, stations, station_x, station_y)
+            waterlevel_series_to_netcdf(fn_res*ext, times, errors, stations, station_x, station_y)
+        else
+            if write_format != "jld2"
+                @warn "Unknown writing format $(write_format), using defaulft format JLD2."
+            end 
+            ext = ".jld2"
+            save(fn_pred*ext,
+                Dict(
+                    "station_x_coordinate" => station_x,
+                    "station_y_coordinate" => station_y,
+                    "station_names" => stations,
+                    "times" => times,
+                    "waterlevel" => prediction
+                )    
+            )
+            save(fn_res*ext,
+                Dict(
+                    "station_x_coordinate" => station_x,
+                    "station_y_coordinate" => station_y,
+                    "station_names" => stations,
+                    "times" => times,
+                    "waterlevel" => errors
+                )    
+            )       
+        end
     end
 
 end

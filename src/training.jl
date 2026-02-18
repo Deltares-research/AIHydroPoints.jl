@@ -6,6 +6,9 @@
 using TOML
 using JLD2
 using Plots
+using Statistics
+using ProgressMeter: Progress, next!
+using ParameterSchedulers: Constant, Step
 
 """
     AbstractModelSettings
@@ -122,7 +125,7 @@ Create training data from a TimeSeries ts using the hyperparameters in settings.
 - `ts::TimeSeries`: Input time series
 - `settings::AbstractModelSettings`: settings containing hyperparameters
 """
-function prepare_train_data(ts::TimeSeries, settings::AbstractModelSettings)
+function prepare_train_data(data_dict::Dict{String, <:AbstractTimeSeries}, settings::AbstractModelSettings)
     error("Function prepare_data not defined for settings $(typeof(settings))")
 end
 
@@ -188,12 +191,22 @@ for the relevant settings type
 - `train_data`: Prepared train data
 - `test_data`: Prepared test data
 """
-function train_model(model, settings::AbstractModelSettings, train_data, test_data)
+function train_model(model, settings::AbstractModelSettings, train_dict::Dict{String, <:AbstractTimeSeries}, test_dict::Dict{String, <:AbstractTimeSeries})
     nepochs = settings.nepochs
     nbatches = settings.nbatches
     learning_rate = settings.learning_rate
+    lr_decay_factor = settings.lr_decay_factor
+    lr_decay_rate = settings.lr_decay_rate
     weight_reg = settings.weight_reg
     use_gpu = settings.use_gpu
+    
+    checkpoints = settings.checkpoints
+    val_daterange = settings.val_daterange
+
+    lr_schedule = Constant(learning_rate)
+    if !isnothing(lr_decay_factor) && !isnothing(lr_decay_rate)
+        lr_schedule = Step(start=learning_rate, decay=lr_decay_factor, step_sizes=lr_decay_rate)
+    end    
 
     if use_gpu && CUDA.has_cuda()
         @info "Training on GPU"
@@ -206,6 +219,9 @@ function train_model(model, settings::AbstractModelSettings, train_data, test_da
     train_losses = []
     test_losses = []
     acc_losses = []
+
+    train_data = prepare_train_data(train_dict, settings)
+    test_data = prepare_train_data(test_dict, settings)
 
     model = model |> device
 
@@ -237,9 +253,26 @@ function train_model(model, settings::AbstractModelSettings, train_data, test_da
                 ("Epoch", epoch),
                 ("Accumulated loss", loss),
                 ("Train loss", train_loss),
-                ("Test loss", test_loss)
+                ("Test loss", test_loss),
+                ("Learning rate", lr_schedule(epoch))
             ]
         )
+
+        if !isnothing(checkpoints) && epoch in checkpoints
+            @info "Creating checkpoint $epoch"
+            tmp_settings =  deepcopy(settings)
+            tmp_settings.model_dir = joinpath(settings.model_dir, "checkpoints", "checkpoint_$epoch")
+            if !isdir(tmp_settings.model_dir)
+                mkpath(tmp_settings.model_dir)
+            end
+            save_model(model|>cpu, tmp_settings)
+            plot_series(model|>cpu, tmp_settings, test_dict, "chk_$epoch";  write_series=false)
+            plot_series(model|>cpu, tmp_settings, test_dict, "chk_$(epoch)_short"; write_series=false, timerange=val_daterange)
+        end
+
+        if !isnothing(lr_schedule)
+            Optimisers.adjust!(opt_state, eta=lr_schedule(epoch+1))
+        end
 
     end
 
@@ -268,6 +301,17 @@ Plot train and test losses
 function plot_losses(train_losses, test_losses, settings::AbstractModelSettings; istart=1)
     plot(train_losses[istart:end], label="Train Loss", xlabel="Epoch", ylabel="Loss")
     plot!(test_losses[istart:end], label="Test Loss")
+    if !isnothing(settings.checkpoints)
+        vline!(settings.checkpoints, label="Checkpoints", ls=:dot, lc=:red)
+    end
+    if !isnothing(settings.lr_decay_factor) && !isnothing(settings.lr_decay_rate)
+        schedule = Step(start=settings.learning_rate, decay=settings.lr_decay_factor, step_sizes=settings.lr_decay_rate)
+        y_lims = (floor(log10(schedule(settings.nepochs))), ceil(log10(schedule(1))))
+        println(y_lims)
+        plot!(twinx(), 1:settings.nepochs, log10.(schedule.(1:settings.nepochs)), label=false, lc=:black, 
+            ylims=y_lims, yaxis="Learning Rate (log10)")
+    end
+    plot!(legend=:topright)
     savefig(joinpath(settings.model_dir, "train_test_losses.png"))
 end
 
@@ -297,6 +341,6 @@ Compare and plot prediction from model with data in TimeSeries ts
 - `ts::TimeSeries`: time series with relevant input data and ground truth
 - `settings::AbstractModelSettings`: settings containing hyperparameters, used for dispatch
 """
-function plot_series(model, ts::TimeSeries, settings::AbstractModelSettings)
+function plot_series(model, data_dict::Dict{String, <:AbstractTimeSeries}, settings::AbstractModelSettings, series_name)
     error("Function plot_series not implemented for settings $(typeof(settings))")
 end
