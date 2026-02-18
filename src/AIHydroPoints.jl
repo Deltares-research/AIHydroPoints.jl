@@ -19,7 +19,7 @@ export NetCDFTimeSeries, write_to_netcdf
 
 # Zarr time series tools
 include("series_zarr.jl")
-export ZarrTimeSeries
+export ZarrTimeSeries, has_aws_credentials
 
 # Import and export for the JLD2 storage format
 include("series_jld2.jl")
