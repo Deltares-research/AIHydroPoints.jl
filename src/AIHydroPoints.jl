@@ -47,6 +47,8 @@ export SurgeSettings, create_surge_model
 include("interaction.jl")
 export InteractionSettings, create_interaction_model
 
+include("wind_stress.jl")
+export uv_to_stress_xy
 
 # Methods in the interface for time series
 # getters for the fields

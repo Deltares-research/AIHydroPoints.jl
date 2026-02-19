@@ -44,4 +44,7 @@ mkdir(temp_dir) # create a new empty temp directory
       include("test_series_noos.jl")
    end
 
+   @testset "wind stress" begin
+      include("test_wind_stress.jl")
+   end
 end
