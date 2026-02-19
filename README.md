@@ -13,6 +13,10 @@ The model uses three components and no internal state to achieve a reliable beha
 The inputs for winds and air-pressure are sampled at a few relevant locations. In the examples ERA5 fields from the Copernicus Climate Data Store (CDS) are used. Tides require Doodson phases as input, but these are easily computed from the times. The outputs in the examples are from the DCSM-FM model.
 Previous values of wind and pressure are taken into account for the surge, and the interaction module also has a time window. You have to make sure that the data provided contains an additional few days to compute the first values. The length is equal to the sum of both windows. It's safe to add a bit extra, so you don't have to change anything in case of a small modification of the model.
 
+## Data downloads
+
+We aim to have the main datasets available in zarr format in the cloud, so they can be easily accessed from the scripts. For now, the scripts download the data and save it locally. You'll need credentials for downloading data. For the S3 storage this amounts to seting the `.aws/credentials` and `.aws/config` files.
+
 ## Status
 
 Currently the three modules tide, surge and interaction are working. There are a few succesful models. However, the code is still messy. We're working on improvements to the code, but it's still not working again and many scripts still use old routines.
@@ -24,7 +28,7 @@ Currently the three modules tide, surge and interaction are working. There are a
 - train tides `train_tides.jl`.
 
 ### ML model Surge
-- convert era5 data to datasets for training `prepare_data_for_surge.jl`
+- convert era5 data to datasets for training `get_era_series.jl`
 - train surges `train_surges.jl`
 
 ### ML model for tide-surge interaction
@@ -40,7 +44,8 @@ Currently the three modules tide, surge and interaction are working. There are a
     Convert 10m winds to stresses
 - `netcdf_utils.jl`
     Write data in delft3d-fm his format nc files
-
+- `abstract_series.jl`, `timeseries.jl`, `series_netcdf.jl`, `series_zarr.jl`, `series_jld2.jl`
+    Utilities for TimeSeries including their meta-data. There are basic functions to get the data, times, names, etc. and also for reading and writing to different formats. The TimeSeries type is based on AbstractTimeSeries, and implements an in-memory array based version. Reading routines are lazy, so only a subset of the data is loaded into memory when needed. 
 ## Other
 - `test_minio_zarr_with_julia.ipynb`
     Test script for downloading a subset of the 1980-2023 DCSM run
