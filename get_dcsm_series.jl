@@ -19,7 +19,7 @@ using AIHydroPoints
 # - "https://example.com/path/to/file.zarr"
 # - "s3://minio.example.com/bucket-name/path/to/file.zarr?profile=minio_example_com"
 # - "local_folder/file.zarr"
-url_or_filename = "s3://s3.deltares.nl/ai-hydro/dcsm_1980_2023/DCSM-FM_0_5nm_1980-2023_his.zarr?profile=minio_deltares"
+url_or_filename = "s3://s3.deltares.nl/ai-hydro/dcsm_1980_2023/DCSM-FM_0_5nm_1980-2023_his.zarr?profile=aihydro_partner"
 
 # open the Zarr time series
 quantity="waterlevel"
@@ -40,7 +40,7 @@ his_data_selected = select_locations_by_ids(his_data_timesel, station_ids)
 
 
 # Save to local file
-output_file = "DCSM-FM_0_5nm_2012_5stations_his.jld2"
+output_file = joinpath("data","DCSM-FM_0_5nm_2012_5stations_his.jld2")
 if isfile(output_file)
     rm(output_file)
     # error("Output file $(output_file) already exists. Please remove it before running this script.")

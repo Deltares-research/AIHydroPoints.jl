@@ -307,7 +307,6 @@ function plot_losses(train_losses, test_losses, settings::AbstractModelSettings;
     if !isnothing(settings.lr_decay_factor) && !isnothing(settings.lr_decay_rate)
         schedule = Step(start=settings.learning_rate, decay=settings.lr_decay_factor, step_sizes=settings.lr_decay_rate)
         y_lims = (floor(log10(schedule(settings.nepochs))), ceil(log10(schedule(1))))
-        println(y_lims)
         plot!(twinx(), 1:settings.nepochs, log10.(schedule.(1:settings.nepochs)), label=false, lc=:black, 
             ylims=y_lims, yaxis="Learning Rate (log10)")
     end

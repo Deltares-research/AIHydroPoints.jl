@@ -41,11 +41,18 @@ include("tides.jl")
 export save_settings, load_settings, save_model, load_model, load_run, ModelSettings, prepare_train_data, predict, train_model, plot_losses, plot_series
 export TideSettings, create_tide_model
 
+include("graph_network.jl")
+export get_adjacency, GraphNetwork, plot_graph
+
+include("attention.jl")
+export Embedder, Deembedder, SinCosPosEmbedder, Transformer
+
 include("surge.jl")
-export SurgeSettings, create_surge_model
+export SurgeSettings, create_surge_model, SurgeModel
 
 include("interaction.jl")
 export InteractionSettings, create_interaction_model
+
 
 
 # Methods in the interface for time series
