@@ -1,4 +1,4 @@
-# get_dcsm_series_new.jl
+# get_dcsm_series.jl
 # Example script to get DCSM time series from Deltares Minio S3 server.
 # The data is stored in a Zarr dataset, which is a compressed, chunkedformat that is optimized for cloud storage.
 # The script downloads a selection and saves it to a local file.
@@ -19,11 +19,12 @@ using AIHydroPoints
 # - "https://example.com/path/to/file.zarr"
 # - "s3://minio.example.com/bucket-name/path/to/file.zarr?profile=minio_example_com"
 # - "local_folder/file.zarr"
+# The profile parameter in the URL is used to specify which AWS credentials profile to use when accessing the S3 bucket. This allows you to manage multiple sets of credentials for different S3 buckets or services.
 url_or_filename = "s3://s3.deltares.nl/ai-hydro/dcsm_1980_2023/DCSM-FM_0_5nm_1980-2023_his.zarr?profile=aihydro_partner"
-
-# open the Zarr time series
 quantity="waterlevel"
 source="DCSM-FM_0_5nm_1980-2023"
+
+# open the Zarr time series
 his_data=ZarrTimeSeries(url_or_filename, quantity, source)
 
 # Select time range

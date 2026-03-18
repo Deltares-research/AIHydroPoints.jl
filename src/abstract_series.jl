@@ -63,7 +63,7 @@ end
 
 # Collect station indices by name
 """
-function find_location_indices(location_selection::Vector{String}, all_location_names::Vector{String})
+function find_location_index(location_selection::Vector{String}, all_location_names::Vector{String})
 Collects the indices of stations in a list of location names.
 use: indices = collect_station_indices(["Station A", "Station C","Station D"], ["Station A", "Station B", "Station C"])
  results in indices = [1, 3, -1]

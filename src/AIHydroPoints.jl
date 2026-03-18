@@ -7,7 +7,7 @@ using NetCDF
 # Abstract data type for time series at multiple locations
 include("abstract_series.jl")
 export AbstractTimeSeries
-export find_location_index, find_location_indices
+export find_location_index
 
 # Time series tools
 include("series.jl")
@@ -19,7 +19,7 @@ export NetCDFTimeSeries, write_to_netcdf
 
 # Zarr time series tools
 include("series_zarr.jl")
-export ZarrTimeSeries
+export ZarrTimeSeries, has_aws_credentials
 
 # Import and export for the JLD2 storage format
 include("series_jld2.jl")
@@ -53,6 +53,8 @@ export SurgeSettings, create_surge_model, SurgeModel
 include("interaction.jl")
 export InteractionSettings, create_interaction_model
 
+include("wind_stress.jl")
+export uv_to_stress_xy
 
 
 # Methods in the interface for time series

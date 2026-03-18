@@ -65,7 +65,7 @@ end
 
 function select_locations_by_names(ts::AbstractTimeSeries, location_names::Vector{String})
     all_location_names = get_names(ts)
-    location_indices = find_location_indices(location_names, all_location_names)
+    location_indices = find_location_index(location_names, all_location_names)
     return select_locations_by_ids(ts, location_indices)
 end
 

@@ -208,7 +208,7 @@ function select_locations_by_ids(ts::ZarrTimeSeries, location_indices::Vector{T}
 end
 
 function select_timespan(ts::ZarrTimeSeries, start_time::DateTime, end_time::DateTime)
-    selection=ts.dataset[Ti=start_time..end_time] # lazy selection of times
+    selection=ts.dataset[Ti=start_time..end_time] # lazy selection of times !! current implementation is not lazy
     times_src= dims(selection, Ti)[:]
     times = fill(DateTime(1900), length(times_src)) # preallocate
     times .= times_src # copy times to DateTime array; avoid for loop
