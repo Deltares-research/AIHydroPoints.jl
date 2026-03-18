@@ -266,8 +266,15 @@ function train_model(model, settings::AbstractModelSettings, train_dict::Dict{St
                 mkpath(tmp_settings.model_dir)
             end
             save_model(model|>cpu, tmp_settings)
-            plot_series(model|>cpu, tmp_settings, test_dict, "chk_$epoch";  write_series=false)
-            plot_series(model|>cpu, tmp_settings, test_dict, "chk_$(epoch)_short"; write_series=false, timerange=val_daterange)
+
+            valdays = day.(DateTime.(val_daterange))
+            indx = 24*((valdays[2] - valdays[1])+1)
+
+            train_daterange = [get_times(train_dict["waterlevel"])[1], get_times(train_dict["waterlevel"])[indx]]
+            plot_series(model|>cpu, tmp_settings, test_dict, "chk_$(epoch)_test";  write_series=false)
+            plot_series(model|>cpu, tmp_settings, test_dict, "chk_$(epoch)_test_short"; write_series=false, timerange=val_daterange)
+            plot_series(model|>cpu, tmp_settings, train_dict, "chk_$(epoch)_train"; write_series=false)
+            plot_series(model|>cpu, tmp_settings, train_dict, "chk_$(epoch)_train_short"; write_series=false, timerange=train_daterange)
         end
 
         if !isnothing(lr_schedule)

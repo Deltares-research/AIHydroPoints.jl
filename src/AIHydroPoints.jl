@@ -39,7 +39,7 @@ export waterlevel_series_to_netcdf
 include("training.jl")
 include("tides.jl")
 export save_settings, load_settings, save_model, load_model, load_run, ModelSettings, prepare_train_data, predict, train_model, plot_losses, plot_series
-export TideSettings, create_tide_model
+export TideSettings, create_tide_model, TideModel
 
 include("graph_network.jl")
 export get_adjacency, GraphNetwork, plot_graph

@@ -10,15 +10,15 @@ tide_model = "TestTideModel"
 filenames=Dict()
 
 filenames["training"] = Dict(
-    "waterlevel" => joinpath("models", tide_model, "training_surge.jld2"),
+    "waterlevel" => joinpath("sandbox", tide_model, "training_surge.jld2"),
     "wind" => "era5_wind_stress_2008_training.jld2"
 )
 filenames["testing"] = Dict(
-    "waterlevel" => joinpath("models", tide_model, "testing_surge.jld2"),
+    "waterlevel" => joinpath("sandbox", tide_model, "testing_surge.jld2"),
     "wind" => "era5_wind_stress_2011_testing.jld2"
 )
 filenames["validation"] = Dict(
-    "waterlevel" => joinpath("models", tide_model, "testing_surge.jld2"),
+    "waterlevel" => joinpath("sandbox", tide_model, "testing_surge.jld2"),
     "wind" => "era5_wind_stress_2011_testing.jld2"
 )
 
@@ -27,20 +27,20 @@ filenames["validation"] = Dict(
 model_pars = Dict()
 model_pars["theta"] = 10000.0
 model_pars["nheads"] = 4
-model_pars["nlayers_branch"] = 7
+model_pars["nlayers_branch"] = 2
 model_pars["nlayers_trunk"] = 0
 model_pars["nhidden_trunk"] = 16
-model_pars["nembed"] = 32
+model_pars["nembed"] = 16
 
 learning_rate = 1.0e-3
 lr_decay_factor = 0.1
-lr_decay_rate = 75
+lr_decay_rate = 400
 nepochs = 200
 checkpoints = [40, 80, 120, 160]
 val_range = ["2011-12-01T00:00:00", "2011-12-31T23:00:00"]
 nlags = 16
 
-name = "SurgeGraphDON"
+name = "SurgeGraphDON_small_test"
 save_dir = "models/$(name)"
 
 # rm(save_dir, recursive=true)
@@ -108,4 +108,4 @@ plot_series(model, settings,
     "testing_14d", timerange=settings.val_daterange)
 plot_series(model, settings, 
     data["training"],
-    "training_14d", timerange=["2009-01-01T00:00:00", "2009-01-15T00:00:00"])
+    "training_14d", timerange=["2009-01-01T00:00:00", "2009-01-31T00:00:00"])

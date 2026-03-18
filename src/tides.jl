@@ -2,6 +2,7 @@ using Flux
 using CUDA
 using Statistics
 using JLD2
+using FFTW
 
 """
     struct TideSettings
@@ -71,10 +72,14 @@ function prepare_train_data(data_dict::Dict{String, <:AbstractTimeSeries}, setti
     times = get_times(ts)
     waterlevel = get_values(ts)
 
+    lats = get_latitudes(ts)
+    lons = get_longitudes(ts)
+
     station_index = collect(1:settings.nstations)
 
-    x_station, x_doodson = prepare_inputs(settings, station_index, times)
-    y_waterlevel = reshape(waterlevel, 1, :)
+    x_station, x_doodson = prepare_inputs(settings, lats, lons, times)
+    # y_waterlevel = reshape(waterlevel, 1, :)
+    y_waterlevel = waterlevel
 
     return (x_station, x_doodson, y_waterlevel)
 end
@@ -92,18 +97,31 @@ and an array of times.
 - `times`: Times used as input.
 """
 
-function prepare_inputs(settings::TideSettings, station_index, times)
+function prepare_inputs(settings::TideSettings, lats, lons, times)
     nstations = settings.nstations
     freqs = settings.freqs
     ntimes = length(times)
 
-    station_arr = station_index*ones(ntimes)'
-    x_station = Flux.onehotbatch(station_arr[:], 1:nstations)
+    x_station = zeros(Float32, 4, nstations, ntimes)
 
-    all_times = [time for i in station_index, time in times]
+    lats_cos = cos.(deg2rad.(lats))
+    lats_sin = sin.(deg2rad.(lats))
+    lons_cos = cos.(deg2rad.(lons))
+    lons_sin = sin.(deg2rad.(lons))
+
+    x_station[1,:,:] .= Float32.(lats_cos)
+    x_station[2,:,:] .= Float32.(lats_sin)
+    x_station[3,:,:] .= Float32.(lons_cos)
+    x_station[4,:,:] .= Float32.(lons_sin)
+
+    # station_arr = station_index*ones(ntimes)'
+    # x_station = Flux.onehotbatch(station_arr[:], 1:nstations)
+
+    # all_times = [time for i in station_index, time in times]
 
     frequencies = primary_frequencies_as_doodson(freqs)
-    doodson = (get_doodson_eqvals(all_times[:])*frequencies)'
+    # doodson = (get_doodson_eqvals(all_times[:])*frequencies)'
+    doodson = (get_doodson_eqvals(times)*frequencies)'
     x_doodson = Float32.(vcat(cos.(doodson), sin.(doodson)))
 
     return x_station, x_doodson
@@ -231,6 +249,61 @@ function create_tide_model(settings::TideSettings)
         
 end
 
+struct TideModel{P, Q, T}
+    branch::P
+    trunk::Q
+    downsample::T
+end
+
+function TideModel(nfreqs, nlayers_branch, nhidden_branch, nlayers_trunk, nhidden_trunk, nlayers_down, activ_func)
+    branch = Chain(
+        Dense(2*nfreqs, nhidden_branch, activ_func),
+        [Dense(nhidden_branch, nhidden_branch, activ_func) for _ in 1:nlayers_branch]...,
+        Dense(nhidden_branch, nhidden_branch, tanh),
+        # x->(reshape(x, nhidden_trunk, 2, :))
+    )
+
+    trunk = Chain(
+        Dense(4, nhidden_trunk, activ_func),
+        [Dense(nhidden_trunk, nhidden_trunk, activ_func) for _ in 1:nlayers_trunk]...,
+        Dense(nhidden_trunk, 2, tanh)
+    )
+
+    # down = Dense(nhidden_branch, 1)
+    down  = Chain(
+        [Dense(nhidden_branch, nhidden_branch, activ_func) for _ in 1:nlayers_down]...,
+        Dense(nhidden_branch, 1)
+    )
+    # down = x->sum(x, dims=1)
+
+    return TideModel(branch, trunk, down)
+end
+
+function TideModel(settings::TideSettings)
+    nfreqs = length(settings.freqs)
+    nlayers_branch = settings.model_pars["nlayers_branch"]
+    nhidden_branch = settings.model_pars["nhidden_branch"]
+    nlayers_trunk = settings.model_pars["nlayers_trunk"]
+    nhidden_trunk = settings.model_pars["nhidden_trunk"]
+    nlayers_down = settings.model_pars["nlayers_down"]
+
+    return TideModel(nfreqs, nlayers_branch, nhidden_branch, nlayers_trunk, nhidden_trunk, nlayers_down, leakyrelu)
+end
+
+function (m::TideModel)(x_stations, x_doodson)
+    branch_out = m.branch(x_doodson)
+    trunk_out = m.trunk(x_stations)
+
+    # merged = cat([trunk_out[2,:,:].*slice .+ trunk_out[2,:,:] for slice in eachslice(trunk_out, dims=2)]..., dims=3)
+    merged = cat([slice[1,:]'.*branch_out .+ slice[2,:]' for slice in eachslice(trunk_out, dims=2)]..., dims=3)
+    merged = permutedims(merged, (1,3,2))
+    merged = m.downsample(merged)
+
+    return Flux.flatten(merged)
+end
+
+@Flux.layer TideModel
+
 ##########
 # Training
 ##########
@@ -258,15 +331,40 @@ function predict(model, settings::TideSettings, ts::TimeSeries)
     times = get_times(ts)
     stations = get_names(ts)
 
-    station_ids = 1:length(stations)
-    (x_station, x_doodson) = prepare_inputs(settings, station_ids, times)
+    lats = get_latitudes(ts)
+    lons = get_longitudes(ts)
+
+    # station_ids = 1:length(stations)
+    (x_station, x_doodson) = prepare_inputs(settings, lats, lons, times)
     y_hat = model(x_station, x_doodson)
     return reshape(y_hat, length(stations), length(times))
 end
 
+function plot_fft(signal, times, label)
+    n = length(signal)
+    dt = (times[2] - times[1]).value / 3.6e6
+
+    fft = fftshift(FFTW.fft(signal)) * 2 / n
+    freqs = fftshift(fftfreq(n, 1/dt))
+
+    fig = plot(freqs, abs.(fft), xlabel="Frequency (1/Hrs)", ylabel="Amplitude", xlims=(0,0.5), label=label)
+
+    return fig
+end
+
+function plot_fft!(fig, signal, times, label)
+    n = length(signal)
+    dt = (times[2] - times[1]).value / 3.6e6
+    fft = fftshift(FFTW.fft(signal)) * 2 / n
+    freqs = fftshift(fftfreq(n, 1/dt))
+
+    plot!(fig, freqs, abs.(fft), xlabel="Frequency (1/Hrs)", ylabel="Amplitude", xlims=(0,0.5), label=label)
+end
+
 function plot_series(model, settings::TideSettings, data_dict::Dict{String, TimeSeries}, series_name; 
     timerange::Union{Vector{DateTime}, Vector{String}, Nothing}=nothing,
-    station_names::Union{Vector{String}, Nothing}=nothing, 
+    station_names::Union{Vector{String}, Nothing}=nothing,
+    show_fft=false, 
     write_series=false, write_format="jld2")
 
     ts = data_dict["waterlevel"]
@@ -296,7 +394,16 @@ function plot_series(model, settings::TideSettings, data_dict::Dict{String, Time
         plot!(p1, times, h_hat, label="Predicted")
         p2 = plot(times, err, label="Residual")
 
-        plot(p1,p2,layout=(2,1))
+        if show_fft
+            p3 = plot_fft(h, times, "Ground Truth FFT")
+            plot_fft!(p3, h_hat, times, "Predicted FFT")
+            p4 = plot_fft(err, times, "Residual FFT")
+            plot(p1,p2,p3,p4,layout=(4,1))
+        else
+            plot(p1,p2,layout=(2,1))
+        end
+
+        # plot(p1,p2,layout=(2,1))
         savefig(joinpath(settings.model_dir, "$(station)_$(series_name).png"))
     end
 

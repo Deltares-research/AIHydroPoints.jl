@@ -141,6 +141,8 @@ function (m::MultiHeadSelfAttention)(x::AbstractArray{<:Number,3})
     qkv = m.qkv_layer(x)
     q, k, v = Flux.chunk(qkv, 3, dims=1)
     y, _ = NNlib.dot_product_attention(q, k, v; nheads=m.nheads, fdrop=m.attn_drop)
+    # mask = NNlib.make_causal_mask(q)
+    # y, _ = NNlib.dot_product_attention(q, k, v; nheads=m.nheads, fdrop=m.attn_drop, mask=mask)
     y = m.projection(y)
     return y
 end

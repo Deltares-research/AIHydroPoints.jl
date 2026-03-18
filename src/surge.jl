@@ -283,11 +283,12 @@ function SurgeModel(gn, nlags, nwind, nembed, theta, nheads, nlayers_branch, nla
         Dense(nhidden_trunk => nwind)
     )
 
-    down = Chain(
-        x->permutedims(x, (2,1,3)),
-        MaxPool((3,)),
-        x->permutedims(x, (2,1,3))
-    )
+    # down = Chain(
+    #     x->permutedims(x, (2,1,3)),
+    #     MaxPool((3,)),
+    #     x->permutedims(x, (2,1,3))
+    # )
+    down = Conv((1,), 3*nlags=>nlags, identity, stride=(1,), pad=SamePad())
 
     return SurgeModel(branch_net, trunk_net, down, gn.adjacency)
 end
