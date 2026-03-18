@@ -199,6 +199,7 @@ function train_model(model, settings::AbstractModelSettings, train_dict::Dict{St
     lr_decay_rate = settings.lr_decay_rate
     weight_reg = settings.weight_reg
     use_gpu = settings.use_gpu
+    patience = settings.patience
     
     checkpoints = settings.checkpoints
     val_daterange = settings.val_daterange
@@ -219,6 +220,8 @@ function train_model(model, settings::AbstractModelSettings, train_dict::Dict{St
     train_losses = []
     test_losses = []
     acc_losses = []
+
+    tmp_losses = 1e3*ones(patience)
 
     train_data = prepare_train_data(train_dict, settings)
     test_data = prepare_train_data(test_dict, settings)
@@ -258,6 +261,14 @@ function train_model(model, settings::AbstractModelSettings, train_dict::Dict{St
             ]
         )
 
+        if test_loss <= mean(tmp_losses)
+            push!(tmp_losses, test_loss)
+            popfirst!(tmp_losses)
+        else
+            @info "No improvement in test loss for $patience epochs, stopping training"
+            break
+        end
+
         if !isnothing(checkpoints) && epoch in checkpoints
             @info "Creating checkpoint $epoch"
             tmp_settings =  deepcopy(settings)
@@ -266,8 +277,15 @@ function train_model(model, settings::AbstractModelSettings, train_dict::Dict{St
                 mkpath(tmp_settings.model_dir)
             end
             save_model(model|>cpu, tmp_settings)
-            plot_series(model|>cpu, tmp_settings, test_dict, "chk_$epoch";  write_series=false)
-            plot_series(model|>cpu, tmp_settings, test_dict, "chk_$(epoch)_short"; write_series=false, timerange=val_daterange)
+
+            valdays = day.(DateTime.(val_daterange))
+            indx = 24*((valdays[2] - valdays[1])+1)
+
+            train_daterange = [get_times(train_dict["waterlevel"])[1], get_times(train_dict["waterlevel"])[indx]]
+            plot_series(model|>cpu, tmp_settings, test_dict, "chk_$(epoch)_test";  write_series=false)
+            plot_series(model|>cpu, tmp_settings, test_dict, "chk_$(epoch)_test_short"; write_series=false, timerange=val_daterange)
+            plot_series(model|>cpu, tmp_settings, train_dict, "chk_$(epoch)_train"; write_series=false)
+            plot_series(model|>cpu, tmp_settings, train_dict, "chk_$(epoch)_train_short"; write_series=false, timerange=train_daterange)
         end
 
         if !isnothing(lr_schedule)
@@ -299,7 +317,7 @@ Plot train and test losses
     (**Default**: `1`)
 """
 function plot_losses(train_losses, test_losses, settings::AbstractModelSettings; istart=1)
-    plot(train_losses[istart:end], label="Train Loss", xlabel="Epoch", ylabel="Loss")
+    plot(train_losses[istart:end], label="Train Loss", xlabel="Epoch", ylabel="Loss", minorgrid=true)
     plot!(test_losses[istart:end], label="Test Loss")
     if !isnothing(settings.checkpoints)
         vline!(settings.checkpoints, label="Checkpoints", ls=:dot, lc=:red)
@@ -307,10 +325,10 @@ function plot_losses(train_losses, test_losses, settings::AbstractModelSettings;
     if !isnothing(settings.lr_decay_factor) && !isnothing(settings.lr_decay_rate)
         schedule = Step(start=settings.learning_rate, decay=settings.lr_decay_factor, step_sizes=settings.lr_decay_rate)
         y_lims = (floor(log10(schedule(settings.nepochs))), ceil(log10(schedule(1))))
-        println(y_lims)
         plot!(twinx(), 1:settings.nepochs, log10.(schedule.(1:settings.nepochs)), label=false, lc=:black, 
             ylims=y_lims, yaxis="Learning Rate (log10)")
     end
+    xlims!(istart, length(train_losses)+istart)
     plot!(legend=:topright)
     savefig(joinpath(settings.model_dir, "train_test_losses.png"))
 end

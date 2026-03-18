@@ -39,16 +39,23 @@ export waterlevel_series_to_netcdf
 include("training.jl")
 include("tides.jl")
 export save_settings, load_settings, save_model, load_model, load_run, ModelSettings, prepare_train_data, predict, train_model, plot_losses, plot_series
-export TideSettings, create_tide_model
+export TideSettings, create_tide_model, TideModel
+
+include("graph_network.jl")
+export get_adjacency, GraphNetwork, plot_graph
+
+include("attention.jl")
+export Embedder, Deembedder, SinCosPosEmbedder, Transformer
 
 include("surge.jl")
-export SurgeSettings, create_surge_model
+export SurgeSettings, create_surge_model, SurgeModel
 
 include("interaction.jl")
 export InteractionSettings, create_interaction_model
 
 include("wind_stress.jl")
 export uv_to_stress_xy
+
 
 # Methods in the interface for time series
 # getters for the fields

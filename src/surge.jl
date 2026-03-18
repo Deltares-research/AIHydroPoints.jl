@@ -3,7 +3,7 @@ using CUDA
 using Statistics
 using IterTools
 using JLD2
-
+using Dates
 
 """
     struct SurgeSettings
@@ -46,6 +46,7 @@ Struct that stores parameters for creating and training a model for surges.
     lr_decay_factor = nothing
     lr_decay_rate = nothing
     weight_reg = 1.0e-4
+    patience = 5
     use_gpu = false
     nstations = nothing # Set per training run from train data
     nwind = nothing # Set per training run from train data
@@ -91,12 +92,26 @@ function prepare_train_data(data_dict::Dict{String, <:AbstractTimeSeries}, setti
     stress_y = get_values(ts_wind_y)
     press = get_values(ts_press)
 
+    lats = get_latitudes(ts_waterlevel)
+    lons = get_longitudes(ts_waterlevel)
+
     nlags = settings.nlags
     nstations = settings.nstations
     station_index = 1:nstations
 
-    x_station, x_stress_press = prepare_inputs(settings, station_index, times, stress_x, stress_y, press)
-    y_waterlevel = reshape(waterlevel[:, nlags:end], 1, :)
+    x_station, x_stress_press = prepare_inputs(settings, station_index, times, stress_x, stress_y, press, lats, lons)
+    
+    time_idx = nlags:length(times)
+    y_waterlevel = zeros(Float32, nstations, nlags, length(time_idx))
+    for itime in time_idx
+
+        waterlevel_block = Float32.(waterlevel[:,itime-nlags+1:itime])
+        y_waterlevel[:,:,itime-nlags+1] = waterlevel_block
+
+    end
+    
+    # y_waterlevel = waterlevel[:, nlags:end]
+    # y_waterlevel = reshape(waterlevel[:, nlags:end], 1, :)
     return x_station, x_stress_press, y_waterlevel
 end
 
@@ -114,7 +129,7 @@ Create surge model inputs based on station indices, time, wind stress, pressure.
 - `stress_y`: Wind stress (y-direction)
 - `press`: Pressure
 """
-function prepare_inputs(settings::SurgeSettings, station_index, times, stress_x, stress_y, press)
+function prepare_inputs(settings::SurgeSettings, station_index, times, stress_x, stress_y, press, h_lats, h_lons)
     nlags = settings.nlags
     time_idx = nlags:length(times)
     ntimes = length(time_idx)
@@ -123,24 +138,50 @@ function prepare_inputs(settings::SurgeSettings, station_index, times, stress_x,
 
     press = 2e-4*(press.-1e5)
 
+    dayperiod = 365.25
+
     # Onehot encoding of station index
-    station_arr = station_index*ones(ntimes)'
-    x_station = Flux.onehotbatch(station_arr[:], 1:nstations)
+    # station_arr = station_index*ones(ntimes)'
+    # x_station = station_arr
+    # x_station = Flux.onehotbatch(station_arr[:], 1:nstations)
+
+    x_station = zeros(Float32, 6, nstations, ntimes)
+
+    times_day = Dates.dayofyear.(times[time_idx])
+    times_cos = cos.(2π .*times_day./dayperiod)
+    times_sin = sin.(2π .*times_day./dayperiod)
+
+    lats_cos = cos.(deg2rad.(h_lats))
+    lats_sin = sin.(deg2rad.(h_lats))
+    lons_cos = cos.(deg2rad.(h_lons))
+    lons_sin = sin.(deg2rad.(h_lons))
+
+    x_station[1,:,:] .= Float32.(lats_cos)
+    x_station[2,:,:] .= Float32.(lats_sin)
+    x_station[3,:,:] .= Float32.(lons_cos)
+    x_station[4,:,:] .= Float32.(lons_sin)
+    x_station[5,:,:] .= Float32.(times_cos)'
+    x_station[6,:,:] .= Float32.(times_sin)'
+
+
 
     # all training times for all stations
     all_times = [itime for i in 1:length(station_index), itime in time_idx][:]
 
     # Create input stress, press data
-    x_stress_press = zeros(Float32, nlags, nwind*3, length(station_index)*ntimes)
+    x_stress_press = zeros(Float32, 3*nwind, nlags, ntimes)
     for itime in time_idx
         stress_x_block = stress_x[:, itime-nlags+1:itime]
         stress_y_block = stress_y[:, itime-nlags+1:itime]
         press_block = press[:, itime-nlags+1:itime]
-        x_block = Float32.(vcat(stress_x_block, stress_y_block, press_block))'
-        for istation in 1:length(station_index) # need copy of x_block for each station
-            isample = (itime-nlags)*(length(station_index))+istation
-            x_stress_press[:,:,isample] .= x_block
-        end
+        x_block = Float32.(vcat(stress_x_block, stress_y_block, press_block))
+        x_stress_press[:,:,itime-nlags+1] .= x_block
+        # x_block = Float32.(permutedims(cat(stress_x_block, stress_y_block, press_block, dims=3), [2,1,3]))
+        # x_stress_press[:,:,:,itime-nlags+1] .= x_block
+        # for istation in 1:length(station_index) # need copy of x_block for each station
+        #     isample = (itime-nlags)*(length(station_index))+istation
+        #     x_stress_press[:,:,:,isample] .= x_block
+        # end
     end
 
     return x_station, x_stress_press
@@ -217,6 +258,71 @@ function create_surge_model(settings::SurgeSettings)
     ) 
 end
 
+struct SurgeModel{P, Q, R, T} 
+    branch_net::P
+    trunk_net::Q
+    downsample::R
+    adjacency::AbstractArray{T,2}
+end
+
+function SurgeModel(gn, nlags, nwind, nembed, theta, nheads, nlayers_branch, nlayers_trunk, nhidden_trunk)
+    # For 3 pars per wind station, and nlags previous timesteps
+    embed = Embedder(3*nwind, nembed)
+    deembed = Deembedder(embed)
+    pos_embed = SinCosPosEmbedder(nembed, nlags, theta=theta)
+
+    branch_net = Chain(embed, 
+        pos_embed, 
+        [Transformer(nembed, nheads) for _ in 1:nlayers_branch]...,
+        deembed,
+        x -> reshape(x, (nwind, 3, nlags, :))
+    )
+
+    trunk_net = Chain(
+        Dense(6=>nhidden_trunk),
+        [Dense(nhidden_trunk => nhidden_trunk) for _ in 1:nlayers_trunk]...,
+        Dense(nhidden_trunk => nwind)
+    )
+
+    # down = Chain(
+    #     x->permutedims(x, (2,1,3)),
+    #     MaxPool((3,)),
+    #     x->permutedims(x, (2,1,3))
+    # )
+    down = Conv((1,), 3*nlags=>nlags, identity, stride=(1,), pad=SamePad())
+
+    return SurgeModel(branch_net, trunk_net, down, gn.adjacency)
+end
+
+function SurgeModel(gn::GraphNetwork, settings::SurgeSettings)
+    nlags = settings.nlags
+    nwind = settings.nwind
+    nembed = settings.model_pars["nembed"]
+    theta = settings.model_pars["theta"]
+    nheads = settings.model_pars["nheads"]
+    nlayers_branch = settings.model_pars["nlayers_branch"]
+    nlayers_trunk = settings.model_pars["nlayers_trunk"]
+    nhidden_trunk = settings.model_pars["nhidden_trunk"]
+
+    return SurgeModel(gn, nlags, nwind, nembed, theta, nheads, nlayers_branch, nlayers_trunk, nhidden_trunk)
+    
+end
+
+function (m::SurgeModel)(x_station, x_wind)
+    nbatch = size(x_station)[end]
+
+    branch_out = m.branch_net(x_wind)
+    trunk_out = m.trunk_net(x_station)
+
+    nwind = size(branch_out,1)
+
+    merged = batched_mul(batched_transpose(trunk_out.*m.adjacency),
+        reshape(branch_out, (nwind, :, nbatch)))
+    return m.downsample(merged)
+end
+
+@Flux.layer SurgeModel
+
 ##########
 # Training
 ##########
@@ -250,10 +356,14 @@ function predict(model, settings::SurgeSettings, ts_h::TimeSeries, ts_wind_x::Ti
     stress_y = get_values(ts_wind_y)
     press = get_values(ts_press)
 
-    x_station, x_stress_press = prepare_inputs(settings, station_idx, times, stress_x, stress_y, press)
+    lats = get_latitudes(ts_h)
+    lons = get_longitudes(ts_h)
+
+    x_station, x_stress_press = prepare_inputs(settings, station_idx, times, stress_x, stress_y, press, lats, lons)
     y_hat = model(x_station, x_stress_press)
     
-    return reshape(y_hat, nstations, length(times)-nlags+1)
+    return y_hat[:, settings.nlags, :]
+    # return reshape(y_hat, nstations, length(times)-nlags+1)
 end
 
 function plot_series(model, settings::SurgeSettings, data_dict::Dict{String, <:AbstractTimeSeries}, series_name;
