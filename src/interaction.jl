@@ -14,6 +14,7 @@ using IterTools
     lr_decay_factor = nothing
     lr_decay_rate = nothing
     weight_reg = 1.0e-4
+    patience = 5
     use_gpu = false
     nstations = nothing # Set per training run from train data
     npars = nothing # Set per training run from train data

@@ -34,6 +34,7 @@ learning_rate = 1.0e-3
 lr_decay_factor = 0.9
 lr_decay_rate = 50
 nepochs = 250
+patience = 10
 checkpoints = [40, 80, 120, 160]
 val_range = ["2011-01-01T00:00:00", "2011-01-15T00:00:00"]
 
@@ -54,6 +55,7 @@ settings = TideSettings(
     lr_decay_factor=lr_decay_factor,
     lr_decay_rate=lr_decay_rate,
     model_dir=save_dir,
+    patience=patience,
     use_gpu=true,
     model_pars=model_pars
 )

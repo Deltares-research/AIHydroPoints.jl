@@ -43,6 +43,7 @@ Struct that stores parameters for creating and training a model for tides.
     lr_decay_factor = nothing
     lr_decay_rate = nothing
     weight_reg = 1.0e-4
+    patience = 5
     use_gpu = false
     nstations = nothing # Set per training run from train data
     freqs = ["SSA","K1","O1","Q1","P1","M2","S2","N2","K2","H"]
