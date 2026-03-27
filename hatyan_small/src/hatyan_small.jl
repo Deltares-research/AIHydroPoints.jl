@@ -14,6 +14,12 @@ include("series_noos.jl")
 include("series_donar.jl")
 include("constituents.jl")
 include("constituents_donar.jl")
+include("constituent_list.jl")
+include("settings.jl")
+include("doodson.jl")
+include("schureman.jl")
+include("analysis.jl")
+include("prediction.jl")
 
 # ── exports ───────────────────────────────────────────────────────────────────
 
@@ -49,5 +55,28 @@ export select_constituents_by_names
 
 # constituent DONAR I/O
 export read_donar_constituents
+
+# Constituent lists
+export constituent_list
+
+# Settings
+export HatyanSettings
+
+# Doodson astronomical arguments
+export DOOD_T, DOOD_S, DOOD_H, DOOD_P, DOOD_N, DOOD_P1
+export robust_timedelta_sec, get_doodson_eqvals
+
+# Schureman constituent tables
+export SchuremanTable, get_schureman_table
+export get_schureman_freqs, get_schureman_v0
+export get_schureman_constants, get_schureman_u, get_schureman_f
+export correct_fwith_xfac
+export get_freqv0_generic, get_uf_generic
+
+# Analysis
+export analysis
+
+# Prediction
+export prediction
 
 end # module hatyan_small
