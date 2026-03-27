@@ -8,7 +8,133 @@ The Hatyan core computational routines are currently implemented in python. We w
 2. select the core computational routines that are needed for the julia version
 3. identify the key data structures used in the core routines (see below)
 4. implement reading and writing routines, so we can test the julia code against the python code on the same data
+5. determine the function signatures for the core routines, and implement them in julia
+6. implement the core routines bottom-up (see implementation order below)
 
+## Implementation order for tidal prediction
+
+Building bottom-up from the call graph, implement in this order:
+
+1. **Schureman tables** (`schureman.jl`) — load `data_schureman_harmonic.csv` and
+   `data_schureman_shallowrelations.csv` from `hatyan_small/data/`. Pure data loading,
+   no computation. Copy the CSV files from `hatyan.git/hatyan/data/`. Verify by
+   comparing the loaded table against Python output.
+
+2. **Doodson equations** (`doodson.jl`) — implement `robust_timedelta_sec()` and
+   `get_doodson_eqvals()` to compute the six astronomical arguments T, S, H, P, N, P1
+   from a `DateTime`. Test against Python output for known dates.
+
+3. **Schureman constituent calculations** (`schureman.jl`) — implement
+   `get_schureman_freqs()`, `get_schureman_v0()`, `get_schureman_constants()`,
+   `get_schureman_u()`, `get_schureman_f()`. Each takes the tables and Doodson values
+   as input and can be unit-tested individually against Python for a known date and
+   constituent list.
+
+4. **Generic wrappers** (`schureman.jl`) — implement `get_freqv0_generic()` and
+   `get_uf_generic()`. Thin dispatch layer; trivial once step 3 works.
+
+5. **Prediction summation** (`prediction.jl`) — implement the cosine summation
+   `h(t) = Σ f_i · A_i · cos(ω_i · Δt + v₀_i + u_i − φ_i)`. Validate end-to-end:
+   read constituents from `VLISSGN_ana.txt` with `read_donar_constituents`, predict,
+   and compare against `VLISSGN_pre.txt`.
+
+## Function signatures
+
+### Settings struct
+
+`HatyanSettings` groups the numerical options that control the harmonic calculation.
+It does **not** include the constituent table method (`"schureman"` / `"foreman"`);
+that is passed as a separate argument to `analysis` and then stored inside the
+resulting `TidalConstituents.source` so `prediction` can recover it automatically.
+
+```julia
+struct HatyanSettings
+    nodalfactors :: Bool   # apply nodal factor corrections (f and u); default true
+    fu_alltimes  :: Bool   # compute f/u at every timestep rather than at period centre; default true
+    xfac         :: Bool   # apply x-factor amplitude correction to f; default false
+end
+
+# Convenience constructor with defaults
+HatyanSettings(;
+    nodalfactors = true,
+    fu_alltimes  = true,
+    xfac         = false,
+) -> HatyanSettings
+```
+
+---
+
+### `analysis`
+
+Performs a least-squares harmonic analysis on one or more water-level timeseries and
+returns the fitted tidal constituent amplitudes and phases.
+
+```julia
+analysis(
+    ts         :: TimeSeries,                    # input water levels [locations × times], metres
+    const_list :: Vector{String},                # constituent names, e.g. ["M2", "S2", "K1"]
+    method     :: String = "schureman",          # constituent table: "schureman" or "foreman"
+    settings   :: HatyanSettings = HatyanSettings(),
+) -> TidalConstituents                           # amplitudes (m) and phases (°) [locations × constituents]
+```
+
+**`TidalConstituents.source` is built by appending the analysis step to the input
+`TimeSeries.source`**, forming a provenance trail:
+
+```
+"VLISSGN" → "VLISSGN | analysis(schureman)"
+```
+
+The method name is embedded in the source string, so `prediction` can recover it by
+parsing the last `analysis(...)` token — the caller does not need to repeat it.
+
+**Other notes:**
+- `const_list` can be built from a predefined set using `constituent_list(name::String)`,
+  e.g. `constituent_list("year")` returns the standard 94-component North Sea set.
+- If `ts` contains multiple locations, each is analysed independently and the results
+  are merged into a multi-location `TidalConstituents`.
+- `NaN` values in `ts` are dropped before the least-squares solve for each location.
+- Include `"A0"` in `const_list` to fit the mean water level.
+
+**Mapping from Python:**
+
+| Python `analysis()` kwarg | Julia |
+|---|---|
+| `nodalfactors=True` | `settings.nodalfactors=true` |
+| `fu_alltimes=True` | `settings.fu_alltimes=true` |
+| `xfac=False` | `settings.xfac=false` |
+| `source='schureman'` | `method="schureman"` |
+
+---
+
+### `prediction`
+
+Reconstructs a water-level timeseries from tidal constituents using the harmonic
+summation formula `h(t) = Σ f_i · A_i · cos(ω_i · Δt + v₀_i + u_i − φ_i)`.
+
+```julia
+prediction(
+    tc       :: TidalConstituents,              # amplitudes and phases [locations × constituents]
+    times    :: Vector{DateTime},               # output times at which to evaluate h(t)
+    settings :: HatyanSettings = HatyanSettings(),
+) -> TimeSeries                                 # predicted water levels [locations × times], metres
+```
+
+The constituent table method is recovered automatically from `tc.source`
+(the `"schureman"` or `"foreman"` suffix written by `analysis`), so it does not need
+to be passed again.
+
+**`TimeSeries.source` extends the provenance trail** by appending the prediction step:
+
+```
+"VLISSGN | analysis(schureman)" → "VLISSGN | analysis(schureman) | prediction"
+```
+
+**Other notes:**
+- `times` can also be passed as a `StepRange{DateTime}`, which is collected internally.
+- If `tc` contains multiple locations, each is predicted independently and the results
+  are merged into a multi-location `TimeSeries`.
+- Δt is measured in seconds from `times[1]` (the start of the prediction period).
 
 ## Julia design elements
 - write to [hatyan_small](hatyan_small) — Julia package with only the core computational routines and minimal dependencies (e.g. DataFrames.jl, CSV.jl)
