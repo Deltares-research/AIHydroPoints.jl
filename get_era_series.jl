@@ -53,23 +53,8 @@ tend=DateTime(2009,1,1)
 # points coordinates
 x_points = [ 3.0, 3.75, 4.25, 5.25, 6.5, 0.0,  5.0, 0.0, 0.0]
 y_points = [51.5,52.0 ,53.0 ,53.25,53.75,56.0,56.0,60.0,50.25]
-
-
-
-# select variables and subset by time and location
-u10=zarr_data["10m_u_component_of_wind"]
-v10=zarr_data["10m_v_component_of_wind"]
-msl=zarr_data["mean_sea_level_pressure"]
-# get coordinates
-times=dims(u10,Ti)[:]
-itime_first = findfirst(x->x>=tstart,times)
-itime_last = findlast(x->x<=tend,times)
-times_sel = times[itime_first:itime_last]
-
-# download the selected data for the specified points and time range
-u10_series = download_points_from_maps(zarr_data, "10m_u_component_of_wind", tstart, tend, x_points, y_points, source)
-v10_series = download_points_from_maps(zarr_data, "10m_v_component_of_wind", tstart, tend, x_points, y_points, source)
-msl_series = download_points_from_maps(zarr_data, "mean_sea_level_pressure", tstart, tend, x_points, y_points, source)
+# filenames for output
+output_files = ["era5_2008_9points_$(quantity).jld2" for quantity in ["wind_stress_x","wind_stress_y","mean_sea_level_pressure"]]
 
 function download_points_from_maps(dataset,variable_name,start_time::DateTime,end_time::DateTime,x_points,y_points,source,time_chunksize=240)
     println("Downloading variable $(variable_name) for points and time range...")
@@ -121,3 +106,23 @@ function download_points_from_maps(dataset,variable_name,start_time::DateTime,en
     return time_series
 end
 
+# download the selected data for the specified points and time range
+u10_series = download_points_from_maps(zarr_data, "10m_u_component_of_wind", tstart, tend, x_points, y_points, source)
+v10_series = download_points_from_maps(zarr_data, "10m_v_component_of_wind", tstart, tend, x_points, y_points, source)
+msl_series = download_points_from_maps(zarr_data, "mean_sea_level_pressure", tstart, tend, x_points, y_points, source)
+
+# convert wind components to stress
+wind_x = get_values(u10_series)
+wind_y = get_values(v10_series)
+stress = uv_to_stress_xy.(wind_x, wind_y) # apply the conversion to each element of the arrays
+stress_x=first.(stress) # extract the x component of the stress
+stress_y=last.(stress) # extract the y component of the stress
+# create new time series for the stress
+stress_x_series = TimeSeries(stress_x, get_times(u10_series), get_names(u10_series), get_longitudes(u10_series), get_latitudes(u10_series), "wind_stress_x", source)
+stress_y_series = TimeSeries(stress_y, get_times(v10_series), get_names(v10_series), get_longitudes(v10_series), get_latitudes(v10_series), "wind_stress_y", source)
+
+# Save to local file
+write_to_jld2(stress_x_series, output_files[1])
+write_to_jld2(stress_y_series, output_files[2])
+write_to_jld2(msl_series, output_files[3])
+println("Data saved to local files: $(output_files).")
