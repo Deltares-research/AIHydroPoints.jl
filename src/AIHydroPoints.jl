@@ -3,30 +3,16 @@ module AIHydroPoints
 # Packages used
 using Dates
 using NetCDF
+using MultiTimeSeries
 
-# Abstract data type for time series at multiple locations
-include("abstract_series.jl")
 export AbstractTimeSeries
 export find_location_index
-
-# Time series tools
-include("series.jl")
 export TimeSeries
 
-# NetCDF time series tools
-include("series_netcdf.jl")
+# Series I/O — now provided by MultiTimeSeries
 export NetCDFTimeSeries, write_to_netcdf
-
-# Zarr time series tools
-include("series_zarr.jl")
 export ZarrTimeSeries, has_aws_credentials
-
-# Import and export for the JLD2 storage format
-include("series_jld2.jl")
 export JLD2TimeSeries, write_to_jld2
-
-# NOOS time series tools
-include("series_noos.jl")
 export NoosTimeSeriesCollection, write_single_noos_file, read_single_noos_file
 export get_sources, get_source_quantity_keys, get_quantities, get_series_from_collection
 

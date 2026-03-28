@@ -1,4 +1,4 @@
-module hatyan_small
+module hatyan_core
 
 # ── dependencies ─────────────────────────────────────────────────────────────
 using Dates
@@ -67,4 +67,4 @@ export analysis
 # Prediction
 export prediction
 
-end # module hatyan_small
+end # module hatyan_core

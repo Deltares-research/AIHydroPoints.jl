@@ -1,6 +1,6 @@
 using Test
 using Dates
-using hatyan_small
+using hatyan_core
 
 const TEST_DATA_DIR = joinpath(@__DIR__, "..", "test_data")
 

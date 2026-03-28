@@ -5,10 +5,10 @@
 # using VLISSGN_ana.txt constituents, 10-min steps on 2019-01-01 (naive UTC+1).
 
 @testset "_extract_method_from_source" begin
-    @test hatyan_small._extract_method_from_source("VLISSGN") == "schureman"
-    @test hatyan_small._extract_method_from_source("VLISSGN | analysis(schureman)") == "schureman"
-    @test hatyan_small._extract_method_from_source("X | analysis(foreman)") == "foreman"
-    @test hatyan_small._extract_method_from_source("A | analysis(schureman) | prediction") == "schureman"
+    @test hatyan_core._extract_method_from_source("VLISSGN") == "schureman"
+    @test hatyan_core._extract_method_from_source("VLISSGN | analysis(schureman)") == "schureman"
+    @test hatyan_core._extract_method_from_source("X | analysis(foreman)") == "foreman"
+    @test hatyan_core._extract_method_from_source("A | analysis(schureman) | prediction") == "schureman"
 end
 
 @testset "prediction: VLISSGN Jan 2019 (fu_alltimes=true)" begin

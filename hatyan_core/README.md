@@ -1,4 +1,4 @@
-# hatyan_small
+# hatyan_core
 
 A Julia package for tidal analysis and prediction, ported from the Python
 [hatyan](https://github.com/Deltares/hatyan) package developed at Deltares.
@@ -16,7 +16,7 @@ A Julia package for tidal analysis and prediction, ported from the Python
 
 ## Acknowledgements
 
-`hatyan_small` is a Julia port of [hatyan](https://github.com/Deltares/hatyan),
+`hatyan_core` is a Julia port of [hatyan](https://github.com/Deltares/hatyan),
 developed and maintained by the Deltares team. All credit for the underlying
 algorithms, constituent tables, and methodology belongs to the original authors.
 If you use tidal analysis in your work, please refer to and cite the original
@@ -34,7 +34,7 @@ hatyan package.
 ## Quick start: tidal prediction
 
 ```julia
-using hatyan_small
+using hatyan_core
 using Dates
 
 # Load tidal constituents from a DONAR analysis file
@@ -79,7 +79,7 @@ ts_nf = prediction(tc, times, HatyanSettings(nodalfactors=false))
 ## Quick start: tidal analysis
 
 ```julia
-using hatyan_small
+using hatyan_core
 using Dates
 
 # Load observed water levels from a DONAR file
@@ -196,6 +196,6 @@ Loading pre-computed constituents and predicting skips the analysis token:
 ## Running the tests
 
 ```bash
-cd hatyan_small
+cd hatyan_core
 julia --project=. -e "using Pkg; Pkg.test()"
 ```

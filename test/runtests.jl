@@ -20,30 +20,6 @@ mkdir(temp_dir) # create a new empty temp directory
 
 @testset "Tools for machine learning based on time-series" begin
 
-   @testset "Abstract time series tools" begin
-      include("test_abstract_series.jl")
-   end
-
-   @testset "Time series tools" begin
-      include("test_series.jl")
-   end
-
-   @testset "Netcdf time series tools" begin
-      include("test_series_netcdf.jl")
-   end
-
-   @testset "Zarr time series tools" begin
-      include("test_series_zarr.jl")
-   end
-   
-   @testset "JLD2 time series tools" begin
-      include("test_series_jld2.jl")
-   end
-
-   @testset "noos ascii time series tools" begin
-      include("test_series_noos.jl")
-   end
-
    @testset "wind stress" begin
       include("test_wind_stress.jl")
    end
