@@ -102,6 +102,45 @@ end
     @test get_source(ts2) == "VLISSGN | analysis(schureman) | prediction"
 end
 
+@testset "prediction: two locations" begin
+    # Build a TidalConstituents with two locations that have different A/φ.
+    # Verify that each row of the output matches a single-location prediction.
+    tc1 = read_donar_constituents(joinpath(TEST_DATA_DIR, "VLISSGN_ana.txt"))
+
+    # Second location: scale amplitudes by 0.5, shift phases by 20°
+    amp2 = tc1.amplitudes .* 0.5f0
+    phi2 = mod.(tc1.phases .+ 20.0f0, 360.0f0)
+    tc2  = TidalConstituents(amp2, phi2, tc1.constituent_names,
+                              ["LOC2"], [4.0], [52.0], tc1.quantity, tc1.source)
+
+    tc_both = TidalConstituents(
+        vcat(tc1.amplitudes, tc2.amplitudes),
+        vcat(tc1.phases,     tc2.phases),
+        tc1.constituent_names,
+        ["VLISSGN", "LOC2"],
+        vcat(tc1.longitudes, tc2.longitudes),
+        vcat(tc1.latitudes,  tc2.latitudes),
+        tc1.quantity, tc1.source,
+    )
+
+    times    = [DateTime(2019, 1, 1) + Minute(10*i) for i in 0:143]
+    settings = HatyanSettings(nodalfactors=true, fu_alltimes=true, xfac=false)
+
+    ts_both = prediction(tc_both, times, settings)
+    ts_loc1 = prediction(tc1,    times, settings)
+    ts_loc2 = prediction(tc2,    times, settings)
+
+    @test size(get_values(ts_both)) == (2, 144)
+    @test get_names(ts_both) == ["VLISSGN", "LOC2"]
+
+    # Each row must equal the corresponding single-location prediction exactly
+    @test get_values(ts_both)[1, :] == get_values(ts_loc1)[1, :]
+    @test get_values(ts_both)[2, :] == get_values(ts_loc2)[1, :]
+
+    # The two rows must differ (different constituents → different signal)
+    @test get_values(ts_both)[1, :] != get_values(ts_both)[2, :]
+end
+
 @testset "prediction: compare with VLISSGN_pre.txt" begin
     # Both Julia and Python predictions should agree to within ~0.02 m;
     # VLISSGN_pre.txt values are stored at 1 cm resolution so some rounding is expected.

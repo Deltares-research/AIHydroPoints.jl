@@ -1,5 +1,8 @@
 # hatyan_small
 
+A Julia package for tidal analysis and prediction, ported from the Python
+[hatyan](https://github.com/Deltares/hatyan) package developed at Deltares.
+
 > **Research repository — not for production use.**
 > This is an experimental Julia port for research and exploration purposes only.
 > For operational and production work, use the original Python
@@ -11,9 +14,6 @@
 > correctness. Always validate against the authoritative source before drawing
 > any conclusions.
 
-A Julia package for tidal analysis and prediction, ported from the Python
-[hatyan](https://github.com/Deltares/hatyan) package developed at Deltares.
-
 ## Acknowledgements
 
 `hatyan_small` is a Julia port of [hatyan](https://github.com/Deltares/hatyan),
@@ -22,29 +22,14 @@ algorithms, constituent tables, and methodology belongs to the original authors.
 If you use tidal analysis in your work, please refer to and cite the original
 hatyan package.
 
-`hatyan_small` implements the core harmonic tidal prediction pipeline:
 
-- Read tidal constituents from DONAR `.txt` files
+## Features
+- Perform harmonic tidal analysis using the Schureman method
 - Compute Doodson astronomical arguments and Schureman nodal factors
 - Reconstruct water levels with the harmonic cosine summation formula:
   `h(t) = Σ fᵢ · Aᵢ · cos(ωᵢ · Δt + v₀ᵢ + uᵢ − φᵢ)`
 - Read and write time series in DONAR and NOOS formats
 
-## Installation
-
-From the Julia REPL inside the repository directory:
-
-```julia
-julia> ]  # enter Pkg mode
-pkg> activate .
-pkg> instantiate
-```
-
-Or with [pixi](https://pixi.sh):
-
-```bash
-pixi run julia --project=.
-```
 
 ## Quick start: tidal prediction
 
@@ -213,10 +198,4 @@ Loading pre-computed constituents and predicting skips the analysis token:
 ```bash
 cd hatyan_small
 julia --project=. -e "using Pkg; Pkg.test()"
-```
-
-Or with pixi:
-
-```bash
-pixi run julia --project=hatyan_small -e "using Pkg; Pkg.test()"
 ```

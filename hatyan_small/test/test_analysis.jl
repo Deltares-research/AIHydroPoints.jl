@@ -113,6 +113,51 @@ end
     @test maximum(abs.(dp)) < 0.01f0   # < 0.01 degree
 end
 
+@testset "analysis: two locations" begin
+    # Build a two-location TimeSeries from two different synthetic signals,
+    # analyse together, verify each location is fitted independently.
+    times = [DateTime(2019, 1, 1) + Minute(10*i) for i in 0:4463]   # 1 month
+
+    # Location 1: A0=0.5, M2=1.2/30°, S2=0.4/120°
+    tc1 = _make_synthetic_tc(A0=0.5f0, A_M2=1.2f0, phi_M2=30.0f0,
+                                        A_S2=0.4f0, phi_S2=120.0f0)
+    # Location 2: different amplitudes and phases
+    tc2 = _make_synthetic_tc(A0=0.2f0, A_M2=0.8f0, phi_M2=75.0f0,
+                                        A_S2=0.6f0, phi_S2=210.0f0)
+
+    settings = HatyanSettings(nodalfactors=true, fu_alltimes=true, xfac=false)
+    ts1 = prediction(tc1, times, settings)
+    ts2 = prediction(tc2, times, settings)
+
+    # Combine into a single two-location TimeSeries
+    ts_both = TimeSeries(
+        vcat(get_values(ts1), get_values(ts2)),
+        times,
+        ["LOC1", "LOC2"],
+        [3.0, 4.0], [51.0, 52.0],
+        "water level", "SYN",
+    )
+
+    tc_out = analysis(ts_both, ["A0", "M2", "S2"], "schureman", settings)
+
+    @test size(tc_out.amplitudes) == (2, 3)
+    @test size(tc_out.phases)     == (2, 3)
+    @test tc_out.names == ["LOC1", "LOC2"]
+
+    # Location 1 recovery
+    @test tc_out.amplitudes[1, 1] ≈ 0.5f0 atol=1e-4   # A0
+    @test tc_out.amplitudes[1, 2] ≈ 1.2f0 atol=1e-4   # M2
+    @test tc_out.phases[1, 2]     ≈ 30.0f0 atol=1e-3
+
+    # Location 2 recovery
+    @test tc_out.amplitudes[2, 1] ≈ 0.2f0 atol=1e-4   # A0
+    @test tc_out.amplitudes[2, 2] ≈ 0.8f0 atol=1e-4   # M2
+    @test tc_out.phases[2, 2]     ≈ 75.0f0 atol=1e-3
+
+    # The two locations must differ
+    @test tc_out.amplitudes[1, :] != tc_out.amplitudes[2, :]
+end
+
 @testset "analysis: condition error on too-short series" begin
     tc_in = _make_synthetic_tc()
     # Only 5 timesteps — far too few for 3 constituents; xTx will be ill-conditioned

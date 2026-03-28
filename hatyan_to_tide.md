@@ -11,6 +11,59 @@ The Hatyan core computational routines are currently implemented in python. We w
 5. determine the function signatures for the core routines, and implement them in julia
 6. implement the core routines bottom-up (see implementation order below)
 
+## Implementation for tidal analysis
+
+Building bottom-up from the call graph, implement in this order:
+
+6. **Constituent list utility** (`constituents.jl`) — add a `constituent_list(name::String) -> Vector{String}`
+   function that returns predefined sets of constituent names. The standard North Sea set is
+   `"year"` (94 components including `"A0"`). The list is hardcoded in
+   `hatyan.git/hatyan/hatyan_core.py` (`get_const_list_hatyan`). This is a prerequisite so
+   callers don't have to supply constituent names manually.
+
+7. **Design matrix and least-squares solve** (`analysis.jl`) — implement `analysis_singleperiod`.
+   For `m` observations and `N` constituents build the `m × 2N` design matrix:
+   ```
+   xmat[1:m, 1:N]    = f_i(t) .* cos.(ω_i .* t_s .+ v0_i .+ u_i(t))   # cosine columns
+   xmat[1:m, N+1:2N] = f_i(t) .* sin.(ω_i .* t_s .+ v0_i .+ u_i(t))   # sine columns
+   ```
+   Solve `(xᵀx) β = xᵀy` with `LinearAlgebra.\\`, then convert to amplitude/phase:
+   ```julia
+   A_i = sqrt.(β[N+1:end].^2 .+ β[1:N].^2)
+   φ_i = rad2deg.(mod.(atan.(β[N+1:end], β[1:N]), 2π))
+   ```
+   Special cases:
+   - `"A0"` (mean water level) uses an all-ones sine column and a zero cosine column, and
+     Python corrects `xTx[N, N] = m` to improve matrix conditioning.
+   - If the solved `A0` phase is 180°, negate the amplitude and set phase to 0°.
+   - Add `LinearAlgebra` to `[deps]` in `Project.toml`.
+
+8. **Matrix condition check** (`analysis.jl`) — after forming `xTx`, compute
+   `cond(xTx)` with `LinearAlgebra.cond`. Raise an error (or warning) if it exceeds a
+   threshold (Python default: 20). This catches series that are too short for the requested
+   constituent list or that contain duplicate constituents.
+
+9. **`analysis` top-level function** (`analysis.jl`) — thin wrapper that:
+   - Drops timesteps where `values` are `NaN` before the solve.
+   - Calls `analysis_singleperiod` for each location independently.
+   - Appends the method to the provenance trail:
+     `"VLISSGN" → "VLISSGN | analysis(schureman)"`
+   - Returns a `TidalConstituents` with `source` containing the `analysis(method)` token
+     so that `prediction` can recover the method automatically.
+
+   Function signature (see also [Function signatures](#function-signatures) below):
+   ```julia
+   analysis(ts, const_list, method="schureman", settings=HatyanSettings()) -> TidalConstituents
+   ```
+
+### Optional extensions (lower priority)
+
+| Feature | Description |
+|---|---|
+| Rayleigh criterion check | Warn when two constituents are closer in frequency than `1 / T_obs`; catches unresolvable pairs before the solve |
+| `vectoravg` | Vector-average A and φ across multiple analysis sub-periods (e.g. per year), then return the mean; needed for multi-year data |
+| Component splitting | Derive satellite components from a parent constituent after the main solve; matches Python `split_components` |
+
 ## Implementation order for tidal prediction
 
 Building bottom-up from the call graph, implement in this order:
