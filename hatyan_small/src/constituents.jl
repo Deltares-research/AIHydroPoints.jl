@@ -12,6 +12,12 @@
 #
 # All locations share the same set of constituents: either all have M4 or none do.
 
+# Extend MultiTimeSeries generic functions so that TidalConstituents shares the same
+# interface as TimeSeries (single-dispatch, no ambiguity).
+import MultiTimeSeries: get_names, get_longitudes, get_latitudes, get_quantity, get_source
+import MultiTimeSeries: select_locations_by_ids, select_location_by_id
+import MultiTimeSeries: select_locations_by_names, select_location_by_name
+
 struct TidalConstituents <: AbstractTidalConstituents
     amplitudes::Matrix{Float32}        # amplitudes in metres [locations × constituents]
     phases::Matrix{Float32}            # phases in degrees [locations × constituents]
