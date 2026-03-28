@@ -69,7 +69,7 @@ Building bottom-up from the call graph, implement in this order:
 Building bottom-up from the call graph, implement in this order:
 
 1. **Schureman tables** (`schureman.jl`) — load `data_schureman_harmonic.csv` and
-   `data_schureman_shallowrelations.csv` from `hatyan_small/data/`. Pure data loading,
+   `data_schureman_shallowrelations.csv` from `hatyan_core/data/`. Pure data loading,
    no computation. Copy the CSV files from `hatyan.git/hatyan/data/`. Verify by
    comparing the loaded table against Python output.
 
@@ -190,7 +190,7 @@ to be passed again.
 - Δt is measured in seconds from `times[1]` (the start of the prediction period).
 
 ## Julia design elements
-- write to [hatyan_small](hatyan_small) — Julia package with only the core computational routines and minimal dependencies (e.g. DataFrames.jl, CSV.jl)
+- write to [hatyan_core](hatyan_core) — Julia package with only the core computational routines and minimal dependencies (e.g. DataFrames.jl, CSV.jl)
 - src/
 
 ## Keep or forget

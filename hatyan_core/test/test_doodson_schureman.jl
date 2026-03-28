@@ -175,7 +175,14 @@ end
     @test length(freq) == 4
     @test size(v0) == (4, 1)
 
-    @test_throws ErrorException get_freqv0_generic(const_list, d_mid, d_start, "foreman")
+    # Foreman also works
+    freq_f, v0_f = get_freqv0_generic(const_list, d_mid, d_start, "foreman")
+    @test length(freq_f) == 4
+    @test size(v0_f) == (4, 1)
+    # M2 frequency should be close between methods (< 1e-5 cycles/hr)
+    @test abs(freq_f[2] - freq[2]) < 1e-5
+
+    @test_throws ErrorException get_freqv0_generic(const_list, d_mid, d_start, "unknown")
 end
 
 @testset "get_uf_generic: nodalfactors=true" begin

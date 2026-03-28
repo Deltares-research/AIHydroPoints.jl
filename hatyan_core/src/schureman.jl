@@ -595,9 +595,15 @@ function get_freqv0_generic(
     dood_date_start :: AbstractVector{DateTime},
     method          :: String,
 )
-    method == "schureman" || error("Only method=\"schureman\" is supported; got \"$method\"")
-    freq = get_schureman_freqs(const_list, dood_date_mid)    # cycles/hr, n_const
-    v0   = get_schureman_v0(const_list,   dood_date_start)   # rad, n_const × n_dates
+    if method == "schureman"
+        freq = get_schureman_freqs(const_list, dood_date_mid)
+        v0   = get_schureman_v0(const_list,   dood_date_start)
+    elseif method == "foreman"
+        freq = get_foreman_freqs(const_list, dood_date_mid)
+        v0   = get_foreman_v0(const_list,   dood_date_start)
+    else
+        error("Unknown method \"$method\"; supported: \"schureman\", \"foreman\"")
+    end
     return freq, v0
 end
 
@@ -627,16 +633,20 @@ function get_uf_generic(
     settings     :: HatyanSettings,
     method       :: String,
 )
-    method == "schureman" || error("Only method=\"schureman\" is supported; got \"$method\"")
     n_const = length(const_list)
     n_dates = length(dood_date_fu)
 
-    if settings.nodalfactors
-        f = get_schureman_f(const_list, dood_date_fu, settings.xfac)   # n_const × n_dates
-        u = get_schureman_u(const_list, dood_date_fu)                   # n_const × n_dates
+    if !settings.nodalfactors
+        return zeros(Float64, n_const, n_dates), ones(Float64, n_const, n_dates)
+    end
+
+    if method == "schureman"
+        f = get_schureman_f(const_list, dood_date_fu, settings.xfac)
+        u = get_schureman_u(const_list, dood_date_fu)
+    elseif method == "foreman"
+        u, f = get_foreman_uf(const_list, dood_date_fu)
     else
-        f = ones(Float64,  n_const, n_dates)
-        u = zeros(Float64, n_const, n_dates)
+        error("Unknown method \"$method\"; supported: \"schureman\", \"foreman\"")
     end
     return u, f
 end

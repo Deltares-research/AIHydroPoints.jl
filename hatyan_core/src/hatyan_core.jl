@@ -15,6 +15,7 @@ include("constituent_list.jl")
 include("settings.jl")
 include("doodson.jl")
 include("schureman.jl")
+include("foreman.jl")
 include("analysis.jl")
 include("prediction.jl")
 
@@ -59,6 +60,12 @@ export SchuremanTable, get_schureman_table
 export get_schureman_freqs, get_schureman_v0
 export get_schureman_constants, get_schureman_u, get_schureman_f
 export correct_fwith_xfac
+
+# Foreman constituent tables
+export ForemanTable, get_foreman_table
+export get_foreman_freqs, get_foreman_v0, get_foreman_uf
+
+# Generic dispatch wrappers (method="schureman" or method="foreman")
 export get_freqv0_generic, get_uf_generic
 
 # Analysis
