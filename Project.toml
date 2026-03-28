@@ -62,3 +62,7 @@ Test = "1.11.0"
 URIs = "1.6.1"
 ZarrDatasets = "0.1.2"
 cuDNN = "1.4.2"
+
+[sources]
+MultiTimeSeries = {url = "https://github.com/robot144/MultiTimeSeries.jl"}
+hatyan_core = {url = "https://github.com/robot144/hatyan_core.jl"}
