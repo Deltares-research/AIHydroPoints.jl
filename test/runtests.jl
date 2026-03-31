@@ -23,4 +23,8 @@ mkdir(temp_dir) # create a new empty temp directory
    @testset "wind stress" begin
       include("test_wind_stress.jl")
    end
+
+   @testset "tidal constituents" begin
+      include("test_tidal_comps.jl")
+   end
 end
