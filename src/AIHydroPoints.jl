@@ -17,7 +17,7 @@ export NoosTimeSeriesCollection, write_single_noos_file, read_single_noos_file
 export get_sources, get_source_quantity_keys, get_quantities, get_series_from_collection
 
 include("tidal_comps.jl")
-export primary_frequencies_as_doodson, get_doodson_eqvals
+export primary_frequencies_as_doodson, get_doodson_eqvals, constituents, lunar2solar, robust_timedelta_sec
 
 include("netcdf_utils.jl")
 export waterlevel_series_to_netcdf
@@ -41,6 +41,9 @@ export InteractionSettings, create_interaction_model
 
 include("wind_stress.jl")
 export uv_to_stress_xy
+
+include("waves.jl")
+export WaveSettings, create_wave_model, stats_skipnan, average_stats
 
 
 # Methods in the interface for time series

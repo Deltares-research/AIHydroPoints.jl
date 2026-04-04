@@ -62,7 +62,7 @@ function robust_timedelta_sec(dood_date::DateTime; refdate_dt::DateTime=default_
 end
 
 function robust_timedelta_sec(dood_date::Vector{DateTime}; refdate_dt::DateTime=default_refdate)
-    return robust_timedelta_sec.(dood_date, refdate_dt)
+    return robust_timedelta_sec.(dood_date; refdate_dt=refdate_dt)
 end
 
 """

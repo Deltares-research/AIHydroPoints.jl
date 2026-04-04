@@ -1,5 +1,7 @@
 # test_tidal_comps.jl
 
+using Dates
+
 @testset "tidal_comps.jl" begin
 
     @testset "robust_timedelta_sec" begin
