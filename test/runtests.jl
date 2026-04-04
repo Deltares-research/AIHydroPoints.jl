@@ -27,4 +27,8 @@ mkdir(temp_dir) # create a new empty temp directory
    @testset "tidal constituents" begin
       include("test_tidal_comps.jl")
    end
+
+   @testset "waves" begin
+      include("test_train_waves.jl")
+   end
 end
