@@ -233,9 +233,11 @@ function train_epoch!(model, settings::WaveSettings, dataloader, opt_state)
     noise_std = Float32(settings.input_noise_std)
     acc_loss  = 0.0f0
     for (x_station, x_input, y) in dataloader
+        x_noisy = noise_std > 0.0f0 ?
+            x_input .+ noise_std .* (x_input isa CuArray ?
+                CUDA.randn(Float32, size(x_input)...) :
+                randn(Float32, size(x_input))) : x_input
         dloss, grads = Flux.withgradient(model) do m
-            x_noisy = noise_std > 0.0f0 ?
-                x_input .+ noise_std * randn(Float32, size(x_input)) : x_input
             Flux.mse(m((x_station, x_noisy)), y)
         end
         Flux.update!(opt_state, model, grads[1])

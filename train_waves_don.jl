@@ -95,7 +95,8 @@ npars=n_input_vars*n_input_stations # data values per time lag
 #
 # optimizer settings
 #
-const nepochs=50
+const nepochs=2 # for testing if the code runs, set to a low number. Change for REAL RUN!
+#const nepochs=50 #Realistic for this model
 const nbatch=256 
 const learning_rate = 0.001 # initial learning_rate
 const learning_rate_decay = 0.03 # lower learning rate at last eopch with factor

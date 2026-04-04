@@ -38,7 +38,8 @@ Saves settings to "settings.toml" file
 function save_settings(settings::AbstractModelSettings)
     fn = joinpath(settings.model_dir, "settings.toml")
     # For convenience when loading we also write the type of the settings written
-    tmp = Dict(key => getfield(settings, key) for key in propertynames(settings))
+    tmp = Dict(key => getfield(settings, key) for key in propertynames(settings)
+               if !isnothing(getfield(settings, key)))
     dict = Dict(string(typeof(settings)) => tmp)
     open(fn, "w") do io
         TOML.print(io, dict)

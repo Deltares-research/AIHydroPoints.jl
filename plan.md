@@ -38,4 +38,4 @@ The main goal of this project is to develop a machine learning model for predict
 - [x] Make the unit tests work again.
 - [x] Create a small dataset for waves in test_data/waves_2021
 - [x] Create a unit test for the wave model that runs fast, using the small dataset in test_data/waves_2021
-- [ ] Adapt train_waves.jl to use the new data structures in src/
+- [x] Adapt train_waves.jl to use the new data structures in src/

@@ -64,7 +64,8 @@ runid    = "10to11_explyr3"
 settings = WaveSettings(
     model_name      = "wave_model_$(runid)_3stations",
     model_dir       = "wave_model_$(runid)_3stations",
-    nepochs         = 100,
+    nepochs         = 2, # FOR TESTING, set to a low number. Change for REAL RUN!
+    # nepochs         = 100, # Realistic for this model, but can be increased for better performance.
     nbatches        = 256,
     learning_rate   = 0.001,
     weight_reg      = 1.0e-4,
@@ -121,7 +122,7 @@ for (timespan_name, (tstart, tend)) in timespans
     stats    = stats_skipnan(swh_ts, swh_pred)
     @show stats
 
-    avg_stats_df = average_stats(avg_stats_df, stats, timespan_name)
+    global avg_stats_df = average_stats(avg_stats_df, stats, timespan_name)
     CSV.write(joinpath(settings.model_dir, "$(timespan_name)_statistics_wave_height.csv"), stats)
 
     span_dict = Dict(
