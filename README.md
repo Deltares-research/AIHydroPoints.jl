@@ -19,7 +19,7 @@ We aim to have the main datasets available in zarr format in the cloud, so they 
 
 ## Status
 
-Currently the three modules tide, surge and interaction are working. There are a few succesful models. However, the code is still messy. We're working on improvements to the code, but it's still not working again and many scripts still use old routines.
+The wave model (`train_waves.jl`) is working end-to-end using the library code in `src/`. Unit tests pass for wind stress, tidal constituents and the wave training pipeline. The tide, surge and interaction models are working but their training scripts have not yet been updated to use the new `src/` library.
 
 ## Intended workflow for training
 
@@ -37,15 +37,22 @@ Currently the three modules tide, surge and interaction are working. There are a
 ### Combined analysis
 - make analysis of a trained model for a new input dataset `run_analysis.jl`
 
-## Supporting source code
-- `tide_time.jl`
-    Some tide routines converted from Hatyan, mainly to compute phases for the basic Doodson frequencies
-- `wind_stress.jl`
-    Convert 10m winds to stresses
-- `netcdf_utils.jl`
-    Write data in delft3d-fm his format nc files
-- `abstract_series.jl`, `timeseries.jl`, `series_netcdf.jl`, `series_zarr.jl`, `series_jld2.jl`
-    Utilities for TimeSeries including their meta-data. There are basic functions to get the data, times, names, etc. and also for reading and writing to different formats. The TimeSeries type is based on AbstractTimeSeries, and implements an in-memory array based version. Reading routines are lazy, so only a subset of the data is loaded into memory when needed. 
+## Source code (`src/`)
+
+All library code lives in `src/` and is exposed as the `AIHydroPoints` Julia package.
+
+- `tidal_comps.jl` — Doodson phases, lunar-to-solar conversion, named tidal constituents
+- `wind_stress.jl` — Convert 10 m winds to stress components
+- `waves.jl` — Wave model: `WaveSettings`, `create_wave_model`, `train_epoch!`, `predict`, `stats_skipnan`, `plot_series`
+- `tides.jl` — Tide model settings and architecture
+- `surge.jl` — Surge model settings and architecture
+- `interaction.jl` — Tide–surge interaction model
+- `training.jl` — Shared training loop (`train_model`), `save_model`, `load_model`, `save_settings`, `load_settings`
+- `netcdf_utils.jl` — Write time-series to Delft3D-FM his-format NetCDF files
+- `graph_network.jl`, `attention.jl` — Graph network and attention building blocks
+
+Time-series I/O (in-memory, NetCDF, Zarr, JLD2, NOOS) is provided by the external
+[MultiTimeSeries.jl](https://github.com/robot144/MultiTimeSeries.jl) package.
 ## Other
 - `test_minio_zarr_with_julia.ipynb`
     Test script for downloading a subset of the 1980-2023 DCSM run
@@ -62,34 +69,36 @@ The different models all need time-series and a configuration as inputs. Each mo
 
 ## TODO
 
-### Tides 
-- [x] convert DCSM to zarr and store in cload
-- [x] basic routines for tides
-- [x] create a few training datassets for tides
+### Waves
+- [x] wave model architecture and training in `src/waves.jl`
+- [x] `train_waves.jl` updated to use `AIHydroPoints` library
+- [x] unit test for wave training pipeline (`test/test_train_waves.jl`)
+### Tides
+- [x] convert DCSM to zarr and store in cloud
+- [x] basic routines for tides (`src/tidal_comps.jl`)
+- [x] create a few training datasets for tides
 - [x] prototype for tide training
 - [x] export to netcdf his file
-- [ ] rewrite `train_tides.jl` to use TimeSeries datasets
+- [ ] rewrite `train_tides.jl` to use `AIHydroPoints` library
 - [ ] check with cpu and gpu. Is gpu faster?
 - [ ] rewrite `get_dcsm_series.jl` to use TimeSeries
 ### Surge
-- [x] download ERA5 data # see [DataCollector.jl repo](https://github.com/robot144/DataCollector.jl)
+- [x] download ERA5 data — see [DataCollector.jl repo](https://github.com/robot144/DataCollector.jl)
 - [x] convert to jld2 and compute stresses
-- [ ] rewrite `train_surge.jl` to use TimeSeries
+- [ ] rewrite `train_surge.jl` to use `AIHydroPoints` library
 - [ ] test `train_surge.jl` with test-dataset
-- ? convert ERA5 to zarr and store in cloud (also in DataCollector.jl)
 ### Tide-Surge Interaction
 - [x] create AI model and train
-- [ ] update model to unse TimeSeries
+- [ ] update `train_interaction.jl` to use `AIHydroPoints` library
 ### Cleaner code
-- [x] Unit tests
-- [x] TimeSeries type based on AbstractTimeSeries
+- [x] Unit tests (`test/`)
+- [x] TimeSeries type via MultiTimeSeries.jl
 - [x] Selection of locations and times for TimeSeries
-- [x] Read and write time-series
-    - [x] NetCDF
-    - [x] Zarr
-    - [x] JLD2
-- [ ] move `tide_time.jl` to src and add a test and check train_tides
-- [ ] move `wind_stress.jl` to src and add a test
+- [x] Read and write time-series (NetCDF, Zarr, JLD2, NOOS)
+- [x] `wind_stress.jl` moved to `src/`
+- [x] tidal constituent routines moved to `src/tidal_comps.jl`
+- [ ] rewrite `train_tides.jl` to use `AIHydroPoints` library
+- [ ] add unit tests for tide, surge and interaction models
 
 
 
