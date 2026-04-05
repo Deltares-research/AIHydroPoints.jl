@@ -45,4 +45,4 @@ The main goal of this project is to develop a machine learning model for predict
 - [x] Create unit test for the tide model (test/test_train_tides.jl)
 - [x] Create analyse_tides_schureman.jl to perform harmonic tidal analysis and produce tides/surge NetCDF, statistics and constituent CSVs, and plots (full year + Jan 1–15)
 - [x] Create surge test dataset using harmonic analysis of the DCSM-FM_0_5nm_2011_5stations_his.jld2 dataset, and create a unit test for the surge model (test/test_train_surges.jl)
-- [ ] Adapt train_surges.jl to use the test dataset
+- [x] Adapt train_surges.jl to use the test dataset
