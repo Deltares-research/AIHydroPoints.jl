@@ -11,29 +11,29 @@ labels=["training","validation","testing"]
 tide_model = "TestTideModel"
 filenames=Dict()
 
+data_dir = joinpath(@__DIR__, "test_data")
 filenames["training"] = Dict(
-    "waterlevel" => "DCSM-FM_0_5nm_2008_3yr_5stations_his.jld2" 
+    "waterlevel" => joinpath(data_dir, "DCSM-FM_0_5nm_2008_3yr_5stations_his.jld2")
 )
 filenames["testing"] = Dict(
-    "waterlevel" => "DCSM-FM_0_5nm_2011_5stations_his.jld2" 
+    "waterlevel" => joinpath(data_dir, "DCSM-FM_0_5nm_2011_5stations_his.jld2")
 )
 filenames["validation"] = Dict(
-    "waterlevel" => "DCSM-FM_0_5nm_2011_5stations_his.jld2" 
+    "waterlevel" => joinpath(data_dir, "DCSM-FM_0_5nm_2011_5stations_his.jld2")
 )
 
 
 name = "TestTideModel"
 save_dir = "models/$(name)"
 
-rm(save_dir, recursive=true)
-if !isdir(save_dir)
-    mkpath(save_dir)
-end
+rm(save_dir, recursive=true, force=true)
+mkpath(save_dir)
 
 learning_rate = 1.0e-3
 lr_decay_factor = 0.9
 lr_decay_rate = 50
-nepochs = 250
+nepochs = 2 # TESTING oNLY, CHANGE TO 250 FOR REAL TRAINING
+# nepochs = 250
 patience = 10
 checkpoints = [40, 80, 120, 160]
 val_range = ["2011-01-01T00:00:00", "2011-01-15T00:00:00"]
