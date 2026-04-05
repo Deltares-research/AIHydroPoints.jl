@@ -31,4 +31,8 @@ mkdir(temp_dir) # create a new empty temp directory
    @testset "waves" begin
       include("test_train_waves.jl")
    end
+
+   @testset "tides" begin
+      include("test_train_tides.jl")
+   end
 end

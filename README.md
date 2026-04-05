@@ -19,7 +19,7 @@ We aim to have the main datasets available in zarr format in the cloud, so they 
 
 ## Status
 
-The wave model (`train_waves.jl`) is working end-to-end using the library code in `src/`. Unit tests pass for wind stress, tidal constituents and the wave training pipeline. The tide, surge and interaction models are working but their training scripts have not yet been updated to use the new `src/` library.
+The wave model (`train_waves.jl`) is working end-to-end using the library code in `src/`. Unit tests pass for wind stress, tidal constituents, the wave training pipeline, and the tide training pipeline. The surge and interaction models are working but their training scripts have not yet been updated to use the new `src/` library.
 
 ## Intended workflow for training
 
@@ -53,6 +53,17 @@ All library code lives in `src/` and is exposed as the `AIHydroPoints` Julia pac
 
 Time-series I/O (in-memory, NetCDF, Zarr, JLD2, NOOS) is provided by the external
 [MultiTimeSeries.jl](https://github.com/robot144/MultiTimeSeries.jl) package.
+## Analysis scripts
+
+- `analyse_tides_schureman.jl` — Harmonic tidal analysis (Schureman, 95 constituents) on a
+  yearly DCSM-FM 5-station JLD2 dataset. Produces tides and surge as NetCDF, per-station
+  full-year and Jan 1–15 plots, a statistics CSV, and a constituent amplitude/phase CSV.
+  Takes the year as a command-line argument (default 2010):
+  ```
+  julia --project analyse_tides_schureman.jl 2011
+  ```
+  Output is written to `output_tides_<year>/`.
+
 ## Other
 - `test_minio_zarr_with_julia.ipynb`
     Test script for downloading a subset of the 1980-2023 DCSM run
@@ -79,6 +90,8 @@ The different models all need time-series and a configuration as inputs. Each mo
 - [x] create a few training datasets for tides
 - [x] prototype for tide training
 - [x] export to netcdf his file
+- [x] small test dataset in `test_data/DCSM-FM_0_5nm_*_5stations_his.jld2`
+- [x] unit test for tide training pipeline (`test/test_train_tides.jl`)
 - [ ] rewrite `train_tides.jl` to use `AIHydroPoints` library
 - [ ] check with cpu and gpu. Is gpu faster?
 - [ ] rewrite `get_dcsm_series.jl` to use TimeSeries
