@@ -48,7 +48,6 @@ All library code lives in `src/` and is exposed as the `AIHydroPoints` Julia pac
 - `surge.jl` — Surge model settings and architecture
 - `interaction.jl` — Tide–surge interaction model
 - `training.jl` — Shared training loop (`train_model`), `save_model`, `load_model`, `save_settings`, `load_settings`
-- `netcdf_utils.jl` — Write time-series to Delft3D-FM his-format NetCDF files
 - `graph_network.jl`, `attention.jl` — Graph network and attention building blocks
 
 Time-series I/O (in-memory, NetCDF, Zarr, JLD2, NOOS) is provided by the external

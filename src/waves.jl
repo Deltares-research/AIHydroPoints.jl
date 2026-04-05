@@ -366,8 +366,8 @@ function _write_wave_series(settings, series_name, times, y_pred, errors, statio
     sx = Float64.(get_longitudes(swh))
     sy = Float64.(get_latitudes(swh))
     if fmt == "netcdf"
-        waterlevel_series_to_netcdf(fn_pred*".nc", times, y_pred,  stations, sx, sy)
-        waterlevel_series_to_netcdf(fn_res*".nc",  times, errors, stations, sx, sy)
+        write_to_netcdf(TimeSeries(Float32.(y_pred),  times, stations, sx, sy, "wave_height", get_source(swh)), fn_pred*".nc")
+        write_to_netcdf(TimeSeries(Float32.(errors),  times, stations, sx, sy, "residual",    get_source(swh)), fn_res*".nc")
     else
         fmt != "jld2" && @warn "Unknown format $fmt, using JLD2."
         save(fn_pred*".jld2", Dict("station_x_coordinate"=>sx, "station_y_coordinate"=>sy,

@@ -2,7 +2,6 @@ module AIHydroPoints
 
 # Packages used
 using Dates
-using NetCDF
 using MultiTimeSeries
 
 export AbstractTimeSeries
@@ -18,9 +17,6 @@ export get_sources, get_source_quantity_keys, get_quantities, get_series_from_co
 
 include("tidal_comps.jl")
 export primary_frequencies_as_doodson, get_doodson_eqvals, constituents, lunar2solar, robust_timedelta_sec
-
-include("netcdf_utils.jl")
-export waterlevel_series_to_netcdf
 
 include("training.jl")
 include("tides.jl")

@@ -417,9 +417,8 @@ function plot_series(model, settings::SurgeSettings, data_dict::Dict{String, <:A
         station_y = Float64.(get_latitudes(ts_h))
 
         if write_format == "netcdf"
-            ext = ".nc"
-            waterlevel_series_to_netcdf(fn_pred*ext, times, prediction, stations, station_x, station_y)
-            waterlevel_series_to_netcdf(fn_res*ext, times, errors, stations, station_x, station_y)
+            write_to_netcdf(TimeSeries(Float32.(prediction), times, stations, station_x, station_y, "surge",    get_source(ts_h)), fn_pred*".nc")
+            write_to_netcdf(TimeSeries(Float32.(errors),     times, stations, station_x, station_y, "residual", get_source(ts_h)), fn_res*".nc")
 
         else
             if write_format != "jld2"

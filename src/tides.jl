@@ -415,9 +415,8 @@ function plot_series(model, settings::TideSettings, data_dict::Dict{String, Time
         station_y = Float64.(get_latitudes(ts))
 
         if write_format == "netcdf"
-            ext = ".nc"
-            waterlevel_series_to_netcdf(fn_pred*ext, times, prediction, stations, station_x, station_y)
-            waterlevel_series_to_netcdf(fn_res*ext, times, errors, stations, station_x, station_y)
+            write_to_netcdf(TimeSeries(Float32.(prediction), times, stations, station_x, station_y, "waterlevel", get_source(ts)), fn_pred*".nc")
+            write_to_netcdf(TimeSeries(Float32.(errors),     times, stations, station_x, station_y, "surge",      get_source(ts)), fn_res*".nc")
         else
             if write_format != "jld2"
                 @warn "Unknown writing format $(write_format), using defaulft format JLD2."
