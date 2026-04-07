@@ -1,0 +1,20 @@
+[WaveSettings]
+nwind = 10
+n_input_channels = 64
+nlags = 16
+learning_rate = 0.001
+use_gpu = true
+wind_scale = 0.5
+nepochs = 2
+model_name = "wave_model_10to11_explyr3_3stations"
+nstations = 11
+input_noise_std = 0.3
+weight_reg = 0.0001
+wave_scale = 3.0
+patience = 5
+nbatches = 256
+model_dir = "wave_model_10to11_explyr3_3stations"
+
+    [WaveSettings.model_pars]
+    nchannel = [64, 64, 64, 1]
+    activation = "swish"

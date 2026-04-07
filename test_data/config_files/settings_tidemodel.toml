@@ -1,0 +1,22 @@
+[TideSettings]
+learning_rate = 0.001
+freqs = ["SSA", "K1", "O1", "Q1", "P1", "M2", "S2", "N2", "K2", "H"]
+use_gpu = true
+val_daterange = ["2011-01-01T00:00:00", "2011-01-15T00:00:00"]
+nepochs = 2
+model_name = "TestTideModel"
+nstations = 5
+weight_reg = 0.0001
+patience = 10
+nbatches = 1024
+lr_decay_rate = 50
+model_dir = "models/TestTideModel"
+checkpoints = [40, 80, 120, 160]
+lr_decay_factor = 0.9
+
+    [TideSettings.model_pars]
+    nhidden_trunk = 8
+    nlayers_down = 1
+    nlayers_trunk = 0
+    nlayers_branch = 2
+    nhidden_branch = 16
