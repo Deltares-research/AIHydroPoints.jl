@@ -39,4 +39,8 @@ mkdir(temp_dir) # create a new empty temp directory
    @testset "surges" begin
       include("test_train_surges.jl")
    end
+
+   @testset "settings" begin
+      include("test_settings.jl")
+   end
 end

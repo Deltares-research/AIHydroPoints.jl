@@ -50,3 +50,17 @@ The main goal of this project is to develop a machine learning model for predict
 - [x] Create unit test for the surge model (test/test_train_surges.jl)
 - [x] Adapt train_surges.jl to use the test dataset
 - [x] Create check_training_scripts.sh to smoke-test all training scripts
+- [ ] Add a test for reading settings from a toml file
+
+
+## Model design and development
+
+The current settings combine the model settings and the training settings in a single dictionary. This is not ideal, as it makes it difficult to reuse the model code for different training settings, and it makes it difficult to run inference with the trained model. We should separate the model settings from the training settings.
+
+### Identifed training settings:
+
+
+### Routines affected by the training settings:
+
+
+### Adapted function signatures:
