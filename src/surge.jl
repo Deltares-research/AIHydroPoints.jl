@@ -8,45 +8,29 @@ using Dates
 """
     struct SurgeSettings
 
-Struct that stores parameters for creating and training a model for surges.
+Inference-time parameters for the surge model.
+Training hyperparameters (epochs, learning rate, etc.) are stored separately in `TrainingSettings`.
 
-# Arguments
+# Fields
 
 - `model_name`: Name of the model.
-    (**Default**: `MySurgeModel`)
-- `model_dir`: Path to directory where files generated during the run will be saved.
-    (**Default**: `MySurgeModel`)
-- `nepochs`: Number of epochs used during training.
-    (**Default**: `100`)
-- `nbatches`: Number of batches to split the training datat into.
-    (**Default**: `1024`)
-- `learning_rate`: Learning rate of the Adam optimizer used.
-    (**Default**: `1.0e-3`)
-- `weight_reg`: Weight Decay parameter
-    (**Default**: `1.0-e4`)
-- `use_gpu`: Whether to train on gpu
+    (**Default**: `"MySurgeModel"`)
+- `model_dir`: Directory where files generated during the run will be saved.
+    (**Default**: `"MySurgeModel"`)
+- `use_gpu`: Whether to train/run on GPU.
     (**Default**: `false`)
-- `nstation`: Number of waterlevel stations used for training. Is deduced from training data when prepared, otherwise `nothing` to throw errors.
+- `nstations`: Number of waterlevel stations. Set from training data.
     (**Default**: `nothing`)
-- `nwind`: Number of wind stations used for training. Is deduced from training data when prepared, otherwise `nothing` to throw errors.
+- `nwind`: Number of wind stations. Set from training data.
     (**Default**: `nothing`)
-- `nlags`: Number of previous timesteps used as input in the model.
-    (*Default**: `16`)
-- `model_pars`: Dict of model parameters used to construct the surge model. The Default is set to work with the `create_surge_model` function.
-    (**Default**: `Dict("channels=>[32,32,32,1], "filter"=>2, "stride"=>2)`)
+- `nlags`: Number of previous timesteps used as input.
+    (**Default**: `16`)
+- `model_pars`: Dict of model architecture parameters.
+    (**Default**: `Dict("channels"=>[32,32,32,1], "filter"=>2, "stride"=>2)`)
 """
 @kwdef mutable struct SurgeSettings <: AbstractModelSettings
     model_name = "MySurgeModel"
     model_dir = "MySurgeModel"
-    nepochs = 100
-    nbatches = 1024
-    checkpoints = nothing
-    val_daterange = nothing
-    learning_rate = 1.0e-3
-    lr_decay_factor = nothing
-    lr_decay_rate = nothing
-    weight_reg = 1.0e-4
-    patience = 5
     use_gpu = false
     nstations = nothing # Set per training run from train data
     nwind = nothing # Set per training run from train data
@@ -333,7 +317,7 @@ function compute_loss(model, settings::SurgeSettings, data)
     return sqrt(Flux.mse(y_hat, y))
 end
 
-function train_epoch!(model, settings::SurgeSettings, dataloader, opt_state)
+function train_epoch!(model, settings::SurgeSettings, train_settings::TrainingSettings, dataloader, opt_state)
     acc_loss = 0.0f0
     for (x_station, x_stress_press, y) in dataloader
         dloss, grads = Flux.withgradient(model) do m

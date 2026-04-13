@@ -47,16 +47,13 @@ using Dates
 
     mktempdir() do model_dir
         settings = SurgeSettings(
-            model_name      = "test_surge_model",
-            model_dir       = model_dir,
-            nepochs         = 2,
-            nbatches        = 64,
-            learning_rate   = 1.0e-3,
-            use_gpu         = false,
-            nstations       = nstations,
-            nwind           = nwind,
-            nlags           = 4,
-            model_pars      = Dict(
+            model_name = "test_surge_model",
+            model_dir  = model_dir,
+            use_gpu    = false,
+            nstations  = nstations,
+            nwind      = nwind,
+            nlags      = 4,
+            model_pars = Dict(
                 "theta"          => 10000.0,
                 "nheads"         => 2,
                 "nlayers_branch" => 1,
@@ -65,14 +62,15 @@ using Dates
                 "nembed"         => 8,
             ),
         )
+        train_settings = TrainingSettings(nepochs=2, nbatches=64, learning_rate=1.0e-3)
 
         model = SurgeModel(gn, settings)
         @test !isnothing(model)
 
         model, acc_losses, train_losses, test_losses =
-            train_model(model, settings, train_dict, test_dict)
+            train_model(model, settings, train_settings, train_dict, test_dict)
 
-        @test length(train_losses) == settings.nepochs
+        @test length(train_losses) == train_settings.nepochs
         @test all(isfinite, train_losses)
         @test all(isfinite, test_losses)
     end

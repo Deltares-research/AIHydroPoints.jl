@@ -7,43 +7,27 @@ using FFTW
 """
     struct TideSettings
 
-Struct that stores parameters for creating and training a model for tides.
+Inference-time parameters for the tide model.
+Training hyperparameters (epochs, learning rate, etc.) are stored separately in `TrainingSettings`.
 
-# Arguments
+# Fields
 
 - `model_name`: Name of the model.
-    (**Default**: `MyTideModel`)
-- `model_dir`: Path to directory where files generated during the run will be saved.
-    (**Default**: `MyTideModel`)
-- `nepochs`: Number of epochs used during training.
-    (**Default**: `100`)
-- `nbatches`: Number of batches to split the training datat into.
-    (**Default**: `1024`)
-- `learning_rate`: Learning rate of the Adam optimizer used.
-    (**Default**: `1.0e-3`)
-- `weight_reg`: Weight Decay parameter
-    (**Default**: `1.0-e4`)
-- `use_gpu`: Whether to train on gpu
+    (**Default**: `"MyTideModel"`)
+- `model_dir`: Directory where files generated during the run will be saved.
+    (**Default**: `"MyTideModel"`)
+- `use_gpu`: Whether to train/run on GPU.
     (**Default**: `false`)
-- `nstation`: Number of waterlevel stations used for training. Is deduced from training data when prepared, otherwise `nothing` to throw errors.
+- `nstations`: Number of waterlevel stations. Set from training data.
     (**Default**: `nothing`)
 - `freqs`: Named tidal constituents used for training.
     (**Default**: `["SSA","K1","O1","Q1","P1","M2","S2","N2","K2","H"]`)
-- `model_pars`: Dict of model parameters used to construct the tide model. The Default is set to work with the `create_tide_model` function.
-    (**Default**: `Dict("nlayers=>1, "n1_feats"=>64, "n2_feats"=>64)`)
+- `model_pars`: Dict of model architecture parameters.
+    (**Default**: `Dict("nlayers"=>1, "n1_feats"=>64, "n2_feats"=>64)`)
 """
 @kwdef mutable struct TideSettings <: AbstractModelSettings
     model_name = "MyTideModel"
     model_dir = "MyTideModel"
-    nepochs = 100
-    nbatches = 1024
-    checkpoints = nothing
-    val_daterange = nothing
-    learning_rate = 1.0e-3
-    lr_decay_factor = nothing
-    lr_decay_rate = nothing
-    weight_reg = 1.0e-4
-    patience = 5
     use_gpu = false
     nstations = nothing # Set per training run from train data
     freqs = ["SSA","K1","O1","Q1","P1","M2","S2","N2","K2","H"]
@@ -315,7 +299,7 @@ function compute_loss(model, settings::TideSettings, data)
     return sqrt(Flux.mse(y_hat, y))
 end
 
-function train_epoch!(model, settings::TideSettings, dataloader, opt_state)
+function train_epoch!(model, settings::TideSettings, train_settings::TrainingSettings, dataloader, opt_state)
     acc_loss = 0.0f0
     for (x_station, x_doodson, y) in dataloader
         dloss, grad = Flux.withgradient(model) do m

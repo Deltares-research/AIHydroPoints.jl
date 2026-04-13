@@ -47,17 +47,20 @@ model_pars["nlayers_down"] = 1
 
 
 settings = TideSettings(
-    model_name=name,
-    nepochs=nepochs,
-    checkpoints=checkpoints,
-    val_daterange=val_range,
-    learning_rate=learning_rate,
-    lr_decay_factor=lr_decay_factor,
-    lr_decay_rate=lr_decay_rate,
-    model_dir=save_dir,
-    patience=patience,
-    use_gpu=true,
-    model_pars=model_pars
+    model_name = name,
+    model_dir  = save_dir,
+    use_gpu    = true,
+    model_pars = model_pars,
+)
+
+train_settings = TrainingSettings(
+    nepochs         = nepochs,
+    checkpoints     = checkpoints,
+    val_daterange   = val_range,
+    learning_rate   = learning_rate,
+    lr_decay_factor = lr_decay_factor,
+    lr_decay_rate   = lr_decay_rate,
+    patience        = patience,
 )
 
 model = TideModel(settings)
@@ -84,18 +87,18 @@ settings.nstations = length(get_names(data["training"]["waterlevel"]))
 
 
 # Train model
-model, acc_losses, train_losses, test_losses = train_model(model, settings, data["training"], data["testing"])
+model, acc_losses, train_losses, test_losses = train_model(model, settings, train_settings, data["training"], data["testing"])
 
 save_model(model, settings)
-save_settings(settings)
+save_settings(settings, train_settings)
 
-plot_losses(train_losses, test_losses, settings)
+plot_losses(train_losses, test_losses, settings, train_settings)
 
 # Make predictions for entire data set
 
 plot_series(model, settings, data["training"], "training", write_series=true, show_fft=true)
 plot_series(model, settings, data["testing"], "testing", write_series=true, show_fft=true)
-plot_series(model, settings, data["testing"], "testing_14d", timerange=settings.val_daterange)
+plot_series(model, settings, data["testing"], "testing_14d", timerange=train_settings.val_daterange)
 plot_series(model, settings, data["training"], "training_14d", timerange=["2009-01-01T00:00:00", "2009-01-15T00:00:00"])
 
 # Or get the predicted time series itself for a single station

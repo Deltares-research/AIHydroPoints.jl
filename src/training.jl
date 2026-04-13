@@ -13,57 +13,69 @@ using ParameterSchedulers: Constant, Step
 """
     AbstractModelSettings
 
-Type that will store the various settings to build and train a model.
-Will be subtyped to dispatch routines for the various models.
-Any particular implementation of ModelSettings should include at minimum:
-- `model_name`: Name of the model.
-- `model_dir`: Path to directory where everything (model, validation prediction, plots, etc.) will be saved.
-- `nepochs`: Number of epochs used during training.
-- `nbatches`: Number of batches to split the training datat into.
-- `learning_rate`: Learning rate of the Adam optimizer used.
-- `weight_reg`: Weight Decay parameter
-- `use_gpu`: Whether to train on gpu
+Base type for inference-time model settings structs (`TideSettings`, `SurgeSettings`, etc.).
+Each subtype holds only the fields needed to construct the model and run inference:
+`model_name`, `model_dir`, `use_gpu`, `nstations`, and model-specific architecture fields.
+
+Training hyperparameters (epochs, learning rate, etc.) are held in a separate `TrainingSettings`
+struct so that inference scripts do not need to carry them.
 """
 abstract type AbstractModelSettings end
 
 """
-    save_settings(settings::AbstractModelSettings)
+    save_settings(model_settings::AbstractModelSettings, train_settings::TrainingSettings)
 
-Saves settings to "settings.toml" file
+Save model and training settings to `"settings.toml"` inside `model_settings.model_dir`.
+The file contains two top-level TOML sections: one named after the concrete model settings
+type (e.g. `[TideSettings]`) and one `[TrainingSettings]`.
 
 # Arguments
 
-- `settings::AbstractModelSettings`: settings to be saved
+- `model_settings`: Inference-time model settings.
+- `train_settings`: Training hyperparameters.
 """
-function save_settings(settings::AbstractModelSettings)
-    fn = joinpath(settings.model_dir, "settings.toml")
-    # For convenience when loading we also write the type of the settings written
-    tmp = Dict(key => getfield(settings, key) for key in propertynames(settings)
-               if !isnothing(getfield(settings, key)))
-    dict = Dict(string(typeof(settings)) => tmp)
+function save_settings(model_settings::AbstractModelSettings, train_settings::TrainingSettings)
+    fn = joinpath(model_settings.model_dir, "settings.toml")
+    model_dict = Dict(string(key) => getfield(model_settings, key)
+                      for key in propertynames(model_settings)
+                      if !isnothing(getfield(model_settings, key)))
+    train_dict = Dict(string(key) => getfield(train_settings, key)
+                      for key in propertynames(train_settings)
+                      if !isnothing(getfield(train_settings, key)))
+    dict = Dict(
+        string(typeof(model_settings)) => model_dict,
+        "TrainingSettings"             => train_dict,
+    )
     open(fn, "w") do io
         TOML.print(io, dict)
     end
 end
 
 """
-    load_settings(fn)
+    load_settings(fn) -> (model_settings, train_settings)
 
-Loads settings from file
+Load settings from a TOML file previously written by `save_settings`.
+
+Returns a tuple `(model_settings, train_settings)` where `model_settings` is an
+instance of the concrete model type recorded in the file (e.g. `TideSettings`) and
+`train_settings` is a `TrainingSettings`.  If the file has no `[TrainingSettings]`
+section, `train_settings` is constructed with all defaults.
 
 # Arguments
 
-- `fn`: path to settings.toml file
+- `fn`: Path to the `settings.toml` file.
 """
 function load_settings(fn)
     dict = TOML.parsefile(fn)
-    # Deduce settings type
-    settings_type = Symbol(only(keys(dict)))
-    # Construct settings
-    vals = only(values(dict))
-    sett_type = @eval $settings_type
-    settings = sett_type(; (Symbol.(keys(vals)) .=> values(vals))...)
-    return settings
+    model_key = only(filter(k -> k != "TrainingSettings", keys(dict)))
+    sett_type = @eval $(Symbol(model_key))
+    vals = dict[model_key]
+    model_settings = sett_type(; (Symbol.(keys(vals)) .=> values(vals))...)
+
+    train_vals = get(dict, "TrainingSettings", Dict{String,Any}())
+    train_settings = TrainingSettings(; (Symbol.(keys(train_vals)) .=> values(train_vals))...)
+
+    return model_settings, train_settings
 end
 
 """
@@ -102,18 +114,19 @@ end
 """
     load_run(fn_dir, model_constructor)
 
-Load a training run from directory. Creates the model settings struct and the trained model
+Load a training run from directory.  Returns the reconstructed model and the inference-time
+model settings (training settings are discarded).
 
 # Arguments
 
-- `fn_dir`: Path to run directory
-- `model_constructor`: Function that builds to model. Used to create a blank model into which parameters are loaded. 
+- `fn_dir`: Path to run directory.
+- `model_constructor`: Function that builds the model; used to create a blank model into
+  which saved parameters are loaded.
 """
 function load_run(fn_dir, model_constructor)
-    settings = load_settings(joinpath(fn_dir, "settings.toml"))
-    model = load_model(settings, model_constructor)
-
-    return model, settings
+    model_settings, _ = load_settings(joinpath(fn_dir, "settings.toml"))
+    model = load_model(model_settings, model_constructor)
+    return model, model_settings
 end
 
 """
@@ -161,54 +174,56 @@ function compute_loss(model, settings::AbstractModelSettings, data)
 end
 
 """
-    train_epoch!(model, settings::AbstractModelSettings, dataloader, opt_state)
+    train_epoch!(model, settings::AbstractModelSettings, train_settings::TrainingSettings, dataloader, opt_state)
 
-Function training a model for a single epoch, based on the data in dataloader and the Optimizer state opt_state
+Train the model for one epoch.
 
 # Arguments
 
-- `model`: model to train
-- `settings::AbstractModelSettings`: settings containing hyperparameters, used for dispatch
-- `dataloader`: Flux DataLoader containing train data
-- `opt_state`: Optimizer state
+- `model`: Model to train.
+- `settings`: Inference-time model settings; used for dispatch.
+- `train_settings`: Training hyperparameters (e.g. `input_noise_std`).
+- `dataloader`: `Flux.DataLoader` with training data.
+- `opt_state`: Optimiser state.
 """
-function train_epoch!(model, settings::AbstractModelSettings, dataloader, opt_state)
-    error("Function train_epoch! not implemented for settings $(typeof(settings))")    
+function train_epoch!(model, settings::AbstractModelSettings, train_settings::TrainingSettings, dataloader, opt_state)
+    error("Function train_epoch! not implemented for settings $(typeof(settings))")
 end
 
 """
-    train_model(model, settings::AbstractModelSettings, train_data, test_data)
+    train_model(model, model_settings::AbstractModelSettings, train_settings::TrainingSettings, train_dict, test_dict)
 
-Train model using train_data, evaluate performance using test_data
-hyperparameters are stored in settings
+Train `model` using `train_dict`, evaluate on `test_dict`.
 
-To use this for a particular model type, implement the train_epoch! and compute_loss functions
-for the relevant settings type
+Model-specific dispatch (data preparation, loss, forward pass) is driven by `model_settings`.
+All training hyperparameters are read from `train_settings`.
 
 # Arguments
 
-- `model`: model to train
-- `settings::AbstractModelSettings`: settings containing hyperparameters, used for dispatching train_epoch!, compute_loss functions
-- `train_data`: Prepared train data
-- `test_data`: Prepared test data
+- `model`: Model to train.
+- `model_settings`: Inference-time settings; controls dispatch of `prepare_train_data`,
+  `compute_loss`, `train_epoch!`, `plot_series`.
+- `train_settings`: Training hyperparameters (epochs, batch size, learning rate, etc.).
+- `train_dict`: Dict of `AbstractTimeSeries` used for training.
+- `test_dict`: Dict of `AbstractTimeSeries` used for evaluation.
 """
-function train_model(model, settings::AbstractModelSettings, train_dict::Dict{String, <:AbstractTimeSeries}, test_dict::Dict{String, <:AbstractTimeSeries})
-    nepochs = settings.nepochs
-    nbatches = settings.nbatches
-    learning_rate = settings.learning_rate
-    lr_decay_factor = settings.lr_decay_factor
-    lr_decay_rate = settings.lr_decay_rate
-    weight_reg = settings.weight_reg
-    use_gpu = settings.use_gpu
-    patience = settings.patience
-    
-    checkpoints = settings.checkpoints
-    val_daterange = settings.val_daterange
+function train_model(model, model_settings::AbstractModelSettings, train_settings::TrainingSettings,
+                     train_dict::Dict{String, <:AbstractTimeSeries}, test_dict::Dict{String, <:AbstractTimeSeries})
+    nepochs         = train_settings.nepochs
+    nbatches        = train_settings.nbatches
+    learning_rate   = train_settings.learning_rate
+    lr_decay_factor = train_settings.lr_decay_factor
+    lr_decay_rate   = train_settings.lr_decay_rate
+    weight_reg      = train_settings.weight_reg
+    patience        = train_settings.patience
+    checkpoints     = train_settings.checkpoints
+    val_daterange   = train_settings.val_daterange
+    use_gpu         = model_settings.use_gpu
 
     lr_schedule = Constant(learning_rate)
     if !isnothing(lr_decay_factor) && !isnothing(lr_decay_rate)
         lr_schedule = Step(start=learning_rate, decay=lr_decay_factor, step_sizes=lr_decay_rate)
-    end    
+    end
 
     if use_gpu && CUDA.has_cuda()
         @info "Training on GPU"
@@ -219,22 +234,20 @@ function train_model(model, settings::AbstractModelSettings, train_dict::Dict{St
     end
 
     train_losses = []
-    test_losses = []
-    acc_losses = []
+    test_losses  = []
+    acc_losses   = []
 
-    tmp_losses = 1e3*ones(patience)
+    tmp_losses = 1e3 * ones(patience)
 
-    train_data = prepare_train_data(train_dict, settings)
-    test_data = prepare_train_data(test_dict, settings)
+    train_data = prepare_train_data(train_dict, model_settings)
+    test_data  = prepare_train_data(test_dict,  model_settings)
 
-    model = model |> device
-
+    model      = model      |> device
     train_data = train_data |> device
-    test_data = test_data |> device
+    test_data  = test_data  |> device
     dataloader = Flux.DataLoader(train_data, batchsize=nbatches, shuffle=true)
 
     opt_state = Flux.setup(OptimiserChain(WeightDecay(weight_reg), Adam(learning_rate)), model)
-    # opt_state = Flux.setup(Adam(learning_rate), model)
 
     @info "Start Training with params"
     @info "no. epochs: $nepochs"
@@ -245,20 +258,20 @@ function train_model(model, settings::AbstractModelSettings, train_dict::Dict{St
     pr = Progress(nepochs, desc="Training Progress", showspeed=true)
 
     for epoch in 1:nepochs
-        loss = train_epoch!(model, settings, dataloader, opt_state)
-        train_loss = compute_loss(model, settings, train_data)
-        test_loss = compute_loss(model, settings, test_data)
-        push!(acc_losses, loss)
+        loss       = train_epoch!(model, model_settings, train_settings, dataloader, opt_state)
+        train_loss = compute_loss(model, model_settings, train_data)
+        test_loss  = compute_loss(model, model_settings, test_data)
+        push!(acc_losses,   loss)
         push!(train_losses, train_loss)
-        push!(test_losses, test_loss)
+        push!(test_losses,  test_loss)
 
         next!(pr;
             showvalues = [
-                ("Epoch", epoch),
+                ("Epoch",            epoch),
                 ("Accumulated loss", loss),
-                ("Train loss", train_loss),
-                ("Test loss", test_loss),
-                ("Learning rate", lr_schedule(epoch))
+                ("Train loss",       train_loss),
+                ("Test loss",        test_loss),
+                ("Learning rate",    lr_schedule(epoch))
             ]
         )
 
@@ -272,66 +285,68 @@ function train_model(model, settings::AbstractModelSettings, train_dict::Dict{St
 
         if !isnothing(checkpoints) && epoch in checkpoints
             @info "Creating checkpoint $epoch"
-            tmp_settings =  deepcopy(settings)
-            tmp_settings.model_dir = joinpath(settings.model_dir, "checkpoints", "checkpoint_$epoch")
+            tmp_settings = deepcopy(model_settings)
+            tmp_settings.model_dir = joinpath(model_settings.model_dir, "checkpoints", "checkpoint_$epoch")
             if !isdir(tmp_settings.model_dir)
                 mkpath(tmp_settings.model_dir)
             end
-            save_model(model|>cpu, tmp_settings)
+            save_model(model |> cpu, tmp_settings)
 
             valdays = day.(DateTime.(val_daterange))
-            indx = 24*((valdays[2] - valdays[1])+1)
-
-            train_daterange = [get_times(train_dict["waterlevel"])[1], get_times(train_dict["waterlevel"])[indx]]
-            plot_series(model|>cpu, tmp_settings, test_dict, "chk_$(epoch)_test";  write_series=false)
-            plot_series(model|>cpu, tmp_settings, test_dict, "chk_$(epoch)_test_short"; write_series=false, timerange=val_daterange)
-            plot_series(model|>cpu, tmp_settings, train_dict, "chk_$(epoch)_train"; write_series=false)
-            plot_series(model|>cpu, tmp_settings, train_dict, "chk_$(epoch)_train_short"; write_series=false, timerange=train_daterange)
+            indx    = 24 * ((valdays[2] - valdays[1]) + 1)
+            train_daterange = [get_times(train_dict["waterlevel"])[1],
+                               get_times(train_dict["waterlevel"])[indx]]
+            plot_series(model |> cpu, tmp_settings, test_dict,  "chk_$(epoch)_test";  write_series=false)
+            plot_series(model |> cpu, tmp_settings, test_dict,  "chk_$(epoch)_test_short";  write_series=false, timerange=val_daterange)
+            plot_series(model |> cpu, tmp_settings, train_dict, "chk_$(epoch)_train"; write_series=false)
+            plot_series(model |> cpu, tmp_settings, train_dict, "chk_$(epoch)_train_short"; write_series=false, timerange=train_daterange)
         end
 
         if !isnothing(lr_schedule)
-            Optimisers.adjust!(opt_state, eta=lr_schedule(epoch+1))
+            Optimisers.adjust!(opt_state, eta=lr_schedule(epoch + 1))
         end
-
     end
 
     model = model |> cpu
 
     return model, acc_losses, train_losses, test_losses
-    
 end
 
 """
-    plot_losses(train_losses, test_losses, settings::AbstractModelSettings; kwargs...)
+    plot_losses(train_losses, test_losses, model_settings, train_settings; kwargs...)
 
-Plot train and test losses
+Plot train and test losses and save to `model_settings.model_dir`.
 
 # Arguments
 
-- `train_losses`: array containing train losses
-- `test_losses`: array containing test losses
-- `settings::AbstractModelSettings`: settings containing save dir
+- `train_losses`: Array of per-epoch training losses.
+- `test_losses`: Array of per-epoch test losses.
+- `model_settings`: Model settings; used only for the output directory.
+- `train_settings`: Training settings; used for checkpoints and LR schedule.
 
 # Keywords
 
-- `istart`: epoch number to start plotting from
+- `istart`: First epoch to include in the plot.
     (**Default**: `1`)
 """
-function plot_losses(train_losses, test_losses, settings::AbstractModelSettings; istart=1)
+function plot_losses(train_losses, test_losses,
+                     model_settings::AbstractModelSettings, train_settings::TrainingSettings;
+                     istart=1)
     plot(train_losses[istart:end], label="Train Loss", xlabel="Epoch", ylabel="Loss", minorgrid=true)
     plot!(test_losses[istart:end], label="Test Loss")
-    if !isnothing(settings.checkpoints)
-        vline!(settings.checkpoints, label="Checkpoints", ls=:dot, lc=:red)
+    if !isnothing(train_settings.checkpoints)
+        vline!(train_settings.checkpoints, label="Checkpoints", ls=:dot, lc=:red)
     end
-    if !isnothing(settings.lr_decay_factor) && !isnothing(settings.lr_decay_rate)
-        schedule = Step(start=settings.learning_rate, decay=settings.lr_decay_factor, step_sizes=settings.lr_decay_rate)
-        y_lims = (floor(log10(schedule(settings.nepochs))), ceil(log10(schedule(1))))
-        plot!(twinx(), 1:settings.nepochs, log10.(schedule.(1:settings.nepochs)), label=false, lc=:black, 
-            ylims=y_lims, yaxis="Learning Rate (log10)")
+    if !isnothing(train_settings.lr_decay_factor) && !isnothing(train_settings.lr_decay_rate)
+        schedule = Step(start=train_settings.learning_rate, decay=train_settings.lr_decay_factor,
+                        step_sizes=train_settings.lr_decay_rate)
+        y_lims = (floor(log10(schedule(train_settings.nepochs))), ceil(log10(schedule(1))))
+        plot!(twinx(), 1:train_settings.nepochs, log10.(schedule.(1:train_settings.nepochs)),
+              label=false, lc=:black, ylims=y_lims, yaxis="Learning Rate (log10)")
     end
-    xlims!(istart, length(train_losses)+istart)
+    xlims!(istart, length(train_losses) + istart)
     plot!(legend=:topright)
-    savefig(joinpath(settings.model_dir, "train_test_losses.png"))
+    savefig(joinpath(model_settings.model_dir, "train_test_losses.png"))
 end
 
 """

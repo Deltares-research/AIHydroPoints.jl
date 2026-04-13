@@ -21,6 +21,9 @@ export primary_frequencies_as_doodson, get_doodson_eqvals, constituents, lunar2s
 include("models/abstract_model.jl")
 export AbstractModel
 
+include("models/training_settings.jl")
+export TrainingSettings
+
 include("training.jl")
 include("tides.jl")
 export save_settings, load_settings, save_model, load_model, load_run, ModelSettings, prepare_train_data, predict, train_model, plot_losses, plot_series

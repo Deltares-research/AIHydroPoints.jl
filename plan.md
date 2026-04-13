@@ -13,8 +13,9 @@ The main goal of this project is to develop a machine learning model for predict
     b. [x] write tests for the code that is not tested at all, and improve the tests for the code that is tested but not well enough.
 5. Clean up the code and make it more modular and reusable.
     a. [x] replace netcdf_utils.jl with MultiTimeSeries.jl
-    b. Structure the model code, with an explicit AbstractModel type, and a common interface for all models.
-    c. Extranct the training settings from the model settings
+    b. [x] Structure the model code, with an explicit AbstractModel type, and a common interface for all models.
+    c. [x] Extract the training settings from the model settings
+    d. [ ] TODO
 6. Create a Separate data-structure for the training data, building on the MultiTimeSeries.jl package, and use it in the training code.
 7. Make training fully controllable from the toml input file, and make it possible to run training from the command line with a specified toml file.
 8. Write a separate script for inference
@@ -25,6 +26,7 @@ The main goal of this project is to develop a machine learning model for predict
 - consider to add new unit tests for the new code
 - fix all unit tests `pixi run julia --project -e "using Pkg; Pkg.test()"`
 - make sure that the code is well documented and that the documentation is up to date.
+- update docs/ (e.g. docs/settings.md) when the public API or settings change.
 - Check if README.md is up to date and update it if necessary.
 - Adapt the status in plan.md
 - run the unit tests and make sure that they all pass.
@@ -50,17 +52,74 @@ The main goal of this project is to develop a machine learning model for predict
 - [x] Create unit test for the surge model (test/test_train_surges.jl)
 - [x] Adapt train_surges.jl to use the test dataset
 - [x] Create check_training_scripts.sh to smoke-test all training scripts
-- [ ] Add a test for reading settings from a toml file
+- [x] Add a test for reading settings from a toml file (test/test_settings.jl)
+- [x] Split settings into TrainingSettings + model settings; document in docs/settings.md
 
 
 ## Model design and development
 
 The current settings combine the model settings and the training settings in a single dictionary. This is not ideal, as it makes it difficult to reuse the model code for different training settings, and it makes it difficult to run inference with the trained model. We should separate the model settings from the training settings.
 
-### Identifed training settings:
+### Identified training-only settings (not needed for inference):
 
+Common to all three models (`TideSettings`, `SurgeSettings`, `WaveSettings`):
+- `nepochs`
+- `nbatches`
+- `learning_rate`
+- `lr_decay_factor`
+- `lr_decay_rate`
+- `weight_reg`
+- `patience`
+- `checkpoints`
+- `val_daterange`
+
+Wave-specific training-only setting:
+- `input_noise_std` — Gaussian noise injected into inputs during `train_epoch!` only
+    - add noise optn for all models!
+
+### Settings needed for inference (must stay in model settings):
+
+| Field | Tide | Surge | Wave |
+|---|:---:|:---:|:---:|
+| `model_name` | ✓ | ✓ | ✓ |
+| `model_dir` | ✓ | ✓ | ✓ |
+| `use_gpu` | ✓ | ✓ | ✓ |
+| `model_pars` | ✓ | ✓ | ✓ |
+| `nstations` | ✓ | ✓ | ✓ |
+| `freqs` | ✓ | — | — |
+| `nwind` | — | ✓ | ✓ |
+| `nlags` | — | ✓ | ✓ |
+| `n_input_channels` | — | — | ✓ |
+| `wind_scale` | — | — | ✓ |
+| `wave_scale` | — | — | ✓ |
 
 ### Routines affected by the training settings:
 
+- `src/training.jl`:
+    - `train_model` — reads all training-only fields directly from `settings`
+    - `plot_losses` — reads `checkpoints`, `lr_decay_factor`, `lr_decay_rate`, `learning_rate`, `nepochs`
+    - `save_settings` / `load_settings` — serialises the whole settings struct; will need updating
+- `src/waves.jl`:
+    - `train_epoch!` — reads `input_noise_std` from `settings`
+- Training scripts (`train_tides.jl`, `train_surges.jl`, `train_waves.jl`, `train_waves_don.jl`) — construct a single settings object containing both groups
 
 ### Adapted function signatures:
+
+```julia
+# Current
+train_model(model, settings::AbstractModelSettings, train_dict, test_dict)
+
+# Proposed — training settings extracted into a separate struct
+train_model(model, model_settings::AbstractModelSettings,
+            train_settings::TrainingSettings, train_dict, test_dict)
+
+# Or keep single settings struct but dispatch on a wrapper:
+train_model(model, settings::AbstractModelSettings, train_dict, test_dict)
+# where AbstractModelSettings only holds inference fields and
+# TrainingSettings <: AbstractModelSettings adds the training fields
+```
+
+The second option (subtype) is less disruptive: existing call sites don't change,
+and `load_settings` / `save_settings` continue to work without modification.
+The first option (two separate structs) is cleaner for inference scripts that
+should not need to construct a full settings object.

@@ -9,74 +9,77 @@ config_dir = joinpath(@__DIR__, "..", "test_data", "config_files")
         fn = joinpath(config_dir, "settings_tidemodel.toml")
         @test isfile(fn)
 
-        s = load_settings(fn)
-        @test s isa TideSettings
-        @test s.model_name    == "TestTideModel"
-        @test s.nepochs       == 2
-        @test s.nbatches      == 1024
-        @test s.nstations     == 5
-        @test s.learning_rate ≈  0.001
-        @test s.lr_decay_factor ≈ 0.9
-        @test s.lr_decay_rate == 50
-        @test s.patience      == 10
-        @test s.use_gpu       == true
-        @test s.val_daterange == ["2011-01-01T00:00:00", "2011-01-15T00:00:00"]
-        @test s.checkpoints   == [40, 80, 120, 160]
-        @test s.model_pars["nlayers_branch"] == 2
-        @test s.model_pars["nhidden_branch"] == 16
-        @test s.model_pars["nlayers_trunk"]  == 0
-        @test s.model_pars["nhidden_trunk"]  == 8
-        @test s.model_pars["nlayers_down"]   == 1
+        ms, ts = load_settings(fn)
+        @test ms isa TideSettings
+        @test ts isa TrainingSettings
+        @test ms.model_name    == "TestTideModel"
+        @test ms.nstations     == 5
+        @test ms.use_gpu       == true
+        @test ms.model_pars["nlayers_branch"] == 2
+        @test ms.model_pars["nhidden_branch"] == 16
+        @test ms.model_pars["nlayers_trunk"]  == 0
+        @test ms.model_pars["nhidden_trunk"]  == 8
+        @test ms.model_pars["nlayers_down"]   == 1
+        @test ts.nepochs       == 2
+        @test ts.nbatches      == 1024
+        @test ts.learning_rate ≈  0.001
+        @test ts.lr_decay_factor ≈ 0.9
+        @test ts.lr_decay_rate == 50
+        @test ts.patience      == 10
+        @test ts.val_daterange == ["2011-01-01T00:00:00", "2011-01-15T00:00:00"]
+        @test ts.checkpoints   == [40, 80, 120, 160]
     end
 
     @testset "SurgeSettings" begin
         fn = joinpath(config_dir, "settings_surgemodel.toml")
         @test isfile(fn)
 
-        s = load_settings(fn)
-        @test s isa SurgeSettings
-        @test s.model_name    == "TestSurgeModel"
-        @test s.nepochs       == 2
-        @test s.nbatches      == 1024
-        @test s.nstations     == 5
-        @test s.nwind         == 9
-        @test s.nlags         == 16
-        @test s.learning_rate ≈  0.001
-        @test s.lr_decay_factor ≈ 0.1
-        @test s.lr_decay_rate == 400
-        @test s.patience      == 5
-        @test s.use_gpu       == false
-        @test s.val_daterange == ["2012-01-01T00:00:00", "2012-01-15T00:00:00"]
-        @test s.checkpoints   == [40, 80, 120, 160]
-        @test s.model_pars["theta"]          ≈ 10000.0
-        @test s.model_pars["nheads"]         == 4
-        @test s.model_pars["nlayers_branch"] == 2
-        @test s.model_pars["nlayers_trunk"]  == 0
-        @test s.model_pars["nhidden_trunk"]  == 16
-        @test s.model_pars["nembed"]         == 16
+        ms, ts = load_settings(fn)
+        @test ms isa SurgeSettings
+        @test ts isa TrainingSettings
+        @test ms.model_name    == "TestSurgeModel"
+        @test ms.nstations     == 5
+        @test ms.nwind         == 9
+        @test ms.nlags         == 16
+        @test ms.use_gpu       == false
+        @test ms.model_pars["theta"]          ≈ 10000.0
+        @test ms.model_pars["nheads"]         == 4
+        @test ms.model_pars["nlayers_branch"] == 2
+        @test ms.model_pars["nlayers_trunk"]  == 0
+        @test ms.model_pars["nhidden_trunk"]  == 16
+        @test ms.model_pars["nembed"]         == 16
+        @test ts.nepochs       == 2
+        @test ts.nbatches      == 1024
+        @test ts.learning_rate ≈  0.001
+        @test ts.lr_decay_factor ≈ 0.1
+        @test ts.lr_decay_rate == 400
+        @test ts.patience      == 5
+        @test ts.val_daterange == ["2012-01-01T00:00:00", "2012-01-15T00:00:00"]
+        @test ts.checkpoints   == [40, 80, 120, 160]
     end
 
     @testset "WaveSettings" begin
         fn = joinpath(config_dir, "settings_wavemodel.toml")
         @test isfile(fn)
 
-        s = load_settings(fn)
-        @test s isa WaveSettings
-        @test s.model_name      == "wave_model_10to11_explyr3_3stations"
-        @test s.nepochs         == 2
-        @test s.nbatches        == 256
-        @test s.nstations       == 11
-        @test s.nwind           == 10
-        @test s.nlags           == 16
-        @test s.n_input_channels == 64
-        @test s.learning_rate   ≈  0.001
-        @test s.wind_scale      ≈  0.5
-        @test s.wave_scale      ≈  3.0
-        @test s.input_noise_std ≈  0.3
-        @test s.patience        == 5
-        @test s.use_gpu         == true
-        @test s.model_pars["nchannel"]   == [64, 64, 64, 1]
-        @test s.model_pars["activation"] == "swish"
+        ms, ts = load_settings(fn)
+        @test ms isa WaveSettings
+        @test ts isa TrainingSettings
+        @test ms.model_name      == "wave_model_10to11_explyr3_3stations"
+        @test ms.nstations       == 11
+        @test ms.nwind           == 10
+        @test ms.nlags           == 16
+        @test ms.n_input_channels == 64
+        @test ms.use_gpu         == true
+        @test ms.wind_scale      ≈  0.5
+        @test ms.wave_scale      ≈  3.0
+        @test ms.model_pars["nchannel"]   == [64, 64, 64, 1]
+        @test ms.model_pars["activation"] == "swish"
+        @test ts.nepochs         == 2
+        @test ts.nbatches        == 256
+        @test ts.learning_rate   ≈  0.001
+        @test ts.input_noise_std ≈  0.3
+        @test ts.patience        == 5
     end
 
 end

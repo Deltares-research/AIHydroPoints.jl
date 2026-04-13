@@ -8,23 +8,16 @@ using DataFrames
 """
     struct WaveSettings
 
-Struct that stores parameters for creating and training a model for wave heights.
+Inference-time parameters for the wave model.
+Training hyperparameters (epochs, learning rate, noise, etc.) are stored separately in `TrainingSettings`.
 
-# Arguments
+# Fields
 
 - `model_name`: Name of the model.
-    (**Default**: `MyWaveModel`)
-- `model_dir`: Path to directory where files generated during the run will be saved.
-    (**Default**: `MyWaveModel`)
-- `nepochs`: Number of epochs used during training.
-    (**Default**: `100`)
-- `nbatches`: Number of batches to split the training data into.
-    (**Default**: `256`)
-- `learning_rate`: Learning rate of the Adam optimizer.
-    (**Default**: `1.0e-3`)
-- `weight_reg`: Weight decay parameter.
-    (**Default**: `1.0e-4`)
-- `use_gpu`: Whether to train on GPU.
+    (**Default**: `"MyWaveModel"`)
+- `model_dir`: Directory where files generated during the run will be saved.
+    (**Default**: `"MyWaveModel"`)
+- `use_gpu`: Whether to train/run on GPU.
     (**Default**: `false`)
 - `nstations`: Number of wave output stations. Set from training data.
     (**Default**: `nothing`)
@@ -35,26 +28,15 @@ Struct that stores parameters for creating and training a model for wave heights
 - `n_input_channels`: Number of channels in the first convolutional layer.
     (**Default**: `64`)
 - `wind_scale`: Divisor applied to wind stress values before input to model.
-    (**Default**: `0.5f0`)
+    (**Default**: `0.5`)
 - `wave_scale`: Divisor applied to wave height values.
-    (**Default**: `3.0f0`)
-- `input_noise_std`: Standard deviation of Gaussian noise added to inputs during training.
-    (**Default**: `0.30f0`)
+    (**Default**: `3.0`)
 - `model_pars`: Dict of model architecture parameters.
     (**Default**: `Dict("nchannel" => [64,64,64,1], "activation" => "swish")`)
 """
 @kwdef mutable struct WaveSettings <: AbstractModelSettings
     model_name = "MyWaveModel"
     model_dir = "MyWaveModel"
-    nepochs = 100
-    nbatches = 256
-    checkpoints = nothing
-    val_daterange = nothing
-    learning_rate = 1.0e-3
-    lr_decay_factor = nothing
-    lr_decay_rate = nothing
-    weight_reg = 1.0e-4  # Float64 — required for TOML serialisation
-    patience = 5
     use_gpu = false
     nstations = nothing   # output (wave) stations — set from data
     nwind = nothing       # input (wind) stations — set from data
@@ -62,7 +44,6 @@ Struct that stores parameters for creating and training a model for wave heights
     n_input_channels = 64
     wind_scale = 0.5
     wave_scale = 3.0
-    input_noise_std = 0.30
     model_pars = Dict(
         "nchannel" => [64, 64, 64, 1],
         "activation" => "swish",
@@ -229,8 +210,8 @@ function compute_loss(model, settings::WaveSettings, data)
     return sqrt(Flux.mse(y_hat, y))
 end
 
-function train_epoch!(model, settings::WaveSettings, dataloader, opt_state)
-    noise_std = Float32(settings.input_noise_std)
+function train_epoch!(model, settings::WaveSettings, train_settings::TrainingSettings, dataloader, opt_state)
+    noise_std = Float32(train_settings.input_noise_std)
     acc_loss  = 0.0f0
     for (x_station, x_input, y) in dataloader
         x_noisy = noise_std > 0.0f0 ?

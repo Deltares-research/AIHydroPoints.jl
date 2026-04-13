@@ -53,17 +53,20 @@ rm(save_dir, recursive=true, force=true)
 mkpath(save_dir)
 
 settings = SurgeSettings(
-    model_name      = name,
+    model_name = name,
+    model_dir  = save_dir,
+    use_gpu    = false,
+    nlags      = nlags,
+    model_pars = model_pars,
+)
+
+train_settings = TrainingSettings(
     nepochs         = nepochs,
     checkpoints     = checkpoints,
     val_daterange   = val_range,
     learning_rate   = learning_rate,
     lr_decay_factor = lr_decay_factor,
     lr_decay_rate   = lr_decay_rate,
-    model_dir       = save_dir,
-    use_gpu         = false,
-    nlags           = nlags,
-    model_pars      = model_pars,
 )
 
 # ──────────────────────────────────────────────
@@ -114,17 +117,17 @@ gn = GraphNetwork(in_points, out_points, max_distance=1e5)
 model = SurgeModel(gn, settings)
 
 model, acc_losses, train_losses, test_losses =
-    train_model(model, settings, data["training"], data["testing"])
+    train_model(model, settings, train_settings, data["training"], data["testing"])
 
 save_model(model, settings)
-save_settings(settings)
+save_settings(settings, train_settings)
 
-plot_losses(train_losses, test_losses, settings)
+plot_losses(train_losses, test_losses, settings, train_settings)
 
 # ──────────────────────────────────────────────
 # Plots
 # ──────────────────────────────────────────────
 plot_series(model, settings, data["testing"],  "testing_14d",
-    timerange=settings.val_daterange)
+    timerange=train_settings.val_daterange)
 plot_series(model, settings, data["training"], "training_14d",
     timerange=["2011-01-01T00:00:00", "2011-01-15T00:00:00"])

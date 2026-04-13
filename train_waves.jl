@@ -62,22 +62,25 @@ test_dict = Dict(
 # ──────────────────────────────────────────────
 runid    = "10to11_explyr3"
 settings = WaveSettings(
-    model_name      = "wave_model_$(runid)_3stations",
-    model_dir       = "wave_model_$(runid)_3stations",
-    nepochs         = 2, # FOR TESTING, set to a low number. Change for REAL RUN!
-    # nepochs         = 100, # Realistic for this model, but can be increased for better performance.
+    model_name       = "wave_model_$(runid)_3stations",
+    model_dir        = "wave_model_$(runid)_3stations",
+    use_gpu          = CUDA.functional(),
+    nstations        = length(output_locations),
+    nwind            = length(input_locations),
+    nlags            = 16,
+    n_input_channels = 64,
+    wind_scale       = 0.5,
+    wave_scale       = 3.0,
+    model_pars       = Dict("nchannel" => [64, 64, 64, 1], "activation" => "swish"),
+)
+
+train_settings = TrainingSettings(
+    nepochs         = 2,    # FOR TESTING — change to 100 for a real run
+    # nepochs       = 100,
     nbatches        = 256,
     learning_rate   = 0.001,
     weight_reg      = 1.0e-4,
-    use_gpu         = CUDA.functional(),
-    nstations       = length(output_locations),
-    nwind           = length(input_locations),
-    nlags           = 16,
-    n_input_channels = 64,
-    wind_scale      = 0.5,
-    wave_scale      = 3.0,
     input_noise_std = 0.30,
-    model_pars      = Dict("nchannel" => [64, 64, 64, 1], "activation" => "swish"),
 )
 
 if isdir(settings.model_dir)
@@ -90,10 +93,10 @@ mkdir(settings.model_dir)
 # ──────────────────────────────────────────────
 model = create_wave_model(settings)
 model, acc_losses, train_losses, test_losses =
-    train_model(model, settings, train_dict, test_dict)
+    train_model(model, settings, train_settings, train_dict, test_dict)
 save_model(model, settings)
-save_settings(settings)
-plot_losses(train_losses, test_losses, settings)
+save_settings(settings, train_settings)
+plot_losses(train_losses, test_losses, settings, train_settings)
 
 # ──────────────────────────────────────────────
 # Predict on full dataset and save

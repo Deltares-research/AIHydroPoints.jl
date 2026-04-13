@@ -19,7 +19,12 @@ We aim to have the main datasets available in zarr format in the cloud, so they 
 
 ## Status
 
-The wave model (`train_waves.jl`) is working end-to-end using the library code in `src/`. Unit tests pass for wind stress, tidal constituents, the wave training pipeline, and the tide training pipeline. The surge and interaction models are working but their training scripts have not yet been updated to use the new `src/` library.
+All four models (tides, surges, waves, interaction) use the `AIHydroPoints` library in `src/`.
+Unit tests pass for wind stress, tidal constituents, and the wave, tide, and surge training pipelines.
+Training and inference settings are split: model-architecture fields live in `TideSettings` /
+`SurgeSettings` / `WaveSettings`, while training hyperparameters (epochs, learning rate, etc.)
+live in a shared `TrainingSettings` struct — see `docs/settings.md`.
+A smoke-test script (`check_training_scripts.sh`) verifies all training scripts end-to-end.
 
 ## Intended workflow for training
 
@@ -41,17 +46,21 @@ The wave model (`train_waves.jl`) is working end-to-end using the library code i
 
 All library code lives in `src/` and is exposed as the `AIHydroPoints` Julia package.
 
+- `models/abstract_model.jl` — `AbstractModel` abstract type (common interface for all models)
+- `models/training_settings.jl` — `TrainingSettings` struct (epochs, learning rate, regularisation, etc.)
 - `tidal_comps.jl` — Doodson phases, lunar-to-solar conversion, named tidal constituents
 - `wind_stress.jl` — Convert 10 m winds to stress components
 - `waves.jl` — Wave model: `WaveSettings`, `create_wave_model`, `train_epoch!`, `predict`, `stats_skipnan`, `plot_series`
-- `tides.jl` — Tide model settings and architecture
-- `surge.jl` — Surge model settings and architecture
-- `interaction.jl` — Tide–surge interaction model
+- `tides.jl` — Tide model: `TideSettings`, `TideModel`, `prepare_inputs`, `predict`, `plot_series`
+- `surge.jl` — Surge model: `SurgeSettings`, `SurgeModel`, `prepare_inputs`, `predict`, `plot_series`
+- `interaction.jl` — Tide–surge interaction model: `InteractionSettings`
 - `training.jl` — Shared training loop (`train_model`), `save_model`, `load_model`, `save_settings`, `load_settings`
 - `graph_network.jl`, `attention.jl` — Graph network and attention building blocks
 
 Time-series I/O (in-memory, NetCDF, Zarr, JLD2, NOOS) is provided by the external
 [MultiTimeSeries.jl](https://github.com/robot144/MultiTimeSeries.jl) package.
+
+See `docs/settings.md` for a full reference of all settings fields.
 ## Analysis scripts
 
 - `analyse_tides_schureman.jl` — Harmonic tidal analysis (Schureman, 95 constituents) on a
@@ -91,14 +100,14 @@ The different models all need time-series and a configuration as inputs. Each mo
 - [x] export to netcdf his file
 - [x] small test dataset in `test_data/DCSM-FM_0_5nm_*_5stations_his.jld2`
 - [x] unit test for tide training pipeline (`test/test_train_tides.jl`)
-- [ ] rewrite `train_tides.jl` to use `AIHydroPoints` library
+- [x] `train_tides.jl` updated to use `AIHydroPoints` library
 - [ ] check with cpu and gpu. Is gpu faster?
 - [ ] rewrite `get_dcsm_series.jl` to use TimeSeries
 ### Surge
 - [x] download ERA5 data — see [DataCollector.jl repo](https://github.com/robot144/DataCollector.jl)
 - [x] convert to jld2 and compute stresses
-- [ ] rewrite `train_surge.jl` to use `AIHydroPoints` library
-- [ ] test `train_surge.jl` with test-dataset
+- [x] `train_surges.jl` updated to use `AIHydroPoints` library
+- [x] unit test for surge training pipeline (`test/test_train_surges.jl`)
 ### Tide-Surge Interaction
 - [x] create AI model and train
 - [ ] update `train_interaction.jl` to use `AIHydroPoints` library
@@ -109,8 +118,11 @@ The different models all need time-series and a configuration as inputs. Each mo
 - [x] Read and write time-series (NetCDF, Zarr, JLD2, NOOS)
 - [x] `wind_stress.jl` moved to `src/`
 - [x] tidal constituent routines moved to `src/tidal_comps.jl`
-- [ ] rewrite `train_tides.jl` to use `AIHydroPoints` library
-- [ ] add unit tests for tide, surge and interaction models
+- [x] `AbstractModel` abstract type in `src/models/abstract_model.jl`
+- [x] `TrainingSettings` separated from model settings; documented in `docs/settings.md`
+- [x] smoke-test script `check_training_scripts.sh`
+- [ ] update `train_interaction.jl` to use `AIHydroPoints` library
+- [ ] add unit test for interaction model
 
 
 

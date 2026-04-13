@@ -1,19 +1,10 @@
 [SurgeSettings]
+model_name = "TestSurgeModel"
+model_dir = "models/TestSurgeModel"
+use_gpu = false
+nstations = 5
 nwind = 9
 nlags = 16
-learning_rate = 0.001
-use_gpu = false
-val_daterange = ["2012-01-01T00:00:00", "2012-01-15T00:00:00"]
-nepochs = 2
-model_name = "TestSurgeModel"
-nstations = 5
-weight_reg = 0.0001
-patience = 5
-nbatches = 1024
-lr_decay_rate = 400
-model_dir = "models/TestSurgeModel"
-checkpoints = [40, 80, 120, 160]
-lr_decay_factor = 0.1
 
     [SurgeSettings.model_pars]
     theta = 10000.0
@@ -22,3 +13,14 @@ lr_decay_factor = 0.1
     nembed = 16
     nlayers_branch = 2
     nhidden_trunk = 16
+
+[TrainingSettings]
+nepochs = 2
+nbatches = 1024
+learning_rate = 0.001
+lr_decay_factor = 0.1
+lr_decay_rate = 400
+weight_reg = 0.0001
+patience = 5
+val_daterange = ["2012-01-01T00:00:00", "2012-01-15T00:00:00"]
+checkpoints = [40, 80, 120, 160]

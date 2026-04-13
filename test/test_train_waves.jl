@@ -53,10 +53,6 @@ using DataFrames
         settings = WaveSettings(
             model_name       = "test_wave_model",
             model_dir        = model_dir,
-            nepochs          = 2,
-            nbatches         = 8,
-            learning_rate    = 0.001,
-            weight_reg       = 1.0e-4,
             use_gpu          = false,
             nstations        = length(output_locations),
             nwind            = length(input_locations),
@@ -64,9 +60,10 @@ using DataFrames
             n_input_channels = 4,
             wind_scale       = 0.5,
             wave_scale       = 3.0,
-            input_noise_std  = 0.0,
             model_pars       = Dict("nchannel" => [4, 1], "activation" => "swish"),
         )
+        train_settings = TrainingSettings(nepochs=2, nbatches=8, learning_rate=0.001,
+                                          weight_reg=1.0e-4, input_noise_std=0.0)
 
         # ── Model creation ─────────────────────────────────────────────────
         model = create_wave_model(settings)
@@ -74,9 +71,9 @@ using DataFrames
 
         # ── Training ───────────────────────────────────────────────────────
         model, acc_losses, train_losses, test_losses =
-            train_model(model, settings, train_dict, test_dict)
-        @test length(train_losses) == settings.nepochs
-        @test length(test_losses)  == settings.nepochs
+            train_model(model, settings, train_settings, train_dict, test_dict)
+        @test length(train_losses) == train_settings.nepochs
+        @test length(test_losses)  == train_settings.nepochs
         @test all(isfinite, train_losses)
 
         # ── Prediction ─────────────────────────────────────────────────────

@@ -21,14 +21,11 @@ using Dates
 
     mktempdir() do model_dir
         settings = TideSettings(
-            model_name    = "test_tide_model",
-            model_dir     = model_dir,
-            nepochs       = 2,
-            nbatches      = 64,
-            learning_rate = 1.0e-3,
-            use_gpu       = false,
-            nstations     = nstations,
-            model_pars    = Dict(
+            model_name = "test_tide_model",
+            model_dir  = model_dir,
+            use_gpu    = false,
+            nstations  = nstations,
+            model_pars = Dict(
                 "nlayers_branch" => 1,
                 "nhidden_branch" => 8,
                 "nlayers_trunk"  => 0,
@@ -36,14 +33,15 @@ using Dates
                 "nlayers_down"   => 1,
             )
         )
+        train_settings = TrainingSettings(nepochs=2, nbatches=64, learning_rate=1.0e-3)
 
         model = TideModel(settings)
         @test !isnothing(model)
 
         model, acc_losses, train_losses, test_losses =
-            train_model(model, settings, train_dict, test_dict)
+            train_model(model, settings, train_settings, train_dict, test_dict)
 
-        @test length(train_losses) == settings.nepochs
+        @test length(train_losses) == train_settings.nepochs
         @test all(isfinite, train_losses)
         @test all(isfinite, test_losses)
 
