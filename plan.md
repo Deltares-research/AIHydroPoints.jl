@@ -106,20 +106,11 @@ Wave-specific training-only setting:
 ### Adapted function signatures:
 
 ```julia
-# Current
+# Old signature: all settings in one struct
 train_model(model, settings::AbstractModelSettings, train_dict, test_dict)
 
-# Proposed — training settings extracted into a separate struct
+# Current — training settings extracted into a separate struct
 train_model(model, model_settings::AbstractModelSettings,
             train_settings::TrainingSettings, train_dict, test_dict)
 
-# Or keep single settings struct but dispatch on a wrapper:
-train_model(model, settings::AbstractModelSettings, train_dict, test_dict)
-# where AbstractModelSettings only holds inference fields and
-# TrainingSettings <: AbstractModelSettings adds the training fields
 ```
-
-The second option (subtype) is less disruptive: existing call sites don't change,
-and `load_settings` / `save_settings` continue to work without modification.
-The first option (two separate structs) is cleaner for inference scripts that
-should not need to construct a full settings object.
