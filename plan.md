@@ -15,7 +15,10 @@ The main goal of this project is to develop a machine learning model for predict
     a. [x] replace netcdf_utils.jl with MultiTimeSeries.jl
     b. [x] Structure the model code, with an explicit AbstractModel type, and a common interface for all models.
     c. [x] Extract the training settings from the model settings
-    d. [ ] TODO
+    d. [ ] Work on model design and development, as described in src/models/design.md
+    e. [ ] Test the new model design with a linear regression model.
+    f. [ ] Implement the new model design for the tide model,  and write unit tests for it.
+    g. [ ] ...
 6. Create a Separate data-structure for the training data, building on the MultiTimeSeries.jl package, and use it in the training code.
 7. Make training fully controllable from the toml input file, and make it possible to run training from the command line with a specified toml file.
 8. Write a separate script for inference
