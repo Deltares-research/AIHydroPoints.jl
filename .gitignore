@@ -32,7 +32,7 @@ JuliaLocalPreferences.toml
 test/.cache
 test/temp
 
-models/
+trained_models/
 
 sandbox# pixi environments
 .pixi/*
