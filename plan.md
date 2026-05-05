@@ -15,8 +15,8 @@ The main goal of this project is to develop a machine learning model for predict
     a. [x] replace netcdf_utils.jl with MultiTimeSeries.jl
     b. [x] Structure the model code, with an explicit AbstractModel type, and a common interface for all models.
     c. [x] Extract the training settings from the model settings
-    d. [ ] Work on model design and development, as described in src/models/design.md
-    e. [ ] Test the new model design with a linear regression model.
+    d. [x] Work on model design and development, as described in src/models/design.md
+    e. [x] Test the new model design with a linear regression model.
     f. [ ] Implement the new model design for the tide model,  and write unit tests for it.
     g. [ ] ...
 6. Create a Separate data-structure for the training data, building on the MultiTimeSeries.jl package, and use it in the training code.
@@ -57,6 +57,11 @@ The main goal of this project is to develop a machine learning model for predict
 - [x] Create check_training_scripts.sh to smoke-test all training scripts
 - [x] Add a test for reading settings from a toml file (test/test_settings.jl)
 - [x] Split settings into TrainingSettings + model settings; document in docs/settings.md
+- [x] Implement LinearSurgeModel as first concrete AbstractFluxModel with training loop, progress bar, and train/val RMSE reporting
+- [x] Add validation_split to TrainingSettings for temporal train/val split
+- [x] Add toml_write utility (src/toml_utils.jl) for saving model settings as TOML
+- [x] Add save_loss_plot utility (src/plot_utils.jl) for saving train/val RMSE plots as PNG
+- [x] Add overwrite guards and directory checks to save_params, toml_write, and save_loss_plot
 
 
 ## Model design and development

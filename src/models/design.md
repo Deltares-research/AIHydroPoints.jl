@@ -38,13 +38,16 @@ ConcreteModel(settings::Dict{String, Any}) -> ConcreteModel
 |---|---|---|
 | `predict`      | `(m::M, input::Dict{String,TimeSeries}) -> Dict{String,TimeSeries}` | Unified inference entry point |
 | `get_settings` | `(m::M) -> Dict{String,Any}` | Return inference-time settings |
-| `save_params`  | `(m::M, file::String)` | Serialise trained weights to file |
+| `save_params`  | `(m::M, file::String; overwrite=false)` | Serialise trained weights to file |
 | `load_params!` | `(m::M, file::String)` | Load weights from file in-place |
-| `train_model!` | `(m::M, train_settings::TrainingSettings)` | Train in-place |
+| `train_model!` | `(m::M, train_settings::TrainingSettings, input, target)` | Train in-place |
 
 `TimeSeries` is the concrete type from `MultiTimeSeries.jl`.
 All methods have fallback implementations that throw a descriptive error when a
 subtype forgets to implement them.
+
+`save_params` checks that the parent directory exists and raises an error if the
+file already exists and `overwrite=false` (default).
 
 ## AbstractFluxModel (`abstract_flux_model.jl`)
 
@@ -55,7 +58,6 @@ Flux-based model types.  It implements `predict`, `save_params`, and
 ```
 AbstractModel
     └── AbstractFluxModel   — implements predict, save_params, load_params!
-            ├── MyFluxModel — convenience concrete struct (chain + settings dict)
             └── FooModel    — domain-specific concrete subtype
 ```
 
@@ -98,24 +100,6 @@ a side-effect on the model struct and keeps `TimeSeries` allocation in one place
 `save_params` and `load_params!` are implemented once at this level using
 `get_flux_model` together with `Flux.state` / `Flux.loadmodel!` and JLD2.
 
-### MyFluxModel
-
-`MyFluxModel <: AbstractFluxModel` is a convenience concrete struct for cases
-where domain models do not need their own struct.  It holds a Flux chain and a
-settings dict, and provides `get_flux_model` and `get_settings` automatically.
-
-```julia
-model = MyFluxModel(my_chain, settings)
-
-# Add domain behaviour via methods that dispatch on MyFluxModel:
-preprocess(m::MyFluxModel, input) = ...
-forward(m::MyFluxModel, x)        = ...
-postprocess!(output, m::MyFluxModel, y) = ...
-```
-
-When a domain model needs additional fields (e.g. cached station metadata),
-define it as its own `<: AbstractFluxModel` struct instead.
-
 ## LinearSurgeModel (`LinearSurgeModel.jl`)
 
 `LinearSurgeModel <: AbstractFluxModel` is the first concrete implementation,
@@ -138,10 +122,9 @@ model = LinearSurgeModel(settings)
 
 | Key | Shape | Description |
 |---|---|---|
-| `"wind_x"`     | `(nwind, T)` | East wind-stress component |
-| `"wind_y"`     | `(nwind, T)` | North wind-stress component |
-| `"pressure"`   | `(nwind, T)` | Sea-level pressure (scaled: `2e-4*(p - 1e5)`) |
-| `"waterlevel"` | `(nstations, T)` | Used only for output station metadata |
+| `"wind_x"`   | `(nwind, T)` | East wind-stress component |
+| `"wind_y"`   | `(nwind, T)` | North wind-stress component |
+| `"pressure"` | `(nwind, T)` | Sea-level pressure (scaled: `2e-4*(p - 1e5)`) |
 
 ### Data flow
 
@@ -152,14 +135,50 @@ forward    → flatten → Dense(3*nwind*nlags => nstations) → (nstations, 1, 
 postprocess! → output["surge"].values .= y[:, 1, :]
 ```
 
+### train_model!
+
+```julia
+train_losses, val_losses = train_model!(model, train_settings, input, target)
+```
+
+`input` and `target` are `Dict{String,TimeSeries}`.  If
+`train_settings.validation_split > 0`, the last fraction of the time series is
+held out for validation and `val_losses` is populated; otherwise it is empty.
+Training progress is shown via a `ProgressMeter` bar with per-epoch RMSE, and
+`@info` lines are emitted every `nepochs ÷ 10` epochs.
+
+## Utilities
+
+### `toml_utils.jl` — `toml_write`
+
+```julia
+toml_write(path::String, dict::Dict; overwrite::Bool=false)
+```
+
+Writes a `Dict{String,Any}` to a TOML file. Raises an error if the parent
+directory does not exist or if the file exists and `overwrite=false`.
+Use this to persist model settings alongside weights:
+
+```julia
+toml_write(joinpath(save_dir, "settings.toml"), get_settings(model); overwrite=true)
+```
+
+### `plot_utils.jl` — `save_loss_plot`
+
+```julia
+save_loss_plot(path::String, train_losses::Vector, val_losses::Vector=[]; overwrite::Bool=false)
+```
+
+Saves a PNG plot of train (and optionally val) RMSE against epoch. Same
+directory/overwrite guards as `toml_write` and `save_params`.
+
 ## Notes
 
 - The work in `src/models/` is a prototype for the future model interface and
   not yet consistent with the existing concrete models (`TideModel`, `SurgeModel`,
-  `WaveSettings`). Integration is planned in steps 5e–5f of `plan.md`.
+  `WaveSettings`). Integration is planned in step 5f of `plan.md`.
 - The existing `train_model` (no `!`) in `training.jl` and the existing settings
   structs (`TideSettings`, etc.) are not yet subtypes of `AbstractModel`; they
   will be migrated incrementally.
-- `train_model!` signature leaves training data handling to the concrete
-  implementation — the top-level interface only specifies the model and training
-  settings.
+- `plot_series` is not yet implemented for `AbstractFluxModel`; the existing
+  version in `training.jl` dispatches on `AbstractModelSettings` only.
