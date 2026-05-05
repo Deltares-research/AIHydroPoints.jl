@@ -18,11 +18,24 @@ export get_sources, get_source_quantity_keys, get_quantities, get_series_from_co
 include("tidal_comps.jl")
 export primary_frequencies_as_doodson, get_doodson_eqvals, constituents, lunar2solar, robust_timedelta_sec
 
-include("models/abstract_model.jl")
-export AbstractModel
+include("toml_utils.jl")
+export toml_write
+
+include("plot_utils.jl")
+export save_loss_plot
 
 include("models/training_settings.jl")
 export TrainingSettings
+
+include("models/abstract_model.jl")
+export AbstractModel, get_settings, save_params, load_params!, train_model!
+
+include("models/abstract_flux_model.jl")
+export AbstractFluxModel, MyFluxModel
+export preprocess, forward, postprocess!, get_flux_model
+
+include("models/LinearSurgeModel.jl")
+export LinearSurgeModel
 
 include("training.jl")
 include("tides.jl")

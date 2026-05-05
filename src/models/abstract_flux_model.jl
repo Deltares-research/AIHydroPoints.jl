@@ -11,6 +11,9 @@
 #       constructed as MyFluxModel values, with domain-specific preprocess /
 #       forward / postprocess! methods dispatching on the model type.
 
+using Flux
+using JLD2
+
 # ──────────────────────────────────────────────────────────────────────────────
 # AbstractFluxModel
 # ──────────────────────────────────────────────────────────────────────────────
@@ -27,7 +30,7 @@ data mapping and network architecture as customisation points.
 ```
 AbstractModel
     └── AbstractFluxModel   — implements predict, save_params, load_params!
-            └── MyFluxModel — concrete struct: Flux chain + settings dict;
+            └── MyFluxModel — imaginary concrete struct: Flux chain + settings dict;
                               domain models are MyFluxModel values with
                               domain-specific preprocess / forward / postprocess
 ```
@@ -55,8 +58,8 @@ by all subtypes without modification.
 | `preprocess`    | `(m::M, input::Dict{String,TimeSeries}) -> (Array{Float32,4}, Dict{String,TimeSeries})` | Build input tensor and pre-allocate output |
 | `forward`       | `(m::M, x::Array{Float32,4}) -> Array{Float32,3}` | Run Flux forward pass |
 | `postprocess!`  | `(output::Dict{String,TimeSeries}, m::M, y::Array{Float32,3})` | Fill pre-allocated output in-place |
-| `get_flux_model`| `(m::M) -> <Flux model>` | Return the underlying Flux chain |
-| `get_settings`  | `(m::M) -> Dict{String,Any}` | Return inference-time settings |
+| `get_flux_model`| `(m::M) -> <Flux model>` | Return the underlying Flux model |
+| `get_settings`  | `(m::M) -> Dict{String,Any}` | Return model settings |
 """
 abstract type AbstractFluxModel <: AbstractModel end
 
@@ -88,12 +91,17 @@ end
 # ──────────────────────────────────────────────────────────────────────────────
 
 """
-    save_params(model::AbstractFluxModel, file::String)
+    save_params(model::AbstractFluxModel, file::String; overwrite::Bool=false)
 
 Serialise trained Flux weights to `file` (JLD2 format) via `Flux.state`.
 Settings are **not** included; retrieve them with `get_settings`.
+
+Throws an error if the parent directory does not exist, or if the file already
+exists and `overwrite` is `false`.
 """
-function save_params(model::AbstractFluxModel, file::String)
+function save_params(model::AbstractFluxModel, file::String; overwrite::Bool=false)
+    isdir(dirname(file)) || error("directory does not exist: $(dirname(file))")
+    !overwrite && isfile(file) && error("file already exists (use overwrite=true): $file")
     flux_model = get_flux_model(model)
     jldsave(file; model_state = Flux.state(flux_model))
 end

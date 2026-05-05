@@ -40,7 +40,7 @@ later via `get_settings`.
 
 | Function | Signature | Purpose |
 |---|---|---|
-| `train_model!` | `(m::M, train_settings::TrainingSettings)` | Train the model in-place |
+| `train_model!` | `(m::M, train_settings::TrainingSettings, input::Dict{String,TimeSeries}, target::Dict{String,TimeSeries})` | Train the model in-place |
 
 ## Notes
 
@@ -112,15 +112,22 @@ function load_params!(model::AbstractModel, file::String)
 end
 
 """
-    train_model!(model::AbstractModel, train_settings::TrainingSettings)
+    train_model!(model::AbstractModel, train_settings::TrainingSettings,
+                 input::Dict{String, TimeSeries}, target::Dict{String, TimeSeries})
 
-Train `model` in-place using `train_data`, evaluating on `test_data`.
-All training hyperparameters (epochs, learning rate, etc.) are taken from
-`train_settings`.  Returns training diagnostics (e.g. loss history) in a
-form decided by the concrete implementation.
+Train `model` in-place.  `input` contains the forcing variables and `target`
+the ground-truth output variables, both as `TimeSeries` dicts.  All training
+hyperparameters (epochs, learning rate, etc.) are taken from `train_settings`.
+Returns training diagnostics (e.g. loss history) in a form decided by the
+concrete implementation.
+
+On the first call, output station metadata (`out_names`, `out_lons`, `out_lats`,
+`out_quantity`) is populated in `model`'s settings from `target` if not already
+present, making the model self-contained for subsequent inference.
 
 Must be implemented by every concrete subtype of `AbstractModel`.
 """
-function train_model!(model::AbstractModel, train_settings::TrainingSettings)
+function train_model!(model::AbstractModel, train_settings::TrainingSettings,
+                      input::Dict{String, TimeSeries}, target::Dict{String, TimeSeries})
     error("train_model! not implemented for $(typeof(model))")
 end

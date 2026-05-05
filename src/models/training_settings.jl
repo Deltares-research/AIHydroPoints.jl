@@ -40,6 +40,10 @@ All fields are shared across every model type.
     during training (data-augmentation regularisation).  `0.0` disables noise.
     Currently used by the wave model; set > 0 to enable for other models.
     (**Default**: `0.0`)
+- `validation_split`: Fraction of the training data (taken from the end of the
+    time series) held out as a validation set for loss reporting.  `0.0`
+    disables validation.
+    (**Default**: `0.0`)
 """
 @kwdef mutable struct TrainingSettings
     nepochs          = 100
@@ -52,4 +56,5 @@ All fields are shared across every model type.
     checkpoints      = nothing
     val_daterange    = nothing
     input_noise_std  = 0.0
+    validation_split = 0.0
 end

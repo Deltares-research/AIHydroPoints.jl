@@ -20,76 +20,146 @@ The main datatypes are:
 - `Dict{String, Any}` (model settings): holds the settings needed for constructing a model or for inference with a trained model.
 - `TrainingSettings`: typed struct holding training hyperparameters (epochs, learning rate, etc.). Not needed for inference.
 
-## Model design
+## AbstractModel (`abstract_model.jl`)
 
-A model is a data structure holding the settings and parameters of a specific
-model implementation. Its type is a concrete subtype `ConcreteModel` of
-`AbstractModel`.
+`AbstractModel` is the root supertype for all AI-Hydro forecast models.  A
+concrete subtype is a self-contained object that stores its own settings and
+trained parameters.
 
-Concrete subtypes must implement the following methods:
+### Constructor convention
 
-- `ConcreteModel(settings::Dict{String, Any}) -> ConcreteModel` — Constructs an uninitialised model (random or zero weights) from a settings dictionary. Settings are stored inside the model.
-- `predict(model::AbstractModel, input::Dict{String, TimeSeries}) -> Dict{String, TimeSeries}` — Runs inference on the given input. `TimeSeries` is the concrete type from `MultiTimeSeries.jl`. Output variables may be at different locations than input variables.
-- `get_settings(model::AbstractModel) -> Dict{String, Any}` — Returns the settings required to reconstruct the model structure. Does not include trained parameters.
-- `save_params(model::AbstractModel, file::String)` — Serialises trained weights to a file (not settings).
-- `load_params!(model::AbstractModel, file::String)` — Loads trained weights from a file into an existing model instance in-place.
+```julia
+ConcreteModel(settings::Dict{String, Any}) -> ConcreteModel
+```
 
-Training is kept separate from the model, dispatching on the model type:
-- `train_model!(model::AbstractModel, train_settings::TrainingSettings)` — Trains the model in-place. Returns training diagnostics (losses, etc.) in a form decided by the concrete implementation.
+### Required interface
 
-### AbstractFluxModel
+| Method | Signature | Purpose |
+|---|---|---|
+| `predict`      | `(m::M, input::Dict{String,TimeSeries}) -> Dict{String,TimeSeries}` | Unified inference entry point |
+| `get_settings` | `(m::M) -> Dict{String,Any}` | Return inference-time settings |
+| `save_params`  | `(m::M, file::String)` | Serialise trained weights to file |
+| `load_params!` | `(m::M, file::String)` | Load weights from file in-place |
+| `train_model!` | `(m::M, train_settings::TrainingSettings)` | Train in-place |
 
-AbstractFluxModel is an abstract subtype of `AbstractModel` that wraps a Flux.jl model. It provides a common interface for training and inference with Flux models, and can be used as a base type for all ML models in the codebase. It is not intended to be used directly, but rather to be subclassed by specific model implementations (e.g. `TideModel`, `SurgeModel`, `WaveModel`), which will implement the required methods and add any additional functionality needed for their specific use case.
+`TimeSeries` is the concrete type from `MultiTimeSeries.jl`.
+All methods have fallback implementations that throw a descriptive error when a
+subtype forgets to implement them.
 
-`AbstractFluxModel <: AbstractModel`
+## AbstractFluxModel (`abstract_flux_model.jl`)
 
-A subtype of `AbstractModel` that implements models by wrapping a Flux model in a time-series context. It sits between `AbstractModel` and concrete model types, implementing the generic Flux machinery once while leaving the data mapping and model architecture as customisation points.
+`AbstractFluxModel <: AbstractModel` sits between `AbstractModel` and concrete
+Flux-based model types.  It implements `predict`, `save_params`, and
+`load_params!` once, delegating to three customisation points and `get_flux_model`.
 
 ```
 AbstractModel
-    └── AbstractFluxModel   — implements predict, handles pre/postprocessing and Flux machinery
-            └── FooModel    — implements preprocess, postprocess, forward and model-specific settings
+    └── AbstractFluxModel   — implements predict, save_params, load_params!
+            ├── MyFluxModel — convenience concrete struct (chain + settings dict)
+            └── FooModel    — domain-specific concrete subtype
 ```
 
-### What `AbstractFluxModel` implements
-
-`predict` is implemented once at this level:
+### predict pipeline
 
 ```julia
-function predict(model::AbstractFluxModel, input::Dict{String,TimeSeries})
-    tensor = preprocess(model, input)    # Dict -> (locations, features, time, batch)
-    output = forward(model, tensor)      # model-specific reshape + Flux forward pass
-    return postprocess(model, output)    # tensor -> Dict
+function predict(model::AbstractFluxModel, input::Dict{String, TimeSeries})
+    tensor, output = preprocess(model, input)   # build tensor + pre-allocate output
+    y = forward(model, tensor)                  # Flux forward pass
+    postprocess!(output, model, y)              # fill output in-place
+    return output
 end
 ```
 
-### Interface — concrete subtypes must implement
-
-- `preprocess(model::AbstractFluxModel, input::Dict{String,TimeSeries}) -> Array{Float32,4}`  
-  Maps input time series to a tensor of shape `(locations, features, time, batch)`. Responsible for variable/location ordering, scaling, and any other input transformations.
-
-- `postprocess(model::AbstractFluxModel, output::Array) -> Dict{String,TimeSeries}`  
-  Maps the Flux output tensor back to named time series. Applies inverse scaling and any output transformations. Note that `postprocess(preprocess(x))` is not expected to recover `x` in general.
-
-- `forward(model::AbstractFluxModel, tensor::Array{Float32,4}) -> Array{Float32,3}`  
-  Reshapes the tensor as needed and runs the Flux forward pass. The reshape depends on the model architecture:
-
-```julia
-# For a dense model
-x_flat = reshape(x, locations*features*time, batch)
-
-# For a 1D time convolution
-x_flat = reshape(x, locations*features, time, batch)
-```
+`preprocess` returns both the input tensor and a pre-allocated
+`Dict{String, TimeSeries}` whose `values` matrices are zero-initialised with
+the correct shape and metadata (times, station names, coordinates).
+`postprocess!` fills those matrices in-place — this avoids storing metadata as
+a side-effect on the model struct and keeps `TimeSeries` allocation in one place.
 
 ### Tensor layout
 
-The canonical tensor format for inputs at this level is `(locations, features, time_lag, time)`. This layout is chosen so that the first dimensions are contiguous in memory under Julia's column-major convention, making reshapes for both dense and convolutional models allocation-free.
-For the output of `forward`, the canonical format is `(locations, features, time)`. We're assuming that the output for a single time step depends on a fixed number of previous time steps (the time lag). Therefore, we can use the output time as the batch dimension for training and inference.
+| Tensor | Shape | Notes |
+|---|---|---|
+| Input (from `preprocess`) | `(locations, features, time_lag, time)` | column-major; `time` is the batch dim |
+| Output (from `forward`)   | `(locations, features, time)` | one output per time step |
 
+`time_lag = 1` means no lag (single time step input).
+
+### Required customisation points
+
+| Method | Signature | Purpose |
+|---|---|---|
+| `preprocess`    | `(m::M, input::Dict{String,TimeSeries}) -> (Array{Float32,4}, Dict{String,TimeSeries})` | Build input tensor; pre-allocate output |
+| `forward`       | `(m::M, x::Array{Float32,4}) -> Array{Float32,3}` | Reshape + Flux forward pass |
+| `postprocess!`  | `(output::Dict{String,TimeSeries}, m::M, y::Array{Float32,3})` | Fill output values in-place |
+| `get_flux_model`| `(m::M) -> <Flux model>` | Expose chain for save/load |
+| `get_settings`  | `(m::M) -> Dict{String,Any}` | Return inference-time settings |
+
+`save_params` and `load_params!` are implemented once at this level using
+`get_flux_model` together with `Flux.state` / `Flux.loadmodel!` and JLD2.
+
+### MyFluxModel
+
+`MyFluxModel <: AbstractFluxModel` is a convenience concrete struct for cases
+where domain models do not need their own struct.  It holds a Flux chain and a
+settings dict, and provides `get_flux_model` and `get_settings` automatically.
+
+```julia
+model = MyFluxModel(my_chain, settings)
+
+# Add domain behaviour via methods that dispatch on MyFluxModel:
+preprocess(m::MyFluxModel, input) = ...
+forward(m::MyFluxModel, x)        = ...
+postprocess!(output, m::MyFluxModel, y) = ...
+```
+
+When a domain model needs additional fields (e.g. cached station metadata),
+define it as its own `<: AbstractFluxModel` struct instead.
+
+## LinearSurgeModel (`LinearSurgeModel.jl`)
+
+`LinearSurgeModel <: AbstractFluxModel` is the first concrete implementation,
+used to validate the interface.  It predicts storm surge from wind-stress and
+pressure history using a single `Dense` layer (identity activation — a linear
+regression).
+
+### Settings
+
+```julia
+settings = Dict{String, Any}(
+    "nstations" => 5,   # number of output (waterlevel) stations
+    "nwind"     => 9,   # number of input (forcing) stations
+    "nlags"     => 16,  # number of previous time steps used as input
+)
+model = LinearSurgeModel(settings)
+```
+
+### Input dict keys
+
+| Key | Shape | Description |
+|---|---|---|
+| `"wind_x"`     | `(nwind, T)` | East wind-stress component |
+| `"wind_y"`     | `(nwind, T)` | North wind-stress component |
+| `"pressure"`   | `(nwind, T)` | Sea-level pressure (scaled: `2e-4*(p - 1e5)`) |
+| `"waterlevel"` | `(nstations, T)` | Used only for output station metadata |
+
+### Data flow
+
+```
+preprocess → tensor (1, 3*nwind, nlags, ntimes_valid)
+                + output Dict("surge" => zeros TimeSeries)
+forward    → flatten → Dense(3*nwind*nlags => nstations) → (nstations, 1, ntimes_valid)
+postprocess! → output["surge"].values .= y[:, 1, :]
+```
 
 ## Notes
 
-- The work in `src/models/` is a prototype for the future model interface and not necessarily fully consistent with the existing concrete models (`TideModel`, `SurgeModel`, `WaveSettings`). Integration is planned in steps 5e–5f of `plan.md`.
-- The existing `train_model` (no `!`) in `training.jl` and the existing settings structs (`TideSettings`, etc.) are not yet subtypes of `AbstractModel`; they will be migrated incrementally.
-- Where `train_model!` receives training data is left to the concrete implementation — the top-level interface only specifies the model and training settings.
+- The work in `src/models/` is a prototype for the future model interface and
+  not yet consistent with the existing concrete models (`TideModel`, `SurgeModel`,
+  `WaveSettings`). Integration is planned in steps 5e–5f of `plan.md`.
+- The existing `train_model` (no `!`) in `training.jl` and the existing settings
+  structs (`TideSettings`, etc.) are not yet subtypes of `AbstractModel`; they
+  will be migrated incrementally.
+- `train_model!` signature leaves training data handling to the concrete
+  implementation — the top-level interface only specifies the model and training
+  settings.
