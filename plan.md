@@ -18,7 +18,8 @@ The main goal of this project is to develop a machine learning model for predict
     d. [x] Work on model design and development, as described in src/models/design.md
     e. [x] Test the new model design with LinearSurgeModel and AttentionSurgeModel.
     f. [x] Implement the new model design for the tide model, and write unit tests for it.
-    g. [ ] ...
+    g. [ ] Implement the new model design for the wave model, and write unit tests for it.
+    h. [ ] Implement the new model design for the interaction model, and write unit tests for it.
 6. Create a Separate data-structure for the training data, building on the MultiTimeSeries.jl package, and use it in the training code.
 7. Make training fully controllable from the toml input file, and make it possible to run training from the command line with a specified toml file.
 8. Write a separate script for inference
@@ -72,6 +73,11 @@ The main goal of this project is to develop a machine learning model for predict
 - [x] Implement DeepONetTideModel wrapping TideModel Flux architecture from tides.jl
 - [x] Add test/models/test_DeepONetTideModel.jl with construction, preprocess, forward, train, predict, save/load tests
 - [x] Add new_train_tide.jl training script; fixed NetCDFTimeSeries materialisation bug
+- [x] Add plot_series to AbstractModel interface; implement _plot_station_series shared skeleton in plot_utils.jl
+- [x] Add plot_series to AbstractSurgeModel (2-panel) and AbstractTideModel (2- or 4-panel with optional FFT)
+- [x] Move plot_fft / plot_fft! from tides.jl to plot_utils.jl
+- [x] Use Plots.plot(ts; location_index=i) from MultiTimeSeries in _plot_station_series
+- [x] Add hatyan_core to [sources] in Project.toml so clean checkouts can resolve it
 
 
 ## Model design and development

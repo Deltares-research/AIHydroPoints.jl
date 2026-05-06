@@ -301,10 +301,29 @@ save_loss_plot(path::String, train_losses::Vector, val_losses::Vector=[]; overwr
 Saves a PNG plot of train (and optionally val) RMSE against epoch. Same
 directory/overwrite guards as `toml_write` and `save_params`.
 
+## plot_series (`plot_utils.jl` + model files)
+
+`plot_series` is part of the `AbstractModel` interface.  Each intermediate
+abstract type provides its own implementation; the shared plotting skeleton
+lives in `_plot_station_series` in `src/plot_utils.jl`.
+
+```julia
+plot_series(model, input::Dict{String,TimeSeries}, target::Dict{String,TimeSeries},
+            series_name::String; save_dir, timerange, station_names, show_fft)
+```
+
+`_plot_station_series` aligns target to prediction times (handles lag trimming
+in surge models via `select_timespan`), computes per-station RMSE, and saves
+one PNG per station.  It uses `Plots.plot(ts; location_index=i)` from
+`MultiTimeSeries.jl` for the observation panel.
+
+| Model type | `show_fft` | Layout |
+|---|---|---|
+| `AbstractSurgeModel` | not supported | 2-panel (series + residual) |
+| `AbstractTideModel`  | optional      | 2-panel or 4-panel (+ FFT panels) |
+
 ## Notes
 
 - The new model hierarchy (`AbstractFluxModel` and subtypes) coexists with the
   old concrete models (`TideSettings`, `SurgeSettings`, `WaveSettings`) in
   `training.jl`.  The old models will be migrated incrementally.
-- `plot_series` is not yet implemented for `AbstractFluxModel`; the existing
-  version in `training.jl` dispatches on `AbstractModelSettings` only.
