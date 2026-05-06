@@ -78,8 +78,12 @@ The main goal of this project is to develop a machine learning model for predict
 - [x] Move plot_fft / plot_fft! from tides.jl to plot_utils.jl
 - [x] Use Plots.plot(ts; location_index=i) from MultiTimeSeries in _plot_station_series
 - [x] Add hatyan_core to [sources] in Project.toml so clean checkouts can resolve it
+- [x] Implement ProductTideModel (station×Doodson product + residual gating) in the new AbstractTideModel hierarchy
+- [x] Add test/models/test_ProductTideModel.jl; add ProductTideModel option to new_train_tide.jl
+- [x] Remove src/surge.jl (fully superseded); rewrite test_train_surges.jl for new interface; update check_training_scripts.sh
 - [x] Implement ConvSurgeModel (Conv1D over lag dim) in the new AbstractSurgeModel hierarchy
 - [x] Add test/models/test_ConvSurgeModel.jl; add ConvSurgeModel to new_train_surge.jl
+- [x] Remove src/tides.jl (fully superseded); move TideModel into DeepONetTideModel.jl; rewrite test_train_tides.jl for new interface; update check_training_scripts.sh
 
 
 ## Model design and development

@@ -73,9 +73,9 @@ run_script() {
 # Scripts
 # ──────────────────────────────────────────────────────────────────────────────
 
-run_script "train_tides" "train_tides.jl" \
-    "test_data/DCSM-FM_0_5nm_2008_3yr_5stations_his.jld2" \
-    "test_data/DCSM-FM_0_5nm_2011_5stations_his.jld2"
+run_script "new_train_tide" "new_train_tide.jl" \
+    "test_data/tides_schureman_2011.nc" \
+    "test_data/tides_schureman_2012.nc"
 
 run_script "new_train_surge" "new_train_surge.jl" \
     "test_data/surge_schureman_2011.nc" \

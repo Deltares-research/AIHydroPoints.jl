@@ -364,8 +364,59 @@ one PNG per station.  It uses `Plots.plot(ts; location_index=i)` from
 | `AbstractSurgeModel` | not supported | 2-panel (series + residual) |
 | `AbstractTideModel`  | optional      | 2-panel or 4-panel (+ FFT panels) |
 
+## ProductTideModel (`ProductTideModel.jl`)
+
+`ProductTideModel <: AbstractTideModel` uses a multiplicative product of learned
+station and Doodson encodings, followed by residual gating layers.  Inspired by
+the `TideInputLayer`/`TideLayer` architecture from the old `tides.jl`, adapted
+to use the 4-feature cos/sin lat/lon station encoding instead of one-hot indices.
+
+### Constructor
+
+```julia
+model = ProductTideModel(settings::Dict{String, Any})
+```
+
+Required key: `"freqs"`. Optional `"model_pars"`:
+
+| Key | Default | Description |
+|---|---|---|
+| `"nfeats"` | `64` | Feature dimension throughout |
+| `"nlayers"` | `3` | Number of `ProductGatingLayer`s |
+
+### Data flow
+
+```
+preprocess → x_station (4, nstations, ntimes)   [cos/sin lat, cos/sin lon]
+             x_doodson (2*nfreqs, ntimes)        [cos/sin Doodson arguments]
+
+ProductInputLayer:
+    Dense(4 → nfeats, identity; bias=false) applied to x_station
+    Dense(2*nfreqs → nfeats, identity; bias=false) applied to x_doodson
+    element-wise product → (nfeats, nstations, ntimes)
+
+ProductGatingLayer × nlayers:
+    x + Dense(nfeats → nfeats, relu)(x) * x
+
+Dense(nfeats → 1) → (nstations, 1, ntimes)
+```
+
+Inherits `preprocess`, `postprocess!`, `train_model!`, `plot_series`,
+`save_params`, and `load_params!` from `AbstractTideModel` /
+`AbstractFluxModel` without override.
+
+```
+AbstractModel
+    └── AbstractFluxModel   — predict, save_params, load_params!
+            └── AbstractTideModel  — preprocess, postprocess!, train_model!
+                    ├── DeepONetTideModel
+                    └── ProductTideModel
+```
+
 ## Notes
 
-- The new model hierarchy (`AbstractFluxModel` and subtypes) coexists with the
-  old concrete models (`TideSettings`, `SurgeSettings`, `WaveSettings`) in
-  `training.jl`.  The old models will be migrated incrementally.
+- The new model hierarchy (`AbstractFluxModel` and subtypes) coexists with
+  `TideSettings`/`WaveSettings`/`InteractionSettings` in `training.jl`.
+  The old models will be migrated incrementally.
+- `src/surge.jl` has been removed — all surge functionality is in the new
+  `AbstractSurgeModel` hierarchy.

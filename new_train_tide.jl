@@ -1,4 +1,8 @@
-# Train a DeepONetTideModel on the Schureman 2011 tide dataset.
+# Train a tide model on the Schureman 2011 tide dataset.
+#
+# Select which model to train by changing model_type below:
+#   "DeepONetTideModel" — branch/trunk DeepONet architecture
+#   "ProductTideModel"  — multiplicative station × Doodson product with gating layers
 #
 # The model is astronomically driven — inputs are Doodson numbers computed from
 # time and station coordinates.  Both input and target are the same waterlevel
@@ -8,6 +12,8 @@ cd(@__DIR__)
 
 using Pkg
 Pkg.activate(".")
+
+model_type = "DeepONetTideModel"   # "DeepONetTideModel" | "ProductTideModel"
 
 ENV["GKSwstype"] = "nul"   # headless GR backend (no display needed)
 using AIHydroPoints
@@ -25,7 +31,7 @@ filenames = Dict(
 # ──────────────────────────────────────────────
 # Model / training settings
 # ──────────────────────────────────────────────
-name     = "DeepONetTideModel"
+name     = model_type
 save_dir = joinpath("models", name)
 
 rm(save_dir, recursive=true, force=true)
@@ -35,14 +41,22 @@ model_settings = Dict{String, Any}(
     "model_name" => name,
     "model_dir"  => save_dir,
     "freqs"      => ["SSA","K1","O1","Q1","P1","M2","S2","N2","K2","H"],
-    "model_pars" => Dict{String, Any}(
+)
+
+if model_type == "DeepONetTideModel"
+    model_settings["model_pars"] = Dict{String, Any}(
         "nlayers_branch" => 2,
         "nhidden_branch" => 64,
         "nlayers_trunk"  => 2,
         "nhidden_trunk"  => 32,
         "nlayers_down"   => 1,
-    ),
-)
+    )
+elseif model_type == "ProductTideModel"
+    model_settings["model_pars"] = Dict{String, Any}(
+        "nfeats"  => 64,
+        "nlayers" => 4,
+    )
+end
 
 train_settings = TrainingSettings(
     nepochs          = 500,
@@ -66,7 +80,13 @@ test_data  = Dict{String, TimeSeries}("waterlevel" => ts_test)
 # ──────────────────────────────────────────────
 # Create and train model
 # ──────────────────────────────────────────────
-model = DeepONetTideModel(model_settings)
+if model_type == "DeepONetTideModel"
+    model = DeepONetTideModel(model_settings)
+elseif model_type == "ProductTideModel"
+    model = ProductTideModel(model_settings)
+else
+    error("Unknown model_type: $model_type")
+end
 
 train_losses, val_losses = train_model!(model, train_settings, train_data, train_data)
 

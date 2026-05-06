@@ -1,7 +1,7 @@
 # DeepONetTideModel.jl
 #
 # Concrete subtype of AbstractTideModel wrapping the TideModel Flux architecture
-# (branch/trunk/downsample DeepONet) from src/tides.jl.
+# (branch/trunk/downsample DeepONet).
 #
 # Inherits from AbstractTideModel:
 #   preprocess, postprocess!, train_model!
@@ -13,6 +13,54 @@
 #   get_flux_model, get_settings, forward
 
 using Flux
+
+# ──────────────────────────────────────────────────────────────────────────────
+# TideModel — DeepONet branch/trunk/downsample Flux architecture
+# ──────────────────────────────────────────────────────────────────────────────
+
+struct TideModel{P, Q, T}
+    branch     :: P
+    trunk      :: Q
+    downsample :: T
+end
+
+function TideModel(nfreqs, nlayers_branch, nhidden_branch,
+                   nlayers_trunk, nhidden_trunk, nlayers_down, activ_func)
+    branch = Chain(
+        Dense(2*nfreqs, nhidden_branch, activ_func),
+        [Dense(nhidden_branch, nhidden_branch, activ_func) for _ in 1:nlayers_branch]...,
+        Dense(nhidden_branch, nhidden_branch, tanh),
+    )
+    trunk = Chain(
+        Dense(4, nhidden_trunk, activ_func),
+        [Dense(nhidden_trunk, nhidden_trunk, activ_func) for _ in 1:nlayers_trunk]...,
+        Dense(nhidden_trunk, 2, tanh),
+    )
+    down = Chain(
+        [Dense(nhidden_branch, nhidden_branch, activ_func) for _ in 1:nlayers_down]...,
+        Dense(nhidden_branch, 1),
+    )
+    return TideModel(branch, trunk, down)
+end
+
+function (m::TideModel)(x_stations, x_doodson)
+    branch_out = m.branch(x_doodson)
+    trunk_out  = m.trunk(x_stations)
+    merged = cat(
+        [slice[1,:]' .* branch_out .+ slice[2,:]'
+         for slice in eachslice(trunk_out, dims=2)]...,
+        dims=3,
+    )
+    merged = permutedims(merged, (1, 3, 2))
+    merged = m.downsample(merged)
+    return Flux.flatten(merged)
+end
+
+@Flux.layer TideModel
+
+# ──────────────────────────────────────────────────────────────────────────────
+# DeepONetTideModel
+# ──────────────────────────────────────────────────────────────────────────────
 
 """
     DeepONetTideModel <: AbstractTideModel

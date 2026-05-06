@@ -71,4 +71,8 @@ mkdir(temp_dir) # create a new empty temp directory
    @testset "DeepONetTideModel" begin
       include("models/test_DeepONetTideModel.jl")
    end
+
+   @testset "ProductTideModel" begin
+      include("models/test_ProductTideModel.jl")
+   end
 end
