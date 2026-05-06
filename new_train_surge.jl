@@ -4,7 +4,8 @@
 #   "LinearSurgeModel"    — single Dense layer (fast baseline)
 #   "AttentionSurgeModel" — transformer branch + dense trunk + graph adjacency
 
-model_type = "LinearSurgeModel"
+model_type = "LinearSurgeModel"   # "LinearSurgeModel" | "ConvSurgeModel" | "AttentionSurgeModel"
+model_type = "ConvSurgeModel"     # "LinearSurgeModel" | "ConvSurgeModel" | "AttentionSurgeModel"
 
 cd(@__DIR__)
 
@@ -44,7 +45,12 @@ model_settings = Dict{String, Any}(
     "nlags"      => 16,
 )
 
-if model_type == "AttentionSurgeModel"
+if model_type == "ConvSurgeModel"
+    model_settings["model_pars"] = Dict{String, Any}(
+        "channels"   => [32, 16],
+        "filtersize" => 3,
+    )
+elseif model_type == "AttentionSurgeModel"
     model_settings["model_pars"] = Dict{String, Any}(
         "nembed"         => 32,
         "theta"          => 1000.0,
@@ -107,6 +113,8 @@ test_target  = Dict{String, TimeSeries}("surge" => data["testing"]["waterlevel"]
 # ──────────────────────────────────────────────
 if model_type == "LinearSurgeModel"
     model = LinearSurgeModel(model_settings)
+elseif model_type == "ConvSurgeModel"
+    model = ConvSurgeModel(model_settings)
 elseif model_type == "AttentionSurgeModel"
     wind_ts    = data["training"]["stress_x"]
     surge_ts   = data["training"]["waterlevel"]

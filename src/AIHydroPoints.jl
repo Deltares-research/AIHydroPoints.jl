@@ -40,6 +40,9 @@ export AbstractSurgeModel
 include("models/LinearSurgeModel.jl")
 export LinearSurgeModel
 
+include("models/ConvSurgeModel.jl")
+export ConvSurgeModel
+
 include("training.jl")
 include("tides.jl")
 export save_settings, load_settings, save_model, load_model, load_run, ModelSettings, prepare_train_data, predict, train_model, plot_losses, plot_series

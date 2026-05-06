@@ -78,6 +78,8 @@ The main goal of this project is to develop a machine learning model for predict
 - [x] Move plot_fft / plot_fft! from tides.jl to plot_utils.jl
 - [x] Use Plots.plot(ts; location_index=i) from MultiTimeSeries in _plot_station_series
 - [x] Add hatyan_core to [sources] in Project.toml so clean checkouts can resolve it
+- [x] Implement ConvSurgeModel (Conv1D over lag dim) in the new AbstractSurgeModel hierarchy
+- [x] Add test/models/test_ConvSurgeModel.jl; add ConvSurgeModel to new_train_surge.jl
 
 
 ## Model design and development

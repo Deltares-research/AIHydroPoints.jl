@@ -174,6 +174,48 @@ held out for validation and `val_losses` is populated; otherwise it is empty.
 Training progress is shown via a `ProgressMeter` bar with per-epoch RMSE, and
 `@info` lines are emitted every `nepochs ÷ 10` epochs.
 
+## ConvSurgeModel (`ConvSurgeModel.jl`)
+
+`ConvSurgeModel <: AbstractSurgeModel` applies 1-D convolutions over the lag
+dimension of the wind-stress and pressure history.
+
+### Constructor
+
+```julia
+model = ConvSurgeModel(settings::Dict{String, Any})
+```
+
+Required keys: `"nstations"`, `"nwind"`, `"nlags"`.  Optional `"model_pars"`:
+
+| Key | Default | Description |
+|---|---|---|
+| `"channels"` | `[32, 16]` | Output channels per Conv1D layer |
+| `"filtersize"` | `3` | Conv1D kernel width |
+
+### Data flow
+
+```
+preprocess → tensor (1, 3*nwind, nlags, ntimes_valid)
+forward    → flatten → reshape (nlags, 3*nwind, ntimes)
+             → Conv1D × N (SamePad, stride=1)
+             → flatten → Dense(nlags*channels[end] → nstations)
+             → (nstations, 1, ntimes_valid)
+postprocess! → output["surge"].values .= y[:, 1, :]
+```
+
+Inherits `preprocess`, `postprocess!`, `train_model!`, `plot_series`,
+`save_params`, and `load_params!` from `AbstractSurgeModel` /
+`AbstractFluxModel` without override.
+
+```
+AbstractModel
+    └── AbstractFluxModel   — predict, save_params, load_params!
+            └── AbstractSurgeModel  — preprocess, postprocess!, train_model!
+                    ├── LinearSurgeModel
+                    ├── ConvSurgeModel
+                    └── AttentionSurgeModel
+```
+
 ## AttentionSurgeModel (`AttentionSurgeModel.jl`)
 
 `AttentionSurgeModel <: AbstractSurgeModel` uses a transformer branch network
