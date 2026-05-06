@@ -131,3 +131,19 @@ function train_model!(model::AbstractModel, train_settings::TrainingSettings,
                       input::Dict{String, TimeSeries}, target::Dict{String, TimeSeries})
     error("train_model! not implemented for $(typeof(model))")
 end
+
+"""
+    plot_series(model::AbstractModel, input::Dict{String, TimeSeries},
+                target::Dict{String, TimeSeries}, series_name::String; kwargs...)
+
+Run inference on `input`, compare predictions to `target`, and save one PNG per
+output station to the model's save directory.  `series_name` is used as a suffix
+in the output file names.
+
+Must be implemented by every concrete subtype of `AbstractModel` (or inherited
+from an intermediate abstract type such as `AbstractSurgeModel` or `AbstractTideModel`).
+"""
+function plot_series(model::AbstractModel, input::Dict{String, TimeSeries},
+                     target::Dict{String, TimeSeries}, series_name::String; kwargs...)
+    error("plot_series not implemented for $(typeof(model))")
+end

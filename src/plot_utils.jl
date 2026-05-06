@@ -1,4 +1,106 @@
 using Plots
+using FFTW
+using Statistics
+using Printf: @sprintf
+
+# ──────────────────────────────────────────────────────────────────────────────
+# FFT plotting helpers (used by _plot_station_series and by tides.jl)
+# ──────────────────────────────────────────────────────────────────────────────
+
+function plot_fft(signal, times, label)
+    n  = length(signal)
+    dt = (times[2] - times[1]).value / 3.6e6
+    fft_out = fftshift(FFTW.fft(signal)) * 2 / n
+    freqs   = fftshift(fftfreq(n, 1/dt))
+    plot(freqs, abs.(fft_out); xlabel="Frequency (1/Hrs)", ylabel="Amplitude",
+         xlims=(0, 0.5), label)
+end
+
+function plot_fft!(fig, signal, times, label)
+    n  = length(signal)
+    dt = (times[2] - times[1]).value / 3.6e6
+    fft_out = fftshift(FFTW.fft(signal)) * 2 / n
+    freqs   = fftshift(fftfreq(n, 1/dt))
+    plot!(fig, freqs, abs.(fft_out); xlabel="Frequency (1/Hrs)", ylabel="Amplitude",
+          xlims=(0, 0.5), label)
+end
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Shared per-station prediction-vs-truth plotting skeleton
+# ──────────────────────────────────────────────────────────────────────────────
+
+"""
+    _plot_station_series(output, target, save_dir, series_name;
+                         timerange=nothing, station_names=nothing, show_fft=false)
+
+Internal helper used by `plot_series` implementations.  Compares `output` from
+`predict` to `target` ground truth per station and saves one PNG per station.
+
+`output` and `target` must share the same primary key (e.g. `"surge"` or
+`"waterlevel"`).  Target times are aligned to the output times automatically,
+which handles lag trimming in surge models.
+
+If `show_fft=true`, two additional FFT spectral panels are added per station
+(4-panel layout instead of 2-panel).
+"""
+function _plot_station_series(output::Dict{String, TimeSeries},
+                               target::Dict{String, TimeSeries},
+                               save_dir::String,
+                               series_name::String;
+                               timerange       = nothing,
+                               station_names   = nothing,
+                               show_fft::Bool  = false)
+
+    out_key = first(keys(output))
+    ts_pred = output[out_key]
+    ts_true = target[out_key]
+
+    # Align ground truth to prediction times (handles lag trimming in surge models)
+    t_start = get_times(ts_pred)[1]
+    t_end   = get_times(ts_pred)[end]
+    ts_true = select_timespan(ts_true, t_start, t_end)
+
+    if !isnothing(station_names)
+        ts_pred = select_locations_by_names(ts_pred, station_names)
+        ts_true = select_locations_by_names(ts_true, station_names)
+    end
+    if !isnothing(timerange)
+        ts_pred = select_timespan(ts_pred, timerange[1], timerange[2])
+        ts_true = select_timespan(ts_true, timerange[1], timerange[2])
+    end
+
+    pred   = get_values(ts_pred)           # (nstations, ntimes)
+    truth  = get_values(ts_true)
+    times  = get_times(ts_pred)
+    names  = get_names(ts_pred)
+    errors = truth .- pred
+    rmses  = sqrt.(mean(abs2, errors; dims=2))[:, 1]
+
+    qty = get_quantity(ts_true)
+
+    for (i, station) in enumerate(names)
+        rmse_str = @sprintf("%.4f", rmses[i])
+        p1 = plot(ts_true; location_index=i, label="Observations",
+                  title="$station  RMSE = $rmse_str")
+        plot!(p1, times, pred[i, :]; label="Predicted")
+        p2 = plot(times, errors[i, :]; label="Residual", xlabel="Time", ylabel=qty)
+
+        if show_fft
+            p3 = plot_fft(truth[i, :], times, "Observations")
+            plot_fft!(p3, pred[i, :], times, "Predicted")
+            p4 = plot_fft(errors[i, :], times, "Residual")
+            plot(p1, p2, p3, p4; layout=(4, 1), size=(800, 1200))
+        else
+            plot(p1, p2; layout=(2, 1), size=(800, 600))
+        end
+
+        savefig(joinpath(save_dir, "$(station)_$(series_name).png"))
+    end
+end
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Loss plot
+# ──────────────────────────────────────────────────────────────────────────────
 
 """
     save_loss_plot(path::String, train_losses::Vector, val_losses::Vector=[];

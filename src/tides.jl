@@ -2,7 +2,6 @@ using Flux
 using CUDA
 using Statistics
 using JLD2
-using FFTW
 
 """
     struct TideSettings
@@ -323,27 +322,6 @@ function predict(model, settings::TideSettings, ts::TimeSeries)
     (x_station, x_doodson) = prepare_inputs(settings, lats, lons, times)
     y_hat = model(x_station, x_doodson)
     return reshape(y_hat, length(stations), length(times))
-end
-
-function plot_fft(signal, times, label)
-    n = length(signal)
-    dt = (times[2] - times[1]).value / 3.6e6
-
-    fft = fftshift(FFTW.fft(signal)) * 2 / n
-    freqs = fftshift(fftfreq(n, 1/dt))
-
-    fig = plot(freqs, abs.(fft), xlabel="Frequency (1/Hrs)", ylabel="Amplitude", xlims=(0,0.5), label=label)
-
-    return fig
-end
-
-function plot_fft!(fig, signal, times, label)
-    n = length(signal)
-    dt = (times[2] - times[1]).value / 3.6e6
-    fft = fftshift(FFTW.fft(signal)) * 2 / n
-    freqs = fftshift(fftfreq(n, 1/dt))
-
-    plot!(fig, freqs, abs.(fft), xlabel="Frequency (1/Hrs)", ylabel="Amplitude", xlims=(0,0.5), label=label)
 end
 
 function plot_series(model, settings::TideSettings, data_dict::Dict{String, TimeSeries}, series_name; 

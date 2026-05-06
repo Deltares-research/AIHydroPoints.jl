@@ -13,7 +13,6 @@ Dates = "ade2ca70-3891-5945-98fb-dc099432e06a"
 FFTW = "7a1cc6ca-52ef-59f5-83cd-3a7055c09341"
 Flux = "587475ba-b771-5e3f-ad9e-33799f191a9c"
 HTTP = "cd3eb016-35fb-5094-929b-558a96fad6f3"
-hatyan_core = "503641d4-5328-4570-8fe0-06fcdaed00b2"
 IterTools = "c8e1da08-722c-5040-9ed9-7db0dc04731e"
 JLD2 = "033835bb-8acc-5ee8-8aae-3f567f8a3819"
 Minio = "4281f0d9-7ae0-406e-9172-b7277c1efa20"
@@ -32,6 +31,11 @@ Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 URIs = "5c2747f8-b7ea-4ff2-ba2e-563bfd36b1d4"
 ZarrDatasets = "519a4cdf-1362-424a-9ea1-b1d782dbb24b"
 cuDNN = "02a925ec-e4fe-4b08-9a7e-0d78e3d38ccd"
+hatyan_core = "503641d4-5328-4570-8fe0-06fcdaed00b2"
+
+[sources]
+MultiTimeSeries = {url = "https://github.com/robot144/MultiTimeSeries.jl"}
+hatyan_core     = {url = "https://github.com/robot144/hatyan_core.jl"}
 
 [compat]
 AWS = "1.92.0"
@@ -43,7 +47,6 @@ Dates = "1.11.0"
 FFTW = "1.8.1"
 Flux = "0.16.3"
 HTTP = "1.10.17"
-hatyan_core = "0.1.0"
 IterTools = "1.10.0"
 JLD2 = "0.5.11"
 Minio = "0.2.2"
@@ -62,7 +65,4 @@ Test = "1.11.0"
 URIs = "1.6.1"
 ZarrDatasets = "0.1.2"
 cuDNN = "1.4.2"
-
-[sources]
-MultiTimeSeries = {url = "https://github.com/robot144/MultiTimeSeries.jl"}
-hatyan_core = {url = "https://github.com/robot144/hatyan_core.jl"}
+hatyan_core = "0.1.0"

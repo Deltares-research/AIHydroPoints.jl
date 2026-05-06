@@ -138,3 +138,8 @@ save_loss_plot(joinpath(save_dir, "losses.png"), train_losses, val_losses; overw
 # Run inference on test set
 # ──────────────────────────────────────────────
 test_output = predict(model, test_input)
+
+# ──────────────────────────────────────────────
+# Evaluation plots
+# ──────────────────────────────────────────────
+plot_series(model, test_input, test_target, "test")

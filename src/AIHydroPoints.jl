@@ -22,13 +22,13 @@ include("toml_utils.jl")
 export toml_write
 
 include("plot_utils.jl")
-export save_loss_plot
+export save_loss_plot, plot_fft, plot_fft!
 
 include("models/training_settings.jl")
 export TrainingSettings
 
 include("models/abstract_model.jl")
-export AbstractModel, get_settings, save_params, load_params!, train_model!
+export AbstractModel, get_settings, save_params, load_params!, train_model!, plot_series
 
 include("models/abstract_flux_model.jl")
 export AbstractFluxModel, MyFluxModel
