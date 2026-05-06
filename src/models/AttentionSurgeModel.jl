@@ -1,7 +1,7 @@
 # AttentionSurgeModel.jl
 #
 # Concrete subtype of AbstractSurgeModel using the attention-based surge
-# architecture from src/surge.jl (branch/trunk/downsample with graph adjacency).
+# architecture (branch/trunk/downsample with graph adjacency).
 #
 # Inherits from AbstractSurgeModel:
 #   postprocess!, save_params, load_params!, predict

@@ -63,8 +63,6 @@ export Embedder, Deembedder, SinCosPosEmbedder, Transformer
 include("models/AttentionSurgeModel.jl")
 export AttentionSurgeModel, AttentionSurgeFlux
 
-include("surge.jl")
-export SurgeSettings, create_surge_model, SurgeModel
 
 include("interaction.jl")
 export InteractionSettings, create_interaction_model

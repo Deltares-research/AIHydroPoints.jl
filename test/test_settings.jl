@@ -30,34 +30,6 @@ config_dir = joinpath(@__DIR__, "..", "test_data", "config_files")
         @test ts.checkpoints   == [40, 80, 120, 160]
     end
 
-    @testset "SurgeSettings" begin
-        fn = joinpath(config_dir, "settings_surgemodel.toml")
-        @test isfile(fn)
-
-        ms, ts = load_settings(fn)
-        @test ms isa SurgeSettings
-        @test ts isa TrainingSettings
-        @test ms.model_name    == "TestSurgeModel"
-        @test ms.nstations     == 5
-        @test ms.nwind         == 9
-        @test ms.nlags         == 16
-        @test ms.use_gpu       == false
-        @test ms.model_pars["theta"]          ≈ 10000.0
-        @test ms.model_pars["nheads"]         == 4
-        @test ms.model_pars["nlayers_branch"] == 2
-        @test ms.model_pars["nlayers_trunk"]  == 0
-        @test ms.model_pars["nhidden_trunk"]  == 16
-        @test ms.model_pars["nembed"]         == 16
-        @test ts.nepochs       == 2
-        @test ts.nbatches      == 1024
-        @test ts.learning_rate ≈  0.001
-        @test ts.lr_decay_factor ≈ 0.1
-        @test ts.lr_decay_rate == 400
-        @test ts.patience      == 5
-        @test ts.val_daterange == ["2012-01-01T00:00:00", "2012-01-15T00:00:00"]
-        @test ts.checkpoints   == [40, 80, 120, 160]
-    end
-
     @testset "WaveSettings" begin
         fn = joinpath(config_dir, "settings_wavemodel.toml")
         @test isfile(fn)
