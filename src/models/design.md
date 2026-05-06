@@ -220,6 +220,62 @@ forward    → AttentionSurgeFlux → (nstations, nlags, ntimes) → [:, end, :]
 postprocess! → output["surge"].values .= y[:, 1, :]
 ```
 
+## AbstractTideModel (`AbstractTideModel.jl`)
+
+`AbstractTideModel <: AbstractFluxModel` is an intermediate abstract type that
+captures shared logic for all tide models.  Tide models are astronomically
+driven — no external forcing.  The only input is a `"waterlevel"` TimeSeries
+that provides times and station coordinates; Doodson numbers are computed from
+those automatically.
+
+### Shared implementations
+
+| Method | What it does |
+|---|---|
+| `preprocess` | Builds `(4, nstations, ntimes)` station tensor and `(2*nfreqs, ntimes)` Doodson tensor; pre-allocates output |
+| `postprocess!` | Writes `y[:, 1, :]` into `output["waterlevel"].values` |
+| `train_model!` | Adam loop with ProgressMeter, temporal train/val split, returns `(train_losses, val_losses)` |
+
+### Input convention
+
+Both `input` and `target` carry a `"waterlevel"` key.  At training time they
+point to the same `TimeSeries`.
+
+```
+AbstractModel
+    └── AbstractFluxModel   — predict, save_params, load_params!
+            └── AbstractTideModel  — preprocess, postprocess!, train_model!
+                    └── DeepONetTideModel
+```
+
+## DeepONetTideModel (`DeepONetTideModel.jl`)
+
+`DeepONetTideModel <: AbstractTideModel` wraps the `TideModel` Flux
+architecture from `src/tides.jl` (branch network for Doodson arguments, trunk
+network for station coordinates, merged and downsampled per station).
+
+### Constructor
+
+```julia
+model = DeepONetTideModel(settings::Dict{String, Any})
+```
+
+Required keys in `settings`:
+
+| Key | Description |
+|---|---|
+| `"freqs"` | Vector of tidal constituent names, e.g. `["M2","S2","K1",...]` |
+| `"model_pars"` | Dict with `"nlayers_branch"`, `"nhidden_branch"`, `"nlayers_trunk"`, `"nhidden_trunk"`, `"nlayers_down"` |
+
+### Data flow
+
+```
+preprocess → x_station (4, nstations, ntimes)   [cos/sin lat, cos/sin lon]
+             x_doodson (2*nfreqs, ntimes)        [cos/sin Doodson arguments]
+forward    → TideModel(x_station, x_doodson) → (nstations, ntimes) → (nstations, 1, ntimes)
+postprocess! → output["waterlevel"].values .= y[:, 1, :]
+```
+
 ## Utilities
 
 ### `toml_utils.jl` — `toml_write`
@@ -247,11 +303,8 @@ directory/overwrite guards as `toml_write` and `save_params`.
 
 ## Notes
 
-- The work in `src/models/` is a prototype for the future model interface and
-  not yet consistent with the existing concrete models (`TideModel`, `SurgeModel`,
-  `WaveSettings`). Integration is planned in step 5f of `plan.md`.
-- The existing `train_model` (no `!`) in `training.jl` and the existing settings
-  structs (`TideSettings`, etc.) are not yet subtypes of `AbstractModel`; they
-  will be migrated incrementally.
+- The new model hierarchy (`AbstractFluxModel` and subtypes) coexists with the
+  old concrete models (`TideSettings`, `SurgeSettings`, `WaveSettings`) in
+  `training.jl`.  The old models will be migrated incrementally.
 - `plot_series` is not yet implemented for `AbstractFluxModel`; the existing
   version in `training.jl` dispatches on `AbstractModelSettings` only.

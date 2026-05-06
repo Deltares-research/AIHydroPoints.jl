@@ -17,7 +17,7 @@ The main goal of this project is to develop a machine learning model for predict
     c. [x] Extract the training settings from the model settings
     d. [x] Work on model design and development, as described in src/models/design.md
     e. [x] Test the new model design with LinearSurgeModel and AttentionSurgeModel.
-    f. [ ] Implement the new model design for the tide model, and write unit tests for it.
+    f. [x] Implement the new model design for the tide model, and write unit tests for it.
     g. [ ] ...
 6. Create a Separate data-structure for the training data, building on the MultiTimeSeries.jl package, and use it in the training code.
 7. Make training fully controllable from the toml input file, and make it possible to run training from the command line with a specified toml file.
@@ -67,6 +67,11 @@ The main goal of this project is to develop a machine learning model for predict
 - [x] Add test/models/test_AttentionSurgeModel.jl with construction, preprocess, forward, train, predict, save/load tests
 - [x] Make wind/stress key naming consistent: preprocess accepts both "stress_x"/"stress_y" and "wind_x"/"wind_y"
 - [x] Add new_train_AttentionSurgeModel.jl training script
+- [x] Merge new_train_LinearSurgeModel.jl and new_train_AttentionSurgeModel.jl into new_train_surge.jl (model_type switch)
+- [x] Implement AbstractTideModel intermediate type (shared preprocess, postprocess!, train_model!)
+- [x] Implement DeepONetTideModel wrapping TideModel Flux architecture from tides.jl
+- [x] Add test/models/test_DeepONetTideModel.jl with construction, preprocess, forward, train, predict, save/load tests
+- [x] Add new_train_tide.jl training script; fixed NetCDFTimeSeries materialisation bug
 
 
 ## Model design and development
