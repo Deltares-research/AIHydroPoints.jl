@@ -16,8 +16,8 @@ The main goal of this project is to develop a machine learning model for predict
     b. [x] Structure the model code, with an explicit AbstractModel type, and a common interface for all models.
     c. [x] Extract the training settings from the model settings
     d. [x] Work on model design and development, as described in src/models/design.md
-    e. [x] Test the new model design with a linear regression model.
-    f. [ ] Implement the new model design for the tide model,  and write unit tests for it.
+    e. [x] Test the new model design with LinearSurgeModel and AttentionSurgeModel.
+    f. [ ] Implement the new model design for the tide model, and write unit tests for it.
     g. [ ] ...
 6. Create a Separate data-structure for the training data, building on the MultiTimeSeries.jl package, and use it in the training code.
 7. Make training fully controllable from the toml input file, and make it possible to run training from the command line with a specified toml file.
@@ -62,6 +62,11 @@ The main goal of this project is to develop a machine learning model for predict
 - [x] Add toml_write utility (src/toml_utils.jl) for saving model settings as TOML
 - [x] Add save_loss_plot utility (src/plot_utils.jl) for saving train/val RMSE plots as PNG
 - [x] Add overwrite guards and directory checks to save_params, toml_write, and save_loss_plot
+- [x] Add AbstractSurgeModel intermediate type (shared preprocess, postprocess!, train_model!)
+- [x] Implement AttentionSurgeModel with transformer branch + dense trunk + graph adjacency
+- [x] Add test/models/test_AttentionSurgeModel.jl with construction, preprocess, forward, train, predict, save/load tests
+- [x] Make wind/stress key naming consistent: preprocess accepts both "stress_x"/"stress_y" and "wind_x"/"wind_y"
+- [x] Add new_train_AttentionSurgeModel.jl training script
 
 
 ## Model design and development

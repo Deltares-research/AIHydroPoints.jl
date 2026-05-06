@@ -7,21 +7,20 @@ using Flux
 # Helpers
 # ──────────────────────────────────────────────────────────────────────────────
 
-"""Build a minimal TimeSeries for testing (nstations × ntimes)."""
-function make_ts(values::Matrix{Float32}, quantity::String)
+function attn_make_ts(values::Matrix{Float32}, quantity::String;
+                 lons=nothing, lats=nothing)
     nstations, ntimes = size(values)
     times = DateTime(2020, 1, 1) .+ Hour.(0:ntimes-1)
     names = ["s$i" for i in 1:nstations]
-    lons  = Float64.(1:nstations)
-    lats  = Float64.(51 .+ (1:nstations))
+    lons  = isnothing(lons) ? Float64.(1:nstations) : lons
+    lats  = isnothing(lats) ? Float64.(51 .+ (1:nstations)) : lats
     return TimeSeries(values, times, names, lons, lats, quantity, "test")
 end
 
-"""Forcing-only input dict for LinearSurgeModel (stress keys by default)."""
-function make_surge_input(; nwind=3, ntimes=30, use_wind_keys=false)
-    sx = make_ts(randn(Float32, nwind, ntimes), "stress_x")
-    sy = make_ts(randn(Float32, nwind, ntimes), "stress_y")
-    pressure = make_ts(ones(Float32, nwind, ntimes) .* 1.0f5, "pressure")
+function attn_make_surge_input(; nwind=3, ntimes=50, use_wind_keys=false)
+    sx = attn_make_ts(randn(Float32, nwind, ntimes), "stress_x")
+    sy = attn_make_ts(randn(Float32, nwind, ntimes), "stress_y")
+    pressure = attn_make_ts(ones(Float32, nwind, ntimes) .* 1.0f5, "pressure")
     keys = use_wind_keys ? ("wind_x", "wind_y") : ("stress_x", "stress_y")
     return Dict{String, TimeSeries}(
         keys[1]    => sx,
@@ -30,21 +29,45 @@ function make_surge_input(; nwind=3, ntimes=30, use_wind_keys=false)
     )
 end
 
-"""Target dict for LinearSurgeModel."""
-function make_surge_target(; nstations=2, ntimes=30)
-    surge = make_ts(randn(Float32, nstations, ntimes), "surge")
+function attn_make_surge_target(; nstations=2, ntimes=50,
+                             lons=[3.5, 4.1], lats=[51.4, 51.9])
+    surge = attn_make_ts(randn(Float32, nstations, ntimes), "surge"; lons, lats)
     return Dict{String, TimeSeries}("surge" => surge)
 end
 
-"""Settings with output metadata pre-filled (for tests that bypass train_model!)."""
-function make_settings(; nstations=2, nwind=3, nlags=4)
+"""Minimal GraphNetwork connecting nwind input points to nstations output points."""
+function attn_make_graph_network(; nwind=3, nstations=2,
+                              in_lons=[3.0, 4.0, 5.0], in_lats=[51.0, 52.0, 53.0],
+                              out_lons=[3.5, 4.1],     out_lats=[51.4, 51.9])
+    in_points  = [(deg2rad(la), deg2rad(lo)) for (la, lo) in zip(in_lats,  in_lons)]
+    out_points = [(deg2rad(la), deg2rad(lo)) for (la, lo) in zip(out_lats, out_lons)]
+    adjacency  = ones(Float32, nwind, nstations)   # fully connected
+    return GraphNetwork(in_points, out_points, adjacency)
+end
+
+"""Minimal model_pars for the attention architecture."""
+function attn_make_model_pars(; nembed=8, nheads=2, nlayers_branch=1, nlayers_trunk=1,
+                           nhidden_trunk=8, theta=1000.0)
+    return Dict{String,Any}(
+        "nembed"         => nembed,
+        "theta"          => theta,
+        "nheads"         => nheads,
+        "nlayers_branch" => nlayers_branch,
+        "nlayers_trunk"  => nlayers_trunk,
+        "nhidden_trunk"  => nhidden_trunk,
+    )
+end
+
+function attn_make_settings(; nstations=2, nwind=3, nlags=4,
+                         out_lons=[3.5, 4.1], out_lats=[51.4, 51.9])
     return Dict{String, Any}(
         "nstations"    => nstations,
         "nwind"        => nwind,
         "nlags"        => nlags,
+        "model_pars"   => attn_make_model_pars(),
         "out_names"    => ["s$i" for i in 1:nstations],
-        "out_lons"     => Float64.(1:nstations),
-        "out_lats"     => Float64.(51 .+ (1:nstations)),
+        "out_lons"     => out_lons,
+        "out_lats"     => out_lats,
         "out_quantity" => "surge",
     )
 end
@@ -53,39 +76,39 @@ end
 # Construction
 # ──────────────────────────────────────────────────────────────────────────────
 
-@testset "LinearSurgeModel construction" begin
-    settings = Dict{String, Any}("nstations" => 2, "nwind" => 3, "nlags" => 4)
-    m = LinearSurgeModel(settings)
+@testset "AttentionSurgeModel construction" begin
+    settings = attn_make_settings()
+    gn       = attn_make_graph_network()
+    m        = AttentionSurgeModel(settings, gn)
 
+    @test m isa AbstractSurgeModel
     @test m isa AbstractFluxModel
     @test m isa AbstractModel
     @test get_settings(m) === settings
-    @test get_flux_model(m) isa Dense
-
-    # Dense layer has correct dimensions: 3*nwind*nlags → nstations
-    @test size(get_flux_model(m).weight) == (2, 3*3*4)
+    @test get_flux_model(m) isa AttentionSurgeFlux
 end
 
 # ──────────────────────────────────────────────────────────────────────────────
-# preprocess — metadata comes from settings, not from input
+# preprocess
 # ──────────────────────────────────────────────────────────────────────────────
 
-@testset "LinearSurgeModel preprocess" begin
-    nwind = 3; nstations = 2; ntimes = 30; nlags = 4
-    m     = LinearSurgeModel(make_settings(nstations=nstations, nwind=nwind, nlags=nlags))
+@testset "AttentionSurgeModel preprocess" begin
+    nwind = 3; nstations = 2; ntimes = 50; nlags = 4
+    m     = AttentionSurgeModel(attn_make_settings(nstations=nstations, nwind=nwind, nlags=nlags),
+                                attn_make_graph_network(nwind=nwind, nstations=nstations))
     nvalid = ntimes - nlags + 1
 
     for use_wind_keys in (false, true)
-        input = make_surge_input(nwind=nwind, ntimes=ntimes, use_wind_keys=use_wind_keys)
-        tensor, output = preprocess(m, input)
+        input = attn_make_surge_input(nwind=nwind, ntimes=ntimes, use_wind_keys=use_wind_keys)
+        (x_station, x_wind), output = preprocess(m, input)
 
-        @test size(tensor) == (1, 3*nwind, nlags, nvalid)
-        @test eltype(tensor) == Float32
+        @test size(x_wind)    == (3*nwind, nlags, nvalid)
+        @test size(x_station) == (6, nstations, nvalid)
+        @test eltype(x_wind)    == Float32
+        @test eltype(x_station) == Float32
         @test haskey(output, "surge")
         @test size(output["surge"].values) == (nstations, nvalid)
         @test all(output["surge"].values .== 0f0)
-        @test length(get_times(output["surge"])) == nvalid
-        @test get_names(output["surge"]) == m.settings["out_names"]
     end
 end
 
@@ -93,40 +116,39 @@ end
 # forward
 # ──────────────────────────────────────────────────────────────────────────────
 
-@testset "LinearSurgeModel forward" begin
+@testset "AttentionSurgeModel forward" begin
     nwind = 3; nstations = 2; nlags = 4; ntimes = 20
-    m = LinearSurgeModel(make_settings(nstations=nstations, nwind=nwind, nlags=nlags))
+    m = AttentionSurgeModel(attn_make_settings(nstations=nstations, nwind=nwind, nlags=nlags),
+                            attn_make_graph_network(nwind=nwind, nstations=nstations))
 
-    x = zeros(Float32, 1, 3*nwind, nlags, ntimes)
-    y = forward(m, x)
+    x_wind    = randn(Float32, 3*nwind, nlags, ntimes)
+    x_station = randn(Float32, 6, nstations, ntimes)
+    y = forward(m, (x_station, x_wind))
 
     @test size(y) == (nstations, 1, ntimes)
     @test eltype(y) == Float32
 end
 
 # ──────────────────────────────────────────────────────────────────────────────
-# train_model! — metadata population + training loop
+# train_model!
 # ──────────────────────────────────────────────────────────────────────────────
 
-@testset "LinearSurgeModel train_model!" begin
-    nwind = 3; nstations = 2; ntimes = 50; nlags = 4
-    # Start with no output metadata in settings
-    settings = Dict{String, Any}("nstations" => nstations, "nwind" => nwind, "nlags" => nlags)
-    m        = LinearSurgeModel(settings)
-    input    = make_surge_input(nwind=nwind, ntimes=ntimes)
-    target   = make_surge_target(nstations=nstations, ntimes=ntimes)
+@testset "AttentionSurgeModel train_model!" begin
+    nwind = 3; nstations = 2; ntimes = 60; nlags = 4
+    settings = Dict{String,Any}("nstations" => nstations, "nwind" => nwind,
+                                "nlags" => nlags, "model_pars" => attn_make_model_pars())
+    m      = AttentionSurgeModel(settings, attn_make_graph_network(nwind=nwind, nstations=nstations))
+    input  = attn_make_surge_input(nwind=nwind, ntimes=ntimes)
+    target = attn_make_surge_target(nstations=nstations, ntimes=ntimes)
 
     ts = TrainingSettings(nepochs=3, nbatches=16, learning_rate=1e-3)
     train_losses, val_losses = train_model!(m, ts, input, target)
 
-    # Metadata populated from target
     @test haskey(m.settings, "out_names")
     @test haskey(m.settings, "out_lons")
     @test haskey(m.settings, "out_lats")
     @test haskey(m.settings, "out_quantity")
-    @test m.settings["out_names"] == get_names(target["surge"])
 
-    # Returns one loss per epoch; no val split by default
     @test length(train_losses) == ts.nepochs
     @test eltype(train_losses) == Float32
     @test all(train_losses .>= 0f0)
@@ -134,21 +156,24 @@ end
 
     # With validation_split
     ts_val = TrainingSettings(nepochs=3, nbatches=16, learning_rate=1e-3, validation_split=0.2)
-    m2 = LinearSurgeModel(Dict{String,Any}("nstations" => nstations, "nwind" => nwind, "nlags" => nlags))
+    m2 = AttentionSurgeModel(
+        Dict{String,Any}("nstations" => nstations, "nwind" => nwind,
+                         "nlags" => nlags, "model_pars" => attn_make_model_pars()),
+        attn_make_graph_network(nwind=nwind, nstations=nstations))
     train_losses2, val_losses2 = train_model!(m2, ts_val, input, target)
     @test length(val_losses2) == ts_val.nepochs
-    @test eltype(val_losses2) == Float32
     @test all(val_losses2 .>= 0f0)
 end
 
 # ──────────────────────────────────────────────────────────────────────────────
-# end-to-end predict (after train_model! sets metadata)
+# predict (end-to-end)
 # ──────────────────────────────────────────────────────────────────────────────
 
-@testset "LinearSurgeModel predict" begin
-    nwind = 3; nstations = 2; ntimes = 30; nlags = 4
-    m      = LinearSurgeModel(make_settings(nstations=nstations, nwind=nwind, nlags=nlags))
-    input  = make_surge_input(nwind=nwind, ntimes=ntimes)
+@testset "AttentionSurgeModel predict" begin
+    nwind = 3; nstations = 2; ntimes = 50; nlags = 4
+    m     = AttentionSurgeModel(attn_make_settings(nstations=nstations, nwind=nwind, nlags=nlags),
+                                attn_make_graph_network(nwind=nwind, nstations=nstations))
+    input = attn_make_surge_input(nwind=nwind, ntimes=ntimes)
 
     output = predict(m, input)
     nvalid = ntimes - nlags + 1
@@ -157,38 +182,26 @@ end
     @test haskey(output, "surge")
     @test size(output["surge"].values) == (nstations, nvalid)
     @test eltype(output["surge"].values) == Float32
-    @test !all(output["surge"].values .== 0f0)   # Dense has random weights
 end
 
 # ──────────────────────────────────────────────────────────────────────────────
 # save_params / load_params! round-trip
 # ──────────────────────────────────────────────────────────────────────────────
 
-@testset "LinearSurgeModel save/load params" begin
-    m  = LinearSurgeModel(make_settings())
+@testset "AttentionSurgeModel save/load params" begin
+    m  = AttentionSurgeModel(attn_make_settings(), attn_make_graph_network())
+    fn = joinpath(temp_dir, "attention_surge_params.jld2")
 
-    W_orig = copy(get_flux_model(m).weight)
-    b_orig = copy(get_flux_model(m).bias)
-
-    fn = joinpath(temp_dir, "linear_surge_params.jld2")
     save_params(m, fn)
     @test isfile(fn)
-
-    # error if file exists and overwrite=false (default)
     @test_throws ErrorException save_params(m, fn)
-
-    # overwrite=true replaces the file
     save_params(m, fn; overwrite=true)
-    @test isfile(fn)
 
-    # error if parent directory does not exist
     bad_path = joinpath(temp_dir, "nonexistent_dir", "params.jld2")
     @test_throws ErrorException save_params(m, bad_path)
 
-    get_flux_model(m).weight .= 0f0
-    get_flux_model(m).bias   .= 0f0
-
-    load_params!(m, fn)
-    @test get_flux_model(m).weight ≈ W_orig
-    @test get_flux_model(m).bias   ≈ b_orig
+    # Load into a fresh model and verify weights match
+    m2 = AttentionSurgeModel(attn_make_settings(), attn_make_graph_network())
+    load_params!(m2, fn)
+    @test Flux.state(get_flux_model(m2)) == Flux.state(get_flux_model(m))
 end

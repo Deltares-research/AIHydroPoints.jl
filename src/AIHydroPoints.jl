@@ -34,6 +34,9 @@ include("models/abstract_flux_model.jl")
 export AbstractFluxModel, MyFluxModel
 export preprocess, forward, postprocess!, get_flux_model
 
+include("models/AbstractSurgeModel.jl")
+export AbstractSurgeModel
+
 include("models/LinearSurgeModel.jl")
 export LinearSurgeModel
 
@@ -47,6 +50,9 @@ export get_adjacency, GraphNetwork, plot_graph
 
 include("attention.jl")
 export Embedder, Deembedder, SinCosPosEmbedder, Transformer
+
+include("models/AttentionSurgeModel.jl")
+export AttentionSurgeModel, AttentionSurgeFlux
 
 include("surge.jl")
 export SurgeSettings, create_surge_model, SurgeModel

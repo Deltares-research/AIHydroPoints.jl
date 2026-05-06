@@ -100,12 +100,39 @@ a side-effect on the model struct and keeps `TimeSeries` allocation in one place
 `save_params` and `load_params!` are implemented once at this level using
 `get_flux_model` together with `Flux.state` / `Flux.loadmodel!` and JLD2.
 
+## AbstractSurgeModel (`AbstractSurgeModel.jl`)
+
+`AbstractSurgeModel <: AbstractFluxModel` is an intermediate abstract type that
+captures shared logic for all surge models.  Concrete subtypes only need to
+implement `forward` and `get_flux_model` / `get_settings`.
+
+### Shared implementations
+
+| Method | What it does |
+|---|---|
+| `preprocess` | Builds `(1, 3*nwind, nlags, nvalid)` wind/pressure lag tensor and pre-allocates output |
+| `postprocess!` | Writes `y[:, 1, :]` into `output["surge"].values` |
+| `train_model!` | Adam loop with ProgressMeter, temporal train/val split, returns `(train_losses, val_losses)` |
+
+### Input key handling
+
+`preprocess` accepts either `"stress_x"`/`"stress_y"` (used directly) or
+`"wind_x"`/`"wind_y"` (converted via `uv_to_stress_xy`).  The helper
+`_get_stress(input)` encapsulates this.
+
+```
+AbstractModel
+    └── AbstractFluxModel   — predict, save_params, load_params!
+            └── AbstractSurgeModel  — preprocess, postprocess!, train_model!
+                    ├── LinearSurgeModel
+                    └── AttentionSurgeModel
+```
+
 ## LinearSurgeModel (`LinearSurgeModel.jl`)
 
-`LinearSurgeModel <: AbstractFluxModel` is the first concrete implementation,
-used to validate the interface.  It predicts storm surge from wind-stress and
-pressure history using a single `Dense` layer (identity activation — a linear
-regression).
+`LinearSurgeModel <: AbstractSurgeModel` is the simplest concrete implementation,
+using a single `Dense` layer (identity activation — linear regression) to
+predict storm surge from wind-stress and pressure history.
 
 ### Settings
 
@@ -122,8 +149,8 @@ model = LinearSurgeModel(settings)
 
 | Key | Shape | Description |
 |---|---|---|
-| `"wind_x"`   | `(nwind, T)` | East wind-stress component |
-| `"wind_y"`   | `(nwind, T)` | North wind-stress component |
+| `"stress_x"` or `"wind_x"` | `(nwind, T)` | East wind-stress (or velocity, auto-converted) |
+| `"stress_y"` or `"wind_y"` | `(nwind, T)` | North wind-stress (or velocity, auto-converted) |
 | `"pressure"` | `(nwind, T)` | Sea-level pressure (scaled: `2e-4*(p - 1e5)`) |
 
 ### Data flow
@@ -146,6 +173,52 @@ train_losses, val_losses = train_model!(model, train_settings, input, target)
 held out for validation and `val_losses` is populated; otherwise it is empty.
 Training progress is shown via a `ProgressMeter` bar with per-epoch RMSE, and
 `@info` lines are emitted every `nepochs ÷ 10` epochs.
+
+## AttentionSurgeModel (`AttentionSurgeModel.jl`)
+
+`AttentionSurgeModel <: AbstractSurgeModel` uses a transformer branch network
+for wind/pressure history and a dense trunk network for station metadata, merged
+via graph-adjacency weights.
+
+### Constructor
+
+```julia
+model = AttentionSurgeModel(settings::Dict{String, Any}, gn::GraphNetwork)
+```
+
+Required keys in `settings`: `"nstations"`, `"nwind"`, `"nlags"`, `"model_pars"`.
+
+Required keys in `"model_pars"`:
+
+| Key | Description |
+|---|---|
+| `"nembed"` | Embedding dimension |
+| `"theta"` | RoPE/SinCos frequency base |
+| `"nheads"` | Transformer attention heads |
+| `"nlayers_branch"` | Transformer layers in branch network |
+| `"nlayers_trunk"` | Dense layers in trunk network |
+| `"nhidden_trunk"` | Hidden width of trunk network |
+
+### Overridden methods
+
+`AttentionSurgeModel` overrides `preprocess`, `forward`, and `train_model!`
+(inherited defaults from `AbstractSurgeModel` do not apply because the model
+has two inputs):
+
+| Method | Notes |
+|---|---|
+| `preprocess` | Returns `((x_station, x_wind), output)` — dual input |
+| `forward` | Accepts `Tuple`, takes `[:, end, :]` of the output |
+| `train_model!` | Batches over both `x_station` and `x_wind` simultaneously |
+
+### Data flow
+
+```
+preprocess → x_wind    (3*nwind, nlags, ntimes_valid)
+             x_station (6, nstations, ntimes_valid)   [cos/sin lat, lon, day-of-year]
+forward    → AttentionSurgeFlux → (nstations, nlags, ntimes) → [:, end, :] → (nstations, 1, ntimes)
+postprocess! → output["surge"].values .= y[:, 1, :]
+```
 
 ## Utilities
 
