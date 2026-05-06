@@ -1,5 +1,10 @@
-# This script trains an AttentionSurgeModel on the Schureman 2011 surge dataset,
-# using ERA5 wind stress and pressure as input.
+# Train a surge model on the Schureman 2011 surge dataset using ERA5 wind stress and pressure.
+#
+# Select which model to train by changing model_type below:
+#   "LinearSurgeModel"    — single Dense layer (fast baseline)
+#   "AttentionSurgeModel" — transformer branch + dense trunk + graph adjacency
+
+model_type = "LinearSurgeModel"
 
 cd(@__DIR__)
 
@@ -28,28 +33,30 @@ filenames = Dict(
 # ──────────────────────────────────────────────
 # Model / training settings
 # ──────────────────────────────────────────────
-name     = "AttentionSurgeModel"
-save_dir = joinpath("models", name)
+save_dir = joinpath("models", model_type)
 
 rm(save_dir, recursive=true, force=true)
 mkpath(save_dir)
 
 model_settings = Dict{String, Any}(
-    "model_name" => name,
+    "model_name" => model_type,
     "model_dir"  => save_dir,
     "nlags"      => 16,
-    "model_pars" => Dict{String, Any}(
+)
+
+if model_type == "AttentionSurgeModel"
+    model_settings["model_pars"] = Dict{String, Any}(
         "nembed"         => 32,
         "theta"          => 1000.0,
         "nheads"         => 4,
         "nlayers_branch" => 2,
         "nlayers_trunk"  => 2,
         "nhidden_trunk"  => 32,
-    ),
-)
+    )
+end
 
 train_settings = TrainingSettings(
-    nepochs          = 200,       # change to e.g. 200 for a real run
+    nepochs          = 100,
     nbatches         = 64,
     learning_rate    = 1.0e-3,
     lr_decay_factor  = 0.1,
@@ -66,7 +73,7 @@ labels = ["training", "testing"]
 data = Dict()
 for label in labels
     @show label
-    ts_h       = NetCDFTimeSeries(filenames[label]["waterlevel"], "surge")
+    ts_h        = NetCDFTimeSeries(filenames[label]["waterlevel"], "surge")
     ts_stress_x = JLD2TimeSeries(filenames[label]["wind"], varname="stress_x")
     ts_stress_y = JLD2TimeSeries(filenames[label]["wind"], varname="stress_y")
     ts_press    = JLD2TimeSeries(filenames[label]["wind"], varname="pressure")
@@ -88,16 +95,6 @@ model_settings["nstations"] = length(get_names(data["training"]["waterlevel"]))
 model_settings["nwind"]     = length(get_names(data["training"]["stress_x"]))
 
 # ──────────────────────────────────────────────
-# Build graph network (wind → waterlevel stations)
-# ──────────────────────────────────────────────
-wind_ts  = data["training"]["stress_x"]
-surge_ts = data["training"]["waterlevel"]
-
-in_points  = collect(zip(get_latitudes(wind_ts),  get_longitudes(wind_ts)))
-out_points = collect(zip(get_latitudes(surge_ts), get_longitudes(surge_ts)))
-gn = GraphNetwork(in_points, out_points)
-
-# ──────────────────────────────────────────────
 # Split into input (forcing) and target (surge)
 # ──────────────────────────────────────────────
 train_input  = Dict{String, TimeSeries}(k => data["training"][k] for k in ("stress_x","stress_y","pressure"))
@@ -106,18 +103,30 @@ test_input   = Dict{String, TimeSeries}(k => data["testing"][k]  for k in ("stre
 test_target  = Dict{String, TimeSeries}("surge" => data["testing"]["waterlevel"])
 
 # ──────────────────────────────────────────────
-# Create and train model
+# Create model
 # ──────────────────────────────────────────────
-model = AttentionSurgeModel(model_settings, gn)
+if model_type == "LinearSurgeModel"
+    model = LinearSurgeModel(model_settings)
+elseif model_type == "AttentionSurgeModel"
+    wind_ts    = data["training"]["stress_x"]
+    surge_ts   = data["training"]["waterlevel"]
+    in_points  = collect(zip(get_latitudes(wind_ts),  get_longitudes(wind_ts)))
+    out_points = collect(zip(get_latitudes(surge_ts), get_longitudes(surge_ts)))
+    gn    = GraphNetwork(in_points, out_points)
+    model = AttentionSurgeModel(model_settings, gn)
+else
+    error("Unknown model_type: $model_type")
+end
 
-# train_model! populates out_names/out_lons/out_lats/out_quantity from train_target
+# ──────────────────────────────────────────────
+# Train
+# ──────────────────────────────────────────────
 train_losses, val_losses = train_model!(model, train_settings, train_input, train_target)
 
 # ──────────────────────────────────────────────
 # Save
 # ──────────────────────────────────────────────
 save_params(model, joinpath(save_dir, "params.jld2"); overwrite=true)
-
 toml_write(joinpath(save_dir, "settings.toml"), get_settings(model); overwrite=true)
 
 # ──────────────────────────────────────────────
