@@ -83,4 +83,8 @@ mkdir(temp_dir) # create a new empty temp directory
    @testset "DeepONetWaveModel" begin
       include("models/test_DeepONetWaveModel.jl")
    end
+
+   @testset "ConvInteractionModel" begin
+      include("models/test_ConvInteractionModel.jl")
+   end
 end

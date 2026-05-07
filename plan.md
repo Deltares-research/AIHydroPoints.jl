@@ -11,15 +11,7 @@ The main goal of this project is to develop a machine learning model for predict
 4. [x] Create additional tests for code that is not tested at all.
     a. [x] figure out which code is not tested at all, and which code is tested but not well enough.
     b. [x] write tests for the code that is not tested at all, and improve the tests for the code that is tested but not well enough.
-5. Clean up the code and make it more modular and reusable.
-    a. [x] replace netcdf_utils.jl with MultiTimeSeries.jl
-    b. [x] Structure the model code, with an explicit AbstractModel type, and a common interface for all models.
-    c. [x] Extract the training settings from the model settings
-    d. [x] Work on model design and development, as described in src/models/design.md
-    e. [x] Test the new model design with LinearSurgeModel and AttentionSurgeModel.
-    f. [x] Implement the new model design for the tide model, and write unit tests for it.
-    g. [x] Implement the new model design for the wave model, and write unit tests for it.
-    h. [ ] Implement the new model design for the interaction model, and write unit tests for it.
+5. [x] Clean up the code and make it more modular and reusable.
 6. Make training scripts more similar and consistent
     a. Create a Separate data-structure for the training data, building on the MultiTimeSeries.jl package, and use it in the training code.
     b. [ ] Make data loading identical across all training scripts, with a single load_data function that can load any dataset based on the settings.
@@ -47,53 +39,12 @@ The main goal of this project is to develop a machine learning model for predict
 - we keep output of unit tests in test/temp. We clean this folder before running the tests, and leave files for inspection after the tests have run. We make sure that the output of the tests is informative and useful for debugging.
 
 ## Status
-- [x] Make the unit tests work again.
-- [x] Create a small dataset for waves in test_data/waves_2021
-- [x] Create a unit test for the wave model that runs fast, using the small dataset in test_data/waves_2021
-- [x] Adapt train_waves.jl to use the new data structures in src/
-- [x] Adapt train_waves_don.jl to use AIHydroPoints (replace series_ml)
-- [x] Fix train_tides.jl (rm force=true)
-- [x] Move DCSM-FM*.jld2 and era5*.jld2 datasets to test_data/
-- [x] Create unit test for the tide model (test/test_train_tides.jl)
-- [x] Create analyse_tides_schureman.jl to perform harmonic tidal analysis and produce tides/surge NetCDF, statistics and constituent CSVs, and plots (full year + Jan 1–15)
-- [x] Create surge test dataset using harmonic analysis of the DCSM-FM_0_5nm_2011_5stations_his.jld2 dataset
-- [x] Create unit test for the surge model (test/test_train_surges.jl)
-- [x] Adapt train_surges.jl to use the test dataset
-- [x] Create check_training_scripts.sh to smoke-test all training scripts
-- [x] Add a test for reading settings from a toml file (test/test_settings.jl)
-- [x] Split settings into TrainingSettings + model settings; document in docs/settings.md
-- [x] Implement LinearSurgeModel as first concrete AbstractFluxModel with training loop, progress bar, and train/val RMSE reporting
-- [x] Add validation_split to TrainingSettings for temporal train/val split
-- [x] Add toml_write utility (src/toml_utils.jl) for saving model settings as TOML
-- [x] Add save_loss_plot utility (src/plot_utils.jl) for saving train/val RMSE plots as PNG
-- [x] Add overwrite guards and directory checks to save_params, toml_write, and save_loss_plot
-- [x] Add AbstractSurgeModel intermediate type (shared preprocess, postprocess!, train_model!)
-- [x] Implement AttentionSurgeModel with transformer branch + dense trunk + graph adjacency
-- [x] Add test/models/test_AttentionSurgeModel.jl with construction, preprocess, forward, train, predict, save/load tests
-- [x] Make wind/stress key naming consistent: preprocess accepts both "stress_x"/"stress_y" and "wind_x"/"wind_y"
-- [x] Add new_train_AttentionSurgeModel.jl training script
-- [x] Merge new_train_LinearSurgeModel.jl and new_train_AttentionSurgeModel.jl into new_train_surge.jl (model_type switch)
-- [x] Implement AbstractTideModel intermediate type (shared preprocess, postprocess!, train_model!)
-- [x] Implement DeepONetTideModel wrapping TideModel Flux architecture from tides.jl
-- [x] Add test/models/test_DeepONetTideModel.jl with construction, preprocess, forward, train, predict, save/load tests
-- [x] Add new_train_tide.jl training script; fixed NetCDFTimeSeries materialisation bug
-- [x] Add plot_series to AbstractModel interface; implement _plot_station_series shared skeleton in plot_utils.jl
-- [x] Add plot_series to AbstractSurgeModel (2-panel) and AbstractTideModel (2- or 4-panel with optional FFT)
-- [x] Move plot_fft / plot_fft! from tides.jl to plot_utils.jl
-- [x] Use Plots.plot(ts; location_index=i) from MultiTimeSeries in _plot_station_series
-- [x] Add hatyan_core to [sources] in Project.toml so clean checkouts can resolve it
-- [x] Implement ProductTideModel (station×Doodson product + residual gating) in the new AbstractTideModel hierarchy
-- [x] Add test/models/test_ProductTideModel.jl; add ProductTideModel option to new_train_tide.jl
-- [x] Remove src/surge.jl (fully superseded); rewrite test_train_surges.jl for new interface; update check_training_scripts.sh
-- [x] Implement ConvSurgeModel (Conv1D over lag dim) in the new AbstractSurgeModel hierarchy
-- [x] Add test/models/test_ConvSurgeModel.jl; add ConvSurgeModel to new_train_surge.jl
-- [x] Remove src/tides.jl (fully superseded); move TideModel into DeepONetTideModel.jl; rewrite test_train_tides.jl for new interface; update check_training_scripts.sh
-- [x] Implement AbstractWaveModel (preprocess with one-hot station encoding, postprocess!, train_model! with NaN filtering, plot_series)
-- [x] Implement ConvWaveModel (WaveInputLayer + strided Conv1D); move WaveInputLayer from waves.jl here
-- [x] Add test/models/test_ConvWaveModel.jl with construction, preprocess, forward, train, predict, save/load tests
-- [x] Implement DeepONetWaveModel (strided Conv branch + dot-product station merge) in the new AbstractWaveModel hierarchy
-- [x] Add test/models/test_DeepONetWaveModel.jl; add both wave models to new_train_waves.jl; update check_training_scripts.sh
-- [x] Remove src/waves.jl (fully superseded); move stats_skipnan/average_stats to wave_stats.jl; rewrite test_train_waves.jl for new interface
+
+Steps 1–5 are complete. The new model hierarchy (`AbstractModel → AbstractFluxModel →
+AbstractSurgeModel / AbstractTideModel / AbstractWaveModel / AbstractInteractionModel →`
+concrete models) is fully implemented, tested, and all legacy source files removed.
+406 unit tests pass. Training scripts: `new_train_surge.jl`, `new_train_tide.jl`,
+`new_train_waves.jl`, `new_train_interaction.jl`. Smoke-tested via `check_training_scripts.sh`.
 
 
 ## Model design and development

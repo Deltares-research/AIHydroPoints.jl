@@ -65,9 +65,6 @@ include("models/AttentionSurgeModel.jl")
 export AttentionSurgeModel, AttentionSurgeFlux
 
 
-include("interaction.jl")
-export InteractionSettings, create_interaction_model
-
 include("wind_stress.jl")
 export uv_to_stress_xy
 
@@ -82,6 +79,12 @@ export DeepONetWaveModel, DeepONetWaveFlux
 
 include("wave_stats.jl")
 export stats_skipnan, average_stats
+
+include("models/AbstractInteractionModel.jl")
+export AbstractInteractionModel
+
+include("models/ConvInteractionModel.jl")
+export ConvInteractionModel, InteractionInputLayer, ConvInteractionFlux
 
 
 # Methods in the interface for time series
