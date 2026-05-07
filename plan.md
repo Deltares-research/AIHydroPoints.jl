@@ -139,9 +139,10 @@ Wave-specific training-only setting:
     - `train_model` — reads all training-only fields directly from `settings`
     - `plot_losses` — reads `checkpoints`, `lr_decay_factor`, `lr_decay_rate`, `learning_rate`, `nepochs`
     - `save_settings` / `load_settings` — serialises the whole settings struct; will need updating
-- `src/waves.jl`:
-    - `train_epoch!` — reads `input_noise_std` from `settings`
-- Training scripts (`train_tides.jl`, `train_surges.jl`, `train_waves.jl`, `train_waves_don.jl`) — construct a single settings object containing both groups
+- `src/interaction.jl`:
+    - `train_epoch!` — reads `input_noise_std` from `settings` (still uses old `InteractionSettings` struct)
+- Legacy training scripts still using old `AbstractModelSettings` structs: `train_interaction.jl`
+- New-style training scripts already using `Dict{String,Any}` + `TrainingSettings`: `new_train_surge.jl`, `new_train_tide.jl`, `new_train_waves.jl`
 
 ### Adapted function signatures:
 

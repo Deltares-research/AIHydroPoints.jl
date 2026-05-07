@@ -80,8 +80,8 @@ export ConvWaveModel, WaveInputLayer
 include("models/DeepONetWaveModel.jl")
 export DeepONetWaveModel, DeepONetWaveFlux
 
-include("waves.jl")
-export WaveSettings, create_wave_model, stats_skipnan, average_stats
+include("wave_stats.jl")
+export stats_skipnan, average_stats
 
 
 # Methods in the interface for time series

@@ -86,12 +86,6 @@ run_script "new_train_surge" "new_train_surge.jl" \
 run_script "new_train_waves" "new_train_waves.jl" \
     "test_data/waves_2021"
 
-run_script "train_waves" "train_waves.jl" \
-    "data/waves_2021_2024_10to11"
-
-run_script "train_waves_don" "train_waves_don.jl" \
-    "data/waves_2021_2024_10to11"
-
 run_script "analyse_tides_schureman" "analyse_tides_schureman.jl" \
     "test_data/DCSM-FM_0_5nm_2010_5stations_his.jld2"
 

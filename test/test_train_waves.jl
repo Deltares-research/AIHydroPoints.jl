@@ -1,9 +1,7 @@
 # test_train_waves.jl
 #
-# Smoke-test for the wave model training pipeline.
+# Smoke-test for the wave model training pipeline using the new ConvWaveModel interface.
 # Uses the small 2021 test dataset in test_data/waves_2021/.
-# The goal is fast feedback that the pipeline runs end-to-end,
-# NOT that the resulting model is accurate.
 
 using Dates
 using DataFrames
@@ -33,7 +31,7 @@ using DataFrames
 
     @test length(get_times(u10)) == length(time_selection)
 
-    # ── Train / validation split ───────────────────────────────────────────
+    # ── Train / test split ─────────────────────────────────────────────────
     t_split = DateTime(2021, 10, 1)
 
     train_dict = Dict(
@@ -47,50 +45,52 @@ using DataFrames
         "wave_height"    => select_timespan(swh,  t_split, time_selection[end]),
     )
 
-    # ── Minimal settings for speed ─────────────────────────────────────────
-    # nlags must equal 2^length(nchannel): 4 = 2^2
-    mktempdir() do model_dir
-        settings = WaveSettings(
-            model_name       = "test_wave_model",
-            model_dir        = model_dir,
-            use_gpu          = false,
-            nstations        = length(output_locations),
-            nwind            = length(input_locations),
-            nlags            = 4,
-            n_input_channels = 4,
-            wind_scale       = 0.5,
-            wave_scale       = 3.0,
-            model_pars       = Dict("nchannel" => [4, 1], "activation" => "swish"),
-        )
-        train_settings = TrainingSettings(nepochs=2, nbatches=8, learning_rate=0.001,
-                                          weight_reg=1.0e-4, input_noise_std=0.0)
+    # nlags=4 → nchannel length must be 2 (2^2=4)
+    nstations = length(output_locations)
+    nwind     = length(input_locations)
 
-        # ── Model creation ─────────────────────────────────────────────────
-        model = create_wave_model(settings)
-        @test !isnothing(model)
+    model_dir = joinpath(temp_dir, "test_wave_model")
+    mkpath(model_dir)
 
-        # ── Training ───────────────────────────────────────────────────────
-        model, acc_losses, train_losses, test_losses =
-            train_model(model, settings, train_settings, train_dict, test_dict)
-        @test length(train_losses) == train_settings.nepochs
-        @test length(test_losses)  == train_settings.nepochs
-        @test all(isfinite, train_losses)
+    settings = Dict{String, Any}(
+        "model_name"        => "test_wave_model",
+        "model_dir"         => model_dir,
+        "nstations"         => nstations,
+        "nwind"             => nwind,
+        "nlags"             => 4,
+        "wind_scale"        => 0.5,
+        "wave_scale"        => 3.0,
+        "n_input_channels"  => 4,
+        "model_pars"        => Dict{String,Any}("nchannel" => [4, 1], "activation" => "swish"),
+    )
+    train_settings = TrainingSettings(nepochs=2, nbatches=8, learning_rate=1e-3)
 
-        # ── Prediction ─────────────────────────────────────────────────────
-        full_dict = Dict("wind_speed" => u10, "wind_direction" => udir, "wave_height" => swh)
-        swh_predicted = predict(model, settings, full_dict)
+    # ── Model creation ─────────────────────────────────────────────────────
+    model = ConvWaveModel(settings)
+    @test model isa AbstractWaveModel
 
-        pred_values = get_values(swh_predicted)
-        @test size(pred_values, 1) == length(output_locations)
-        @test size(pred_values, 2) == length(time_selection)
-        # After the initial NaN-filled lags, values should be finite
-        @test any(isfinite, pred_values)
+    # ── Training ───────────────────────────────────────────────────────────
+    train_losses, val_losses = train_model!(model, train_settings, train_dict, train_dict)
+    @test length(train_losses) == train_settings.nepochs
+    @test all(isfinite, train_losses)
+    @test isempty(val_losses)
 
-        # ── Statistics ─────────────────────────────────────────────────────
-        stats = stats_skipnan(swh, swh_predicted)
-        @test nrow(stats) == length(output_locations)
-        @test all(isfinite, stats.rmse)
-        @test all(stats.count .> 0)
-    end
+    # ── Prediction ─────────────────────────────────────────────────────────
+    output = predict(model, test_dict)
+    @test output isa Dict{String, TimeSeries}
+    @test haskey(output, "wave_height")
+    pred_values = get_values(output["wave_height"])
+    @test size(pred_values, 1) == nstations
+    @test any(isfinite, pred_values)
+
+    # ── Statistics ─────────────────────────────────────────────────────────
+    # Align times: predict trims the first nlags-1 steps
+    swh_trimmed = select_timespan(test_dict["wave_height"],
+                                  get_times(output["wave_height"])[1],
+                                  get_times(output["wave_height"])[end])
+    stats = stats_skipnan(swh_trimmed, output["wave_height"])
+    @test nrow(stats) == nstations
+    @test all(isfinite, stats.rmse)
+    @test all(stats.count .> 0)
 
 end
