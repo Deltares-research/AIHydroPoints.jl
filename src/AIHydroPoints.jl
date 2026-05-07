@@ -32,7 +32,7 @@ export AbstractModel, get_settings, save_params, load_params!, train_model!, plo
 
 include("models/abstract_flux_model.jl")
 export AbstractFluxModel, MyFluxModel
-export preprocess, forward, postprocess!, get_flux_model
+export preprocess, forward, postprocess!, get_flux_model, predict
 
 include("models/AbstractSurgeModel.jl")
 export AbstractSurgeModel
