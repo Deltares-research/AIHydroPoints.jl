@@ -43,66 +43,7 @@ The main goal of this project is to develop a machine learning model for predict
 Steps 1–5 are complete. The new model hierarchy (`AbstractModel → AbstractFluxModel →
 AbstractSurgeModel / AbstractTideModel / AbstractWaveModel / AbstractInteractionModel →`
 concrete models) is fully implemented, tested, and all legacy source files removed.
-406 unit tests pass. Training scripts: `new_train_surge.jl`, `new_train_tide.jl`,
-`new_train_waves.jl`, `new_train_interaction.jl`. Smoke-tested via `check_training_scripts.sh`.
+406 unit tests pass. Training scripts: `train_surge.jl`, `train_tide.jl`,
+`train_waves.jl`, `train_interaction.jl`. Smoke-tested via `check_training_scripts.sh`.
 
 
-## Model design and development
-
-The current settings combine the model settings and the training settings in a single dictionary. This is not ideal, as it makes it difficult to reuse the model code for different training settings, and it makes it difficult to run inference with the trained model. We should separate the model settings from the training settings.
-
-### Identified training-only settings (not needed for inference):
-
-Common to all three models (`TideSettings`, `SurgeSettings`, `WaveSettings`):
-- `nepochs`
-- `nbatches`
-- `learning_rate`
-- `lr_decay_factor`
-- `lr_decay_rate`
-- `weight_reg`
-- `patience`
-- `checkpoints`
-- `val_daterange`
-
-Wave-specific training-only setting:
-- `input_noise_std` — Gaussian noise injected into inputs during `train_epoch!` only
-    - add noise optn for all models!
-
-### Settings needed for inference (must stay in model settings):
-
-| Field | Tide | Surge | Wave |
-|---|:---:|:---:|:---:|
-| `model_name` | ✓ | ✓ | ✓ |
-| `model_dir` | ✓ | ✓ | ✓ |
-| `use_gpu` | ✓ | ✓ | ✓ |
-| `model_pars` | ✓ | ✓ | ✓ |
-| `nstations` | ✓ | ✓ | ✓ |
-| `freqs` | ✓ | — | — |
-| `nwind` | — | ✓ | ✓ |
-| `nlags` | — | ✓ | ✓ |
-| `n_input_channels` | — | — | ✓ |
-| `wind_scale` | — | — | ✓ |
-| `wave_scale` | — | — | ✓ |
-
-### Routines affected by the training settings:
-
-- `src/training.jl`:
-    - `train_model` — reads all training-only fields directly from `settings`
-    - `plot_losses` — reads `checkpoints`, `lr_decay_factor`, `lr_decay_rate`, `learning_rate`, `nepochs`
-    - `save_settings` / `load_settings` — serialises the whole settings struct; will need updating
-- `src/interaction.jl`:
-    - `train_epoch!` — reads `input_noise_std` from `settings` (still uses old `InteractionSettings` struct)
-- Legacy training scripts still using old `AbstractModelSettings` structs: `train_interaction.jl`
-- New-style training scripts already using `Dict{String,Any}` + `TrainingSettings`: `new_train_surge.jl`, `new_train_tide.jl`, `new_train_waves.jl`
-
-### Adapted function signatures:
-
-```julia
-# Old signature: all settings in one struct
-train_model(model, settings::AbstractModelSettings, train_dict, test_dict)
-
-# Current — training settings extracted into a separate struct
-train_model(model, model_settings::AbstractModelSettings,
-            train_settings::TrainingSettings, train_dict, test_dict)
-
-```

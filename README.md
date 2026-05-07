@@ -1,141 +1,123 @@
 
 # A series approach to forecasting tides and storm-surges
 
-The purpose of this time-series based AI model is to have a simple and fast benchmark model. The inputs are a few time-series of winds and air-pressure, from ERA5 in the examples in this repository. The outputs are timeseries of tides, surge and interaction at a number of locations. For now, the model is trained on output of a numerical model. In principle, measurements can also be used for training.
+The purpose of this time-series based AI model is to have a simple and fast benchmark model.
+The inputs are time-series of winds, air-pressure, tides, and surge from ERA5 / DCSM-FM.
+The outputs are time-series of tides, surge, waves, and their interaction at a number of locations.
 
-The AI model in this folder contains 3 modules for forecasting, tides, surges and their interaction. 
-- Tides: takes only time and location name as input, and should be trained on a multi year dataset of multiple time-series
-- Surge: takes winds and pressure at a few points around the North Sea as input, and should be trained with several years of timeseries for a collection of stations.
-- Tide-Surge Interation: takes the output of the previous two modules as input and outputs time-series for the non-linear interation. 
-This should be summed together result in time-series for the total waterlevel as well as for the individual components. The architecture considers the dynamics to be in part local and in part generic, which is reflected in specific inputs per location and common layers. For example to compute the tide level at the second location a one-hot vector `[0,1,0,...]` is used with as length the number of locations. The other inputs are Doodson phases at that data and time.
-The model uses three components and no internal state to achieve a reliable behavior for long lead times. The model is as easily fed with forecasted winds as with winds from a reanalysis for reconstruction of a historical event. Our understanding of the physics of the phenomena has been included in multiple ways into the architecture.
+The AI model contains four modules:
 
-The inputs for winds and air-pressure are sampled at a few relevant locations. In the examples ERA5 fields from the Copernicus Climate Data Store (CDS) are used. Tides require Doodson phases as input, but these are easily computed from the times. The outputs in the examples are from the DCSM-FM model.
-Previous values of wind and pressure are taken into account for the surge, and the interaction module also has a time window. You have to make sure that the data provided contains an additional few days to compute the first values. The length is equal to the sum of both windows. It's safe to add a bit extra, so you don't have to change anything in case of a small modification of the model.
+- **Tides** — takes time and location identity as input; trained on multi-year tidal records.
+- **Surge** — takes lagged wind stress and pressure at a few locations as input.
+- **Waves** — takes lagged wind speed and direction at input locations; encodes output stations via one-hot vectors.
+- **Tide–surge interaction** — takes lagged tide and surge at each station as input and predicts the non-linear residual.
 
-## Data downloads
+Summing all four outputs gives the total water level.  The architecture captures both local and generic dynamics: a one-hot station vector selects station-specific parameters while shared layers encode the common physics.
 
-We aim to have the main datasets available in zarr format in the cloud, so they can be easily accessed from the scripts. For now, the scripts download the data and save it locally. You'll need credentials for downloading data. For the S3 storage this amounts to seting the `.aws/credentials` and `.aws/config` files.
+The model has no internal state, which makes it equally suitable for hindcasts (reanalysis winds) and forecasts (NWP winds).
 
 ## Status
 
-All four models (tides, surges, waves, interaction) use the `AIHydroPoints` library in `src/`.
-Unit tests pass for wind stress, tidal constituents, and the wave, tide, and surge training pipelines.
-Training and inference settings are split: model-architecture fields live in `TideSettings` /
-`SurgeSettings` / `WaveSettings`, while training hyperparameters (epochs, learning rate, etc.)
-live in a shared `TrainingSettings` struct — see `docs/settings.md`.
-A smoke-test script (`check_training_scripts.sh`) verifies all training scripts end-to-end.
+All four models (tides, surges, waves, interaction) are fully implemented and tested.
+
+- Model hierarchy: `AbstractModel → AbstractFluxModel → Abstract{Surge,Tide,Wave,Interaction}Model → concrete models`
+- Settings split: model architecture lives in a `Dict{String,Any}`; training hyperparameters live in `TrainingSettings` — see `docs/settings.md`
+- 406 unit tests pass (`pixi run julia --project -e "using Pkg; Pkg.test()"`)
+- All training scripts smoke-tested end-to-end via `check_training_scripts.sh`
 
 ## Intended workflow for training
 
-### ML model Tides
-- download sealevel data `get_dcsm_series.jl` - read from 1980-2023 DCSM run stored in the cloud
-- train tides `train_tides.jl`.
+```bash
+# Tides
+julia --project train_tide.jl
 
-### ML model Surge
-- convert era5 data to datasets for training `get_era_series.jl`
-- train surges `train_surges.jl`
+# Surge
+julia --project train_surge.jl
 
-### ML model for tide-surge interaction
-- train tide-surge interaction model `train_interaction.jl`
+# Waves
+julia --project train_waves.jl
 
-### Combined analysis
-- make analysis of a trained model for a new input dataset `run_analysis.jl`
+# Tide–surge interaction
+julia --project train_interaction.jl
+```
+
+Each script has `nepochs = 2` for a fast smoke-test; increase for a real run.
+
+## Data downloads
+
+We aim to have the main datasets available in Zarr format in the cloud.
+For now the scripts download data and save it locally.
+For S3 storage you need `~/.aws/credentials` and `~/.aws/config`.
 
 ## Source code (`src/`)
 
 All library code lives in `src/` and is exposed as the `AIHydroPoints` Julia package.
 
-- `models/abstract_model.jl` — `AbstractModel` abstract type (common interface for all models)
-- `models/training_settings.jl` — `TrainingSettings` struct (epochs, learning rate, regularisation, etc.)
-- `tidal_comps.jl` — Doodson phases, lunar-to-solar conversion, named tidal constituents
-- `wind_stress.jl` — Convert 10 m winds to stress components
-- `waves.jl` — Wave model: `WaveSettings`, `create_wave_model`, `train_epoch!`, `predict`, `stats_skipnan`, `plot_series`
-- `tides.jl` — Tide model: `TideSettings`, `TideModel`, `prepare_inputs`, `predict`, `plot_series`
-- `surge.jl` — Surge model: `SurgeSettings`, `SurgeModel`, `prepare_inputs`, `predict`, `plot_series`
-- `interaction.jl` — Tide–surge interaction model: `InteractionSettings`
-- `training.jl` — Shared training loop (`train_model`), `save_model`, `load_model`, `save_settings`, `load_settings`
-- `graph_network.jl`, `attention.jl` — Graph network and attention building blocks
+### Model hierarchy
 
-Time-series I/O (in-memory, NetCDF, Zarr, JLD2, NOOS) is provided by the external
-[MultiTimeSeries.jl](https://github.com/robot144/MultiTimeSeries.jl) package.
+| File | Contents |
+|---|---|
+| `models/abstract_model.jl` | `AbstractModel` — common interface (`predict`, `train_model!`, `save_params`, `load_params!`, `plot_series`) |
+| `models/abstract_flux_model.jl` | `AbstractFluxModel` — generic `predict`/`save_params`/`load_params!` via `preprocess`/`forward`/`postprocess!` |
+| `models/training_settings.jl` | `TrainingSettings` — epochs, learning rate, batch size, validation split, etc. |
+| `models/AbstractSurgeModel.jl` | Shared surge `preprocess` (wind-stress lags), `postprocess!`, `train_model!`, `plot_series` |
+| `models/LinearSurgeModel.jl` | Single Dense layer surge baseline |
+| `models/ConvSurgeModel.jl` | Conv1D over lag dimension |
+| `models/AttentionSurgeModel.jl` | Transformer branch + dense trunk + graph adjacency |
+| `models/AbstractTideModel.jl` | Shared tide `preprocess` (Doodson phases), `postprocess!`, `train_model!`, `plot_series` |
+| `models/DeepONetTideModel.jl` | DeepONet branch/trunk architecture |
+| `models/ProductTideModel.jl` | Station×Doodson product + residual gating |
+| `models/AbstractWaveModel.jl` | Shared wave `preprocess` (one-hot station + lagged wind-stress), `postprocess!`, `train_model!`, `plot_series` |
+| `models/ConvWaveModel.jl` | `WaveInputLayer` exp gate + strided Conv1D |
+| `models/DeepONetWaveModel.jl` | Conv branch + dot-product station merge |
+| `models/AbstractInteractionModel.jl` | Shared interaction `preprocess` (one-hot + tide/surge lags, Z-score), `postprocess!`, `train_model!`, `plot_series` |
+| `models/ConvInteractionModel.jl` | `InteractionInputLayer` gate + strided Conv1D |
+
+### Utilities
+
+| File | Contents |
+|---|---|
+| `tidal_comps.jl` | Doodson phases, lunar-to-solar conversion, named tidal constituents |
+| `wind_stress.jl` | Convert 10 m winds to stress components |
+| `wave_stats.jl` | `stats_skipnan`, `average_stats` — per-station wave statistics |
+| `graph_network.jl` | Graph network building blocks |
+| `attention.jl` | Transformer / attention building blocks |
+| `training.jl` | Legacy training loop for old `AbstractModelSettings`-based models |
+| `toml_utils.jl` | `toml_write` — save model settings dict as TOML |
+| `plot_utils.jl` | `save_loss_plot`, `_plot_station_series`, `plot_fft` |
+
+Time-series I/O (NetCDF, Zarr, JLD2, NOOS) is provided by
+[MultiTimeSeries.jl](https://github.com/robot144/MultiTimeSeries.jl).
 
 See `docs/settings.md` for a full reference of all settings fields.
+
 ## Analysis scripts
 
 - `analyse_tides_schureman.jl` — Harmonic tidal analysis (Schureman, 95 constituents) on a
-  yearly DCSM-FM 5-station JLD2 dataset. Produces tides and surge as NetCDF, per-station
-  full-year and Jan 1–15 plots, a statistics CSV, and a constituent amplitude/phase CSV.
-  Takes the year as a command-line argument (default 2010):
+  yearly DCSM-FM 5-station JLD2 dataset.  Produces tides and surge as NetCDF, per-station
+  plots, statistics CSV, and constituent CSV.  Takes the year as a command-line argument
+  (default 2010):
   ```
   julia --project analyse_tides_schureman.jl 2011
   ```
   Output is written to `output_tides_<year>/`.
 
 ## Other
-- `test_minio_zarr_with_julia.ipynb`
-    Test script for downloading a subset of the 1980-2023 DCSM run
-- `hatyan_core.py`
-    Copy of basic tide routines from Haytan2
 
-## Design ideas
+- `test_minio_zarr_with_julia.ipynb` — test script for downloading a subset of the 1980–2023 DCSM run
+- `hatyan_core.py` — copy of basic tide routines from Hatyan2
 
-The different models all need time-series and a configuration as inputs. Each model has different configuration options when studied in more detail. 
-- Configurations can use a TOML file, wich maps to a data-structure in memory. During development scripts can override values. Production scripts should be fully comfigurable from the config file
-- For the model config we can make the time-span for the computation optional. When not given the model settings and times of the dataset are used to determine the start and end time.
-- Different configs should share elements where useful
-- Long term goal could be more generic scripts like `ai_hydro_train.jl` and `ai_hydro_predict.jl` with the model settings etc all in a config.
+## Design
 
-## TODO
-
-### Waves
-- [x] wave model architecture and training in `src/waves.jl`
-- [x] `train_waves.jl` updated to use `AIHydroPoints` library
-- [x] unit test for wave training pipeline (`test/test_train_waves.jl`)
-### Tides
-- [x] convert DCSM to zarr and store in cloud
-- [x] basic routines for tides (`src/tidal_comps.jl`)
-- [x] create a few training datasets for tides
-- [x] prototype for tide training
-- [x] export to netcdf his file
-- [x] small test dataset in `test_data/DCSM-FM_0_5nm_*_5stations_his.jld2`
-- [x] unit test for tide training pipeline (`test/test_train_tides.jl`)
-- [x] `train_tides.jl` updated to use `AIHydroPoints` library
-- [ ] check with cpu and gpu. Is gpu faster?
-- [ ] rewrite `get_dcsm_series.jl` to use TimeSeries
-### Surge
-- [x] download ERA5 data — see [DataCollector.jl repo](https://github.com/robot144/DataCollector.jl)
-- [x] convert to jld2 and compute stresses
-- [x] `train_surges.jl` updated to use `AIHydroPoints` library
-- [x] unit test for surge training pipeline (`test/test_train_surges.jl`)
-### Tide-Surge Interaction
-- [x] create AI model and train
-- [ ] update `train_interaction.jl` to use `AIHydroPoints` library
-### Cleaner code
-- [x] Unit tests (`test/`)
-- [x] TimeSeries type via MultiTimeSeries.jl
-- [x] Selection of locations and times for TimeSeries
-- [x] Read and write time-series (NetCDF, Zarr, JLD2, NOOS)
-- [x] `wind_stress.jl` moved to `src/`
-- [x] tidal constituent routines moved to `src/tidal_comps.jl`
-- [x] `AbstractModel` abstract type in `src/models/abstract_model.jl`
-- [x] `TrainingSettings` separated from model settings; documented in `docs/settings.md`
-- [x] smoke-test script `check_training_scripts.sh`
-- [ ] update `train_interaction.jl` to use `AIHydroPoints` library
-- [ ] add unit test for interaction model
-
-
+- All settings are plain `Dict{String,Any}`.  Training-only fields live in `TrainingSettings`.
+- A trained model's inference settings are saved as a flat `settings.toml`; model weights are saved as `model_params.jld2`.
+- Long-term goal: generic `ai_hydro_train.jl` / `ai_hydro_predict.jl` fully driven by a config TOML.
 
 ## Statistics and hyperparameters
 
 ### Tide model
-- tide layers: 3
-- channels per layer: 64
-- regularization: 0.0001
-- batch size: 1024
-- stations: 314 (all)
-- epochs: 20
-- train perdiod: 2008, 2009, 2010
-- testing period: 2011
-- mean RMSE train: 0.216
-- mean RMSE test: 0.230
+
+- tide layers: 3 — channels per layer: 64 — regularization: 0.0001
+- batch size: 1024 — stations: 314 (all) — epochs: 20
+- train period: 2008–2010 — test period: 2011
+- mean RMSE train: 0.216 — mean RMSE test: 0.230

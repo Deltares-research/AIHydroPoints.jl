@@ -73,20 +73,20 @@ run_script() {
 # Scripts
 # ──────────────────────────────────────────────────────────────────────────────
 
-run_script "new_train_tide" "new_train_tide.jl" \
+run_script "train_tide" "train_tide.jl" \
     "test_data/tides_schureman_2011.nc" \
     "test_data/tides_schureman_2012.nc"
 
-run_script "new_train_surge" "new_train_surge.jl" \
+run_script "train_surge" "train_surge.jl" \
     "test_data/surge_schureman_2011.nc" \
     "test_data/era5_wind_stress_2011_testing.jld2" \
     "test_data/surge_schureman_2012.nc" \
     "test_data/era5_wind_stress_2012_validation.jld2"
 
-run_script "new_train_waves" "new_train_waves.jl" \
+run_script "train_waves" "train_waves.jl" \
     "test_data/waves_2021"
 
-run_script "new_train_interaction" "new_train_interaction.jl" \
+run_script "train_interaction" "train_interaction.jl" \
     "test_data/tides_schureman_2011.nc" \
     "test_data/surge_schureman_2011.nc" \
     "test_data/tides_schureman_2012.nc" \

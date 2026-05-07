@@ -94,7 +94,7 @@ train_losses, val_losses = train_model!(model, train_settings, train_data, train
 # Save
 # ──────────────────────────────────────────────
 save_params(model, joinpath(save_dir, "params.jld2"); overwrite=true)
-toml_write(get_settings(model),joinpath(save_dir, "settings.toml"); overwrite=true)
+toml_write(joinpath(save_dir, "settings.toml"),get_settings(model); overwrite=true)
 
 # ──────────────────────────────────────────────
 # Plots

@@ -47,8 +47,8 @@ later via `get_settings`.
 - Input and output of `predict` are dicts mapping variable names to time series.
   Output locations need not match input locations.
 - Computations are causal: output at time `t` depends only on input at times ≤ `t`.
-- `save_params` / `load_params!` persist **only** trained weights; settings are handled
-  separately by `save_settings` / `load_settings`.
+- `save_params` / `load_params!` persist **only** trained weights; settings are saved
+  separately via `toml_write(get_settings(model), path)`.
 - `train_model!` mutates the model in-place (updates weights) and returns training
   diagnostics (losses, etc.) decided by the concrete implementation.
 """
@@ -90,7 +90,7 @@ end
     save_params(model::AbstractModel, file::String)
 
 Serialise the trained model weights to `file` (JLD2 format).
-Settings are **not** included; use `save_settings` for those.
+Settings are **not** included; save them separately with `toml_write(get_settings(model), path)`.
 
 Must be implemented by every concrete subtype of `AbstractModel`.
 """
