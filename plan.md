@@ -20,7 +20,11 @@ The main goal of this project is to develop a machine learning model for predict
     f. [x] Implement the new model design for the tide model, and write unit tests for it.
     g. [x] Implement the new model design for the wave model, and write unit tests for it.
     h. [ ] Implement the new model design for the interaction model, and write unit tests for it.
-6. Create a Separate data-structure for the training data, building on the MultiTimeSeries.jl package, and use it in the training code.
+6. Make training scripts more similar and consistent
+    a. Create a Separate data-structure for the training data, building on the MultiTimeSeries.jl package, and use it in the training code.
+    b. [ ] Make data loading identical across all training scripts, with a single load_data function that can load any dataset based on the settings.
+    c. [ ] Make the training loop identical across all training scripts, with a single train_model function that can train any model based on the settings.
+    d. [ ] Make the output generation (plots, saved models, etc.) identical across all training scripts, with a single save_output function that can save any output based on the settings.
 7. Make training fully controllable from the toml input file, and make it possible to run training from the command line with a specified toml file.
 8. Write a separate script for inference
 
@@ -89,6 +93,7 @@ The main goal of this project is to develop a machine learning model for predict
 - [x] Add test/models/test_ConvWaveModel.jl with construction, preprocess, forward, train, predict, save/load tests
 - [x] Implement DeepONetWaveModel (strided Conv branch + dot-product station merge) in the new AbstractWaveModel hierarchy
 - [x] Add test/models/test_DeepONetWaveModel.jl; add both wave models to new_train_waves.jl; update check_training_scripts.sh
+- [x] Remove src/waves.jl (fully superseded); move stats_skipnan/average_stats to wave_stats.jl; rewrite test_train_waves.jl for new interface
 
 
 ## Model design and development
