@@ -18,7 +18,7 @@ The main goal of this project is to develop a machine learning model for predict
     d. [x] Work on model design and development, as described in src/models/design.md
     e. [x] Test the new model design with LinearSurgeModel and AttentionSurgeModel.
     f. [x] Implement the new model design for the tide model, and write unit tests for it.
-    g. [ ] Implement the new model design for the wave model, and write unit tests for it.
+    g. [x] Implement the new model design for the wave model, and write unit tests for it.
     h. [ ] Implement the new model design for the interaction model, and write unit tests for it.
 6. Create a Separate data-structure for the training data, building on the MultiTimeSeries.jl package, and use it in the training code.
 7. Make training fully controllable from the toml input file, and make it possible to run training from the command line with a specified toml file.
@@ -84,6 +84,11 @@ The main goal of this project is to develop a machine learning model for predict
 - [x] Implement ConvSurgeModel (Conv1D over lag dim) in the new AbstractSurgeModel hierarchy
 - [x] Add test/models/test_ConvSurgeModel.jl; add ConvSurgeModel to new_train_surge.jl
 - [x] Remove src/tides.jl (fully superseded); move TideModel into DeepONetTideModel.jl; rewrite test_train_tides.jl for new interface; update check_training_scripts.sh
+- [x] Implement AbstractWaveModel (preprocess with one-hot station encoding, postprocess!, train_model! with NaN filtering, plot_series)
+- [x] Implement ConvWaveModel (WaveInputLayer + strided Conv1D); move WaveInputLayer from waves.jl here
+- [x] Add test/models/test_ConvWaveModel.jl with construction, preprocess, forward, train, predict, save/load tests
+- [x] Implement DeepONetWaveModel (strided Conv branch + dot-product station merge) in the new AbstractWaveModel hierarchy
+- [x] Add test/models/test_DeepONetWaveModel.jl; add both wave models to new_train_waves.jl; update check_training_scripts.sh
 
 
 ## Model design and development

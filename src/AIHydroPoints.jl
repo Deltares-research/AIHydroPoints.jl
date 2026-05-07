@@ -71,6 +71,15 @@ export InteractionSettings, create_interaction_model
 include("wind_stress.jl")
 export uv_to_stress_xy
 
+include("models/AbstractWaveModel.jl")
+export AbstractWaveModel
+
+include("models/ConvWaveModel.jl")
+export ConvWaveModel, WaveInputLayer
+
+include("models/DeepONetWaveModel.jl")
+export DeepONetWaveModel, DeepONetWaveFlux
+
 include("waves.jl")
 export WaveSettings, create_wave_model, stats_skipnan, average_stats
 

@@ -83,6 +83,9 @@ run_script "new_train_surge" "new_train_surge.jl" \
     "test_data/surge_schureman_2012.nc" \
     "test_data/era5_wind_stress_2012_validation.jld2"
 
+run_script "new_train_waves" "new_train_waves.jl" \
+    "test_data/waves_2021"
+
 run_script "train_waves" "train_waves.jl" \
     "data/waves_2021_2024_10to11"
 

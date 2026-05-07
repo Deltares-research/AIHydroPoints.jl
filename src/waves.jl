@@ -121,50 +121,6 @@ function _wind_to_stress(u10_values, udir_values, wind_scale)
     return wind_x, wind_y
 end
 
-####################
-# Custom Input Layer
-####################
-
-"""
-    struct WaveInputLayer{T1,T2}
-
-Input layer for the wave model. Combines a station-modulation branch with a 1-D
-convolutional branch.  The station branch scales the convolved wind features
-channel-wise (via `exp`), giving each output station its own sensitivity profile.
-"""
-struct WaveInputLayer{T1,T2}
-    station_params::T1
-    first_conv::T2
-end
-
-"""
-    WaveInputLayer(n_stations, nlags, npars, nchannels, f_activation)
-
-Construct a WaveInputLayer.
-
-# Arguments
-
-- `n_stations`: Number of output (wave) stations.
-- `nlags`: Number of input time steps.
-- `npars`: Number of input parameters per time step (`2 * n_wind_stations`).
-- `nchannels`: Number of output channels.
-- `f_activation`: Activation function for the convolutional branch.
-"""
-WaveInputLayer(n_stations, nlags, npars, nchannels, f_activation) = WaveInputLayer(
-    Dense(n_stations => (nlags * nchannels), identity; bias=false),
-    Conv((1,), npars => nchannels, f_activation),
-)
-
-function (l::WaveInputLayer)(x)
-    x_station, x_input = x
-    x1 = l.first_conv(x_input)
-    s1 = l.station_params(x_station)
-    s1 = reshape(s1, size(x1))
-    return exp.(s1) .* x1
-end
-
-Flux.@layer WaveInputLayer
-
 ###############
 # Model Builder
 ###############
