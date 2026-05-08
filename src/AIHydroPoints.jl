@@ -21,6 +21,9 @@ export primary_frequencies_as_doodson, get_doodson_eqvals, constituents, lunar2s
 include("toml_utils.jl")
 export toml_write
 
+include("data_loading.jl")
+export load_data
+
 include("plot_utils.jl")
 export save_loss_plot, plot_fft, plot_fft!
 

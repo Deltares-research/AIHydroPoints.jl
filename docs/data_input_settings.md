@@ -140,43 +140,33 @@ values — one entry per split.
 
 ```toml
 [[data_settings.files]]
-  path      = "test_data/waves_2021/wind_speed_*.noos"
+  path      = "test_data/waves_2021"
   format    = "noos"
+  source    = "knmi_harmonie40_wind"
   split     = "training"
   timerange = ["2021-01-01", "2021-09-30T23:00:00"]
-  variables = ["wind_speed"]
+  variables = ["wind_speed", "wind_direction"]
 
 [[data_settings.files]]
-  path      = "test_data/waves_2021/wind_direction_*.noos"
+  path      = "test_data/waves_2021"
   format    = "noos"
-  split     = "training"
-  timerange = ["2021-01-01", "2021-09-30T23:00:00"]
-  variables = ["wind_direction"]
-
-[[data_settings.files]]
-  path      = "test_data/waves_2021/wave_height_*.noos"
-  format    = "noos"
+  source    = "swan_dcsm_harmonie"
   split     = "training"
   timerange = ["2021-01-01", "2021-09-30T23:00:00"]
   variables = ["wave_height"]
 
 [[data_settings.files]]
-  path      = "test_data/waves_2021/wind_speed_*.noos"
+  path      = "test_data/waves_2021"
   format    = "noos"
+  source    = "knmi_harmonie40_wind"
   split     = "testing"
   timerange = ["2021-10-01", "2021-12-31T23:00:00"]
-  variables = ["wind_speed"]
+  variables = ["wind_speed", "wind_direction"]
 
 [[data_settings.files]]
-  path      = "test_data/waves_2021/wind_direction_*.noos"
+  path      = "test_data/waves_2021"
   format    = "noos"
-  split     = "testing"
-  timerange = ["2021-10-01", "2021-12-31T23:00:00"]
-  variables = ["wind_direction"]
-
-[[data_settings.files]]
-  path      = "test_data/waves_2021/wave_height_*.noos"
-  format    = "noos"
+  source    = "swan_dcsm_harmonie"
   split     = "testing"
   timerange = ["2021-10-01", "2021-12-31T23:00:00"]
   variables = ["wave_height"]
@@ -225,9 +215,12 @@ windows out of a single source file.
 omitted, all locations in the file are loaded.
 
 **`files[].path`** — relative to the TOML file's directory (or script working directory;
-TBD).  Absolute paths are also accepted.  Glob patterns are expanded before loading;
-each matched file must contain the same quantity (e.g. `wind_speed_*.noos` selects one
-station per file, all for wind speed).
+TBD).  Absolute paths are also accepted.  For `format = "noos"`, `path` is a directory
+loaded via `NoosTimeSeriesCollection`; for other formats it is a file path.
+
+**`files[].source`** — required for `format = "noos"`.  Selects a sub-collection by
+source name (maps to the second argument of `get_series_from_collection`).  Ignored
+for other formats.
 
 **`model_io.input` / `model_io.target`** — determines how loaded variables are routed
 into the `input` and `target` dicts returned by `load_data`.
