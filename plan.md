@@ -13,10 +13,10 @@ The main goal of this project is to develop a machine learning model for predict
     b. [x] write tests for the code that is not tested at all, and improve the tests for the code that is tested but not well enough.
 5. [x] Clean up the code and make it more modular and reusable.
 6. Make training scripts more similar and consistent
-    a. Create a Separate data-structure for the training data, building on the MultiTimeSeries.jl package, and use it in the training code.
-    b. [ ] Make data loading identical across all training scripts, with a single load_data function that can load any dataset based on the settings.
-    c. [ ] Make the training loop identical across all training scripts, with a single train_model function that can train any model based on the settings.
-    d. [ ] Make the output generation (plots, saved models, etc.) identical across all training scripts, with a single save_output function that can save any output based on the settings.
+    a. [x] Create a Separate data-structure for the training data, building on the MultiTimeSeries.jl package, and use it in the training code.
+    b. [x] Make data loading identical across all training scripts, with a single load_data function that can load any dataset based on the settings.
+    c. [x] Make the training loop identical across all training scripts, with a single train_model function that can train any model based on the settings.
+    d. [x] Make the output generation (plots, saved models, etc.) identical across all training scripts, with a single save_output function that can save any output based on the settings.
 7. Make training fully controllable from the toml input file, and make it possible to run training from the command line with a specified toml file.
 8. Write a separate script for inference
 9. Rename `"nstations"` / `"nwind"` to `"nlocations_output"` / `"nlocations_input"` throughout all model settings and constructors for consistency across model types (wave, surge, interaction all use different informal names today).

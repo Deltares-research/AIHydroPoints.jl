@@ -211,7 +211,7 @@ windows out of a single source file.
 - Table with alias: `{ name = "u10", as = "stress_x" }` — use when the on-disk name
   and the model-facing name differ.
 
-**`files[].locations`** — optional list of location IDs to load from the file.  When
+**`files[].locations`** — optional list of location names to load from the file.  When
 omitted, all locations in the file are loaded.
 
 **`files[].path`** — relative to the TOML file's directory (or script working directory;

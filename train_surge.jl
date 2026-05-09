@@ -99,30 +99,27 @@ train_settings = TrainingSettings(
 )
 
 # ──────────────────────────────────────────────
-# Collect settings
-# ──────────────────────────────────────────────
-all_settings = Dict{String,Any}(
-    "model_settings"    => model_settings,
-    "train_settings"    => to_dict(train_settings),
-    "data_settings"     => data_settings,
-)
-toml_write(joinpath(save_dir, "run_settings.toml"), all_settings; overwrite=true)
-
-# ──────────────────────────────────────────────
-# Augmented model settings (from data)
+# Augmented model settings (from data) + save
 # ──────────────────────────────────────────────
 first_target = first(values(train_target))
 first_input  = first(values(train_input))
-model_settings["out_quantities"] = collect(keys(train_target))
-model_settings["out_names"]      = get_names(first_target)
-model_settings["out_lons"]       = get_longitudes(first_target)
-model_settings["out_lats"]       = get_latitudes(first_target)
-model_settings["in_quantities"]  = collect(keys(train_input))
-model_settings["in_names"]       = get_names(first_input)
-model_settings["in_lons"]        = get_longitudes(first_input)
-model_settings["in_lats"]        = get_latitudes(first_input)
-model_settings["nstations"]      = length(model_settings["out_names"]) #TODO: rename to nlocations_output see plan.md
-model_settings["nwind"]          = length(model_settings["in_names"]) # TODO: rename to nlocations_input see plan.md
+get!(model_settings, "out_quantities", collect(keys(train_target)))
+get!(model_settings, "out_names",      get_names(first_target))
+get!(model_settings, "out_lons",       get_longitudes(first_target))
+get!(model_settings, "out_lats",       get_latitudes(first_target))
+get!(model_settings, "in_quantities",  collect(keys(train_input)))
+get!(model_settings, "in_names",       get_names(first_input))
+get!(model_settings, "in_lons",        get_longitudes(first_input))
+get!(model_settings, "in_lats",        get_latitudes(first_input))
+get!(model_settings, "nstations",      length(model_settings["out_names"])) # TODO: rename to nlocations_output see plan.md
+get!(model_settings, "nwind",          length(model_settings["in_names"]))  # TODO: rename to nlocations_input see plan.md
+
+all_settings = Dict{String,Any}(
+    "model_settings" => model_settings,
+    "train_settings" => to_dict(train_settings),
+    "data_settings"  => data_settings,
+)
+toml_write(joinpath(save_dir, "run_settings.toml"), all_settings; overwrite=true)
 
 # ──────────────────────────────────────────────
 # Create model

@@ -111,12 +111,11 @@ function preprocess(model::AbstractWaveModel, input::Dict{String, TimeSeries})
 
     u10  = input["wind_speed"]
     udir = input["wind_direction"]
-    swh  = input["wave_height"]
 
-    times        = get_times(swh)
+    times        = get_times(u10)
     ntimes       = length(times)
     ntimes_valid = ntimes - nlags + 1
-    nstations    = length(get_names(swh))
+    nstations    = settings["nstations"]
     nwind        = size(get_values(u10), 1)
 
     wind_x, wind_y = _wave_wind_to_stress(get_values(u10), get_values(udir), wind_scale)
@@ -138,10 +137,10 @@ function preprocess(model::AbstractWaveModel, input::Dict{String, TimeSeries})
 
     # Pre-allocate output TimeSeries
     times_valid = times[nlags:end]
-    names = get(settings, "out_names", get_names(swh))
-    lons  = get(settings, "out_lons",  Float64.(get_longitudes(swh)))
-    lats  = get(settings, "out_lats",  Float64.(get_latitudes(swh)))
-    qty   = get(settings, "out_quantity", get_quantity(swh))
+    names = settings["out_names"]
+    lons  = settings["out_lons"]
+    lats  = settings["out_lats"]
+    qty   = get(settings, "out_quantity", "wave_height")
     out_ts = TimeSeries(
         zeros(Float32, nstations, ntimes_valid),
         times_valid, names, lons, lats, qty, string(typeof(model)),

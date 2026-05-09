@@ -1,87 +1,105 @@
-# new_train_interaction.jl
-#
 # Train a tide-surge interaction model using the Schureman 2011 tide and surge
 # test datasets.
 #
-# Waterlevel is synthesised as tide + surge so the model learns to reconstruct
-# the linear combination.  In a real application, replace this with observed
-# waterlevel.
+# PURPOSE OF THIS MODEL
+# The interaction model is intended to capture non-linear tide-surge interaction:
+# the part of the waterlevel signal that cannot be explained by adding a linear
+# tide model and a linear surge model.  In production the target should therefore
+# be the surge residual:
+#
+#   target = observed_waterlevel - tide_prediction - linear_surge_prediction
+#
+# SYNTHETIC TARGET USED HERE
+# The test data do not include observed waterlevel, so we synthesise a dummy
+# target as tide + surge.  This lets the code run end-to-end but produces
+# meaningless results: the model is asked to learn the trivial identity
+# waterlevel = tide + surge, which contains no residual interaction at all.
+# Do not interpret the loss values or evaluation plots as meaningful.
 
+model_type = "ConvInteractionModel"
+
+# ──────────────────────────────────────────────
+# Set up environment and load dependencies
+# ──────────────────────────────────────────────
 cd(@__DIR__)
-
 using Pkg
 Pkg.activate(".")
-
-ENV["GKSwstype"] = "nul"   # headless GR backend
-
+ENV["GKSwstype"] = "nul"   # to allow plotting in headless environments (e.g. remote servers, CI)
 using AIHydroPoints
-using Dates
+
+# ─────────────────────────────────────────────
+# Create output folder
+# ─────────────────────────────────────────────
+save_dir = joinpath("models", model_type)
+rm(save_dir, recursive=true, force=true)
+mkpath(save_dir)
 
 # ──────────────────────────────────────────────
-# File paths
+# Data settings
 # ──────────────────────────────────────────────
+# Target waterlevel is synthesised from tide + surge below, so model_io only
+# routes the raw loaded variables.  Both splits load the same two quantities.
 data_dir = joinpath(@__DIR__, "test_data")
-
-#NOTE: this surge was computed as waterlevel - tide and thus contains much of the interaction already. It's just a synthetic test for the code, not a real test of the model's ability to learn the interaction from separate tide and surge inputs.
-tide_train_file  = joinpath(data_dir, "tides_schureman_2011.nc")
-surge_train_file = joinpath(data_dir, "surge_schureman_2011.nc") 
-tide_val_file    = joinpath(data_dir, "tides_schureman_2012.nc")
-surge_val_file   = joinpath(data_dir, "surge_schureman_2012.nc")
+data_settings = Dict{String,Any}(
+    "files" => [
+        Dict("path"      => joinpath(data_dir, "tides_schureman_2011.nc"),
+             "format"    => "netcdf",
+             "split"     => "training",
+             "variables" => [Dict("name" => "waterlevel", "as" => "tide")]),
+        Dict("path"      => joinpath(data_dir, "surge_schureman_2011.nc"),
+             "format"    => "netcdf",
+             "split"     => "training",
+             "variables" => ["surge"]),
+        Dict("path"      => joinpath(data_dir, "tides_schureman_2012.nc"),
+             "format"    => "netcdf",
+             "split"     => "testing",
+             "variables" => [Dict("name" => "waterlevel", "as" => "tide")]),
+        Dict("path"      => joinpath(data_dir, "surge_schureman_2012.nc"),
+             "format"    => "netcdf",
+             "split"     => "testing",
+             "variables" => ["surge"]),
+    ],
+    "model_io" => Dict("input" => ["tide", "surge"], "target" => ["tide", "surge"]),
+)
 
 # ──────────────────────────────────────────────
 # Load data
 # ──────────────────────────────────────────────
-ts_tide_train  = TimeSeries(NetCDFTimeSeries(tide_train_file,  "waterlevel"))
-ts_surge_train = TimeSeries(NetCDFTimeSeries(surge_train_file, "surge"))
-ts_tide_val    = TimeSeries(NetCDFTimeSeries(tide_val_file,    "waterlevel"))
-ts_surge_val   = TimeSeries(NetCDFTimeSeries(surge_val_file,   "surge"))
+data = load_data(data_settings)
+train_input = data["training"].input
+test_input  = data["testing"].input
 
-# Synthesise waterlevel = tide + surge (proxy for observed waterlevel)
-wl_train_vals = get_values(ts_tide_train) .+ get_values(ts_surge_train)
-wl_val_vals   = get_values(ts_tide_val)   .+ get_values(ts_surge_val)
-
-ts_wl_train = TimeSeries(
-    Float32.(wl_train_vals),
-    get_times(ts_tide_train),
-    get_names(ts_tide_train),
-    Float64.(get_longitudes(ts_tide_train)),
-    Float64.(get_latitudes(ts_tide_train)),
-    "waterlevel",
-    "synthetic",
-)
-ts_wl_val = TimeSeries(
-    Float32.(wl_val_vals),
-    get_times(ts_tide_val),
-    get_names(ts_tide_val),
-    Float64.(get_longitudes(ts_tide_val)),
-    Float64.(get_latitudes(ts_tide_val)),
-    "waterlevel",
-    "synthetic",
-)
-
-train_input  = Dict{String, TimeSeries}("tide" => ts_tide_train, "surge" => ts_surge_train)
-train_target = Dict{String, TimeSeries}("waterlevel" => ts_wl_train)
-val_input    = Dict{String, TimeSeries}("tide" => ts_tide_val,   "surge" => ts_surge_val)
-val_target   = Dict{String, TimeSeries}("waterlevel" => ts_wl_val)
-
-@info "Loaded training data" nstations=size(get_values(ts_tide_train), 1) ntimes=size(get_values(ts_tide_train), 2)
+# Synthesise a dummy target (tide + surge) for code testing only.
+# Replace with: observed_waterlevel - tide_prediction - linear_surge_prediction
+function _synthesize_waterlevel(input::Dict{String, TimeSeries})
+    ts_tide  = input["tide"]
+    ts_surge = input["surge"]
+    TimeSeries(
+        Float32.(get_values(ts_tide) .+ get_values(ts_surge)),
+        get_times(ts_tide),
+        get_names(ts_tide),
+        Float64.(get_longitudes(ts_tide)),
+        Float64.(get_latitudes(ts_tide)),
+        "waterlevel",
+        "synthetic",
+    )
+end
+train_target = Dict{String, TimeSeries}("waterlevel" => _synthesize_waterlevel(train_input))
+test_target  = Dict{String, TimeSeries}("waterlevel" => _synthesize_waterlevel(test_input))
 
 # ──────────────────────────────────────────────
-# Model / training settings
+# Model settings
 # ──────────────────────────────────────────────
-save_dir = joinpath("models", "ConvInteractionModel")
-
-rm(save_dir, recursive=true, force=true)
-mkpath(save_dir)
-
 model_settings = Dict{String, Any}(
-    "model_name" => "ConvInteractionModel",
+    "model_name" => model_type,
     "model_dir"  => save_dir,
-    "nstations"  => size(get_values(ts_tide_train), 1),
     "nlags"      => 16,
     "model_pars" => Dict{String, Any}("channels" => [64, 32, 16, 1]),
 )
 
+# ──────────────────────────────────────────────
+# Training settings
+# ──────────────────────────────────────────────
 train_settings = TrainingSettings(
     nepochs          = 2,    # increase for a real run (e.g. 200)
     nbatches         = 64,
@@ -90,28 +108,55 @@ train_settings = TrainingSettings(
 )
 
 # ──────────────────────────────────────────────
-# Train
+# Augmented model settings (from data) + save
+# ──────────────────────────────────────────────
+first_target = first(values(train_target))
+first_input  = first(values(train_input))
+get!(model_settings, "out_quantities", collect(keys(train_target)))
+get!(model_settings, "out_names",      get_names(first_target))
+get!(model_settings, "out_lons",       get_longitudes(first_target))
+get!(model_settings, "out_lats",       get_latitudes(first_target))
+get!(model_settings, "in_quantities",  collect(keys(train_input)))
+get!(model_settings, "in_names",       get_names(first_input))
+get!(model_settings, "in_lons",        get_longitudes(first_input))
+get!(model_settings, "in_lats",        get_latitudes(first_input))
+get!(model_settings, "nstations",      length(model_settings["out_names"])) # TODO: rename to nlocations_output see plan.md
+
+all_settings = Dict{String,Any}(
+    "model_settings" => model_settings,
+    "train_settings" => to_dict(train_settings),
+    "data_settings"  => data_settings,
+)
+toml_write(joinpath(save_dir, "run_settings.toml"), all_settings; overwrite=true)
+
+# ──────────────────────────────────────────────
+# Create model
 # ──────────────────────────────────────────────
 model = ConvInteractionModel(model_settings)
-@info "Training $(model_settings["model_name"])"
 
+# ──────────────────────────────────────────────
+# Train
+# ──────────────────────────────────────────────
 train_losses, val_losses = train_model!(model, train_settings, train_input, train_target)
 
 # ──────────────────────────────────────────────
 # Save
 # ──────────────────────────────────────────────
-params_file = joinpath(save_dir, "model_params.jld2")
-save_params(model, params_file)
-@info "Saved parameters" file=params_file
-
-toml_write(joinpath(save_dir, "settings.toml"),get_settings(model); overwrite=true)
-
-save_loss_plot(joinpath(save_dir, "losses.png"),train_losses, val_losses; overwrite=true)
+save_params(model, joinpath(save_dir, "params.jld2"); overwrite=true)
+toml_write(joinpath(save_dir, "model_settings.toml"), get_settings(model); overwrite=true)
 
 # ──────────────────────────────────────────────
-# Evaluate and plot
+# Plots
 # ──────────────────────────────────────────────
-plot_series(model, train_input, train_target, "train"; save_dir)
-plot_series(model, val_input,   val_target,   "val";   save_dir)
+save_loss_plot(joinpath(save_dir, "losses.png"), train_losses, val_losses; overwrite=true)
 
-@info "Done"
+# ──────────────────────────────────────────────
+# Run inference on test set
+# ──────────────────────────────────────────────
+test_output = predict(model, test_input)
+
+# ──────────────────────────────────────────────
+# Evaluation plots
+# ──────────────────────────────────────────────
+plot_series(model, train_input, train_target, "train")
+plot_series(model, test_input,  test_target,  "test")

@@ -8,37 +8,57 @@
 # time and station coordinates.  Both input and target are the same waterlevel
 # TimeSeries.
 
-cd(@__DIR__)
-
-using Pkg
-Pkg.activate(".")
-
 model_type = "DeepONetTideModel"   # "DeepONetTideModel" | "ProductTideModel"
 
-ENV["GKSwstype"] = "nul"   # headless GR backend (no display needed)
+# ──────────────────────────────────────────────
+# Set up environment and load dependencies
+# ──────────────────────────────────────────────
+cd(@__DIR__)
+using Pkg
+Pkg.activate(".")
+ENV["GKSwstype"] = "nul"   # to allow plotting in headless environments (e.g. remote servers, CI)
 using AIHydroPoints
 
-# ──────────────────────────────────────────────
-# File paths
-# ──────────────────────────────────────────────
-data_dir = joinpath(@__DIR__, "test_data")
-
-filenames = Dict(
-    "training" => joinpath(data_dir, "tides_schureman_2011.nc"),
-    "testing"  => joinpath(data_dir, "tides_schureman_2012.nc"),
-)
-
-# ──────────────────────────────────────────────
-# Model / training settings
-# ──────────────────────────────────────────────
-name     = model_type
-save_dir = joinpath("models", name)
-
+# ─────────────────────────────────────────────
+# Create output folder
+# ─────────────────────────────────────────────
+save_dir = joinpath("models", model_type)
 rm(save_dir, recursive=true, force=true)
 mkpath(save_dir)
 
+# ──────────────────────────────────────────────
+# Data settings
+# ──────────────────────────────────────────────
+data_dir = joinpath(@__DIR__, "test_data")
+data_settings = Dict{String,Any}(
+    "files" => [
+        Dict("path"      => joinpath(data_dir, "tides_schureman_2011.nc"),
+             "format"    => "netcdf",
+             "split"     => "training",
+             "variables" => ["waterlevel"]),
+        Dict("path"      => joinpath(data_dir, "tides_schureman_2012.nc"),
+             "format"    => "netcdf",
+             "split"     => "testing",
+             "variables" => ["waterlevel"]),
+    ],
+    "model_io" => Dict("input" => ["waterlevel"], "target" => ["waterlevel"]),
+)
+
+# ──────────────────────────────────────────────
+# Load data
+# ──────────────────────────────────────────────
+data = load_data(data_settings)
+# shorthands for train/test splits
+train_input  = data["training"].input
+train_target = data["training"].target
+test_input   = data["testing"].input
+test_target  = data["testing"].target
+
+# ──────────────────────────────────────────────
+# Model settings
+# ──────────────────────────────────────────────
 model_settings = Dict{String, Any}(
-    "model_name" => name,
+    "model_name" => model_type,
     "model_dir"  => save_dir,
     "freqs"      => ["SSA","K1","O1","Q1","P1","M2","S2","N2","K2","H"],
 )
@@ -58,6 +78,9 @@ elseif model_type == "ProductTideModel"
     )
 end
 
+# ──────────────────────────────────────────────
+# Training settings
+# ──────────────────────────────────────────────
 train_settings = TrainingSettings(
     nepochs          = 500,
     nbatches         = 64,
@@ -69,16 +92,24 @@ train_settings = TrainingSettings(
 )
 
 # ──────────────────────────────────────────────
-# Load data
+# Augmented model settings (from data) + save
 # ──────────────────────────────────────────────
-ts_train = TimeSeries(NetCDFTimeSeries(filenames["training"], "waterlevel"))
-ts_test  = TimeSeries(NetCDFTimeSeries(filenames["testing"],  "waterlevel"))
+first_target = first(values(train_target))
+get!(model_settings, "out_quantities", collect(keys(train_target)))
+get!(model_settings, "out_names",      get_names(first_target))
+get!(model_settings, "out_lons",       get_longitudes(first_target))
+get!(model_settings, "out_lats",       get_latitudes(first_target))
+get!(model_settings, "nstations",      length(model_settings["out_names"])) # TODO: rename to nlocations_output see plan.md
 
-train_data = Dict{String, TimeSeries}("waterlevel" => ts_train)
-test_data  = Dict{String, TimeSeries}("waterlevel" => ts_test)
+all_settings = Dict{String,Any}(
+    "model_settings" => model_settings,
+    "train_settings" => to_dict(train_settings),
+    "data_settings"  => data_settings,
+)
+toml_write(joinpath(save_dir, "run_settings.toml"), all_settings; overwrite=true)
 
 # ──────────────────────────────────────────────
-# Create and train model
+# Create model
 # ──────────────────────────────────────────────
 if model_type == "DeepONetTideModel"
     model = DeepONetTideModel(model_settings)
@@ -88,13 +119,16 @@ else
     error("Unknown model_type: $model_type")
 end
 
-train_losses, val_losses = train_model!(model, train_settings, train_data, train_data)
+# ──────────────────────────────────────────────
+# Train
+# ──────────────────────────────────────────────
+train_losses, val_losses = train_model!(model, train_settings, train_input, train_target)
 
 # ──────────────────────────────────────────────
 # Save
 # ──────────────────────────────────────────────
 save_params(model, joinpath(save_dir, "params.jld2"); overwrite=true)
-toml_write(joinpath(save_dir, "settings.toml"),get_settings(model); overwrite=true)
+toml_write(joinpath(save_dir, "model_settings.toml"), get_settings(model); overwrite=true)
 
 # ──────────────────────────────────────────────
 # Plots
@@ -104,9 +138,9 @@ save_loss_plot(joinpath(save_dir, "losses.png"), train_losses, val_losses; overw
 # ──────────────────────────────────────────────
 # Run inference on test set
 # ──────────────────────────────────────────────
-test_output = predict(model, test_data)
+test_output = predict(model, test_input)
 
 # ──────────────────────────────────────────────
 # Evaluation plots
 # ──────────────────────────────────────────────
-plot_series(model, test_data, test_data, "test")
+plot_series(model, test_input, test_target, "test")
