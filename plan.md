@@ -19,6 +19,7 @@ The main goal of this project is to develop a machine learning model for predict
     d. [ ] Make the output generation (plots, saved models, etc.) identical across all training scripts, with a single save_output function that can save any output based on the settings.
 7. Make training fully controllable from the toml input file, and make it possible to run training from the command line with a specified toml file.
 8. Write a separate script for inference
+9. Rename `"nstations"` / `"nwind"` to `"nlocations_output"` / `"nlocations_input"` throughout all model settings and constructors for consistency across model types (wave, surge, interaction all use different informal names today).
 
 ## Checklist for each step:
 - all source should eventually be in src/ and all tests should be in test/ and test data should be in test_data/

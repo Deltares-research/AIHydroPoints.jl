@@ -28,7 +28,7 @@ include("plot_utils.jl")
 export save_loss_plot, plot_fft, plot_fft!
 
 include("models/training_settings.jl")
-export TrainingSettings
+export TrainingSettings, to_dict
 
 include("models/abstract_model.jl")
 export AbstractModel, get_settings, save_params, load_params!, train_model!, plot_series

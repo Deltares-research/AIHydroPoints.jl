@@ -58,3 +58,18 @@ All fields are shared across every model type.
     input_noise_std  = 0.0
     validation_split = 0.0
 end
+
+"""
+    to_dict(ts::TrainingSettings) -> Dict{String,Any}
+
+Convert a `TrainingSettings` to a plain dict suitable for TOML serialisation.
+Fields set to `nothing` are omitted.
+"""
+function to_dict(ts::TrainingSettings)
+    d = Dict{String,Any}()
+    for f in fieldnames(TrainingSettings)
+        v = getfield(ts, f)
+        v !== nothing && (d[String(f)] = v)
+    end
+    return d
+end
