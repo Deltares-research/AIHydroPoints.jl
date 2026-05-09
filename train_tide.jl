@@ -8,7 +8,9 @@
 # time and station coordinates.  Both input and target are the same waterlevel
 # TimeSeries.
 
-model_type = "DeepONetTideModel"   # "DeepONetTideModel" | "ProductTideModel"
+model_type  = "DeepONetTideModel"   # "DeepONetTideModel" | "ProductTideModel"
+runid       = "dummy"
+description = "Reference case trained on 2011 Schureman tides."
 
 # ──────────────────────────────────────────────
 # Set up environment and load dependencies
@@ -22,7 +24,7 @@ using AIHydroPoints
 # ─────────────────────────────────────────────
 # Create output folder
 # ─────────────────────────────────────────────
-save_dir = joinpath("models", model_type)
+save_dir = joinpath("training_output", "$(runid)_$(model_type)")
 rm(save_dir, recursive=true, force=true)
 mkpath(save_dir)
 
@@ -102,6 +104,7 @@ get!(model_settings, "out_lats",       get_latitudes(first_target))
 get!(model_settings, "nstations",      length(model_settings["out_names"])) # TODO: rename to nlocations_output see plan.md
 
 all_settings = Dict{String,Any}(
+    "run_info"       => Dict("runid" => runid, "description" => description),
     "model_settings" => model_settings,
     "train_settings" => to_dict(train_settings),
     "data_settings"  => data_settings,

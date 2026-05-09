@@ -41,10 +41,12 @@ The main goal of this project is to develop a machine learning model for predict
 
 ## Status
 
-Steps 1–5 are complete. The new model hierarchy (`AbstractModel → AbstractFluxModel →
+Steps 1–6 are complete. The new model hierarchy (`AbstractModel → AbstractFluxModel →
 AbstractSurgeModel / AbstractTideModel / AbstractWaveModel / AbstractInteractionModel →`
 concrete models) is fully implemented, tested, and all legacy source files removed.
 406 unit tests pass. Training scripts: `train_surge.jl`, `train_tide.jl`,
-`train_waves.jl`, `train_interaction.jl`. Smoke-tested via `check_training_scripts.sh`.
+`train_waves.jl`, `train_interaction.jl`. All use `load_data`, a shared `train_model!`
+interface, unified plotting, `runid`/`description` metadata, and write `run_settings.toml`
+for reproducibility. Smoke-tested via `check_training_scripts.sh`.
 
 

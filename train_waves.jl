@@ -4,8 +4,10 @@
 #   "ConvWaveModel"     — WaveInputLayer + strided Conv (exp channel modulation)
 #   "DeepONetWaveModel" — strided Conv branch + dot-product station merge
 
-model_type = "ConvWaveModel"      # "ConvWaveModel" | "DeepONetWaveModel"
-model_type = "DeepONetWaveModel"
+model_type  = "ConvWaveModel"      # "ConvWaveModel" | "DeepONetWaveModel"
+model_type  = "DeepONetWaveModel"
+runid       = "dummy"
+description = "Reference case trained on 2021 KNMI Harmonie wind (Jan–Sep)."
 
 # ──────────────────────────────────────────────
 # Set up environment and load dependencies
@@ -19,7 +21,7 @@ using AIHydroPoints
 # ─────────────────────────────────────────────
 # Create output folder
 # ─────────────────────────────────────────────
-save_dir = joinpath("models", model_type)
+save_dir = joinpath("training_output", "$(runid)_$(model_type)")
 rm(save_dir, recursive=true, force=true)
 mkpath(save_dir)
 
@@ -121,6 +123,7 @@ get!(model_settings, "nstations",      length(model_settings["out_names"])) # TO
 get!(model_settings, "nwind",          length(model_settings["in_names"]))  # TODO: rename to nlocations_input see plan.md
 
 all_settings = Dict{String,Any}(
+    "run_info"       => Dict("runid" => runid, "description" => description),
     "model_settings" => model_settings,
     "train_settings" => to_dict(train_settings),
     "data_settings"  => data_settings,

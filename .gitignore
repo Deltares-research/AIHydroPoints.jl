@@ -33,6 +33,7 @@ test/.cache
 test/temp
 
 trained_models/
+training_output/
 
 sandbox# pixi environments
 .pixi/*
