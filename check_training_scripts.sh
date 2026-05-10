@@ -95,6 +95,80 @@ run_script "train_interaction" "train_interaction.jl" \
 run_script "analyse_tides_schureman" "analyse_tides_schureman.jl" \
     "test_data/DCSM-FM_0_5nm_2010_5stations_his.jld2"
 
+# ── Generic train.jl smoke-tests (one per example TOML) ───────────────────────
+
+run_train() {
+    local label="$1"
+    local toml="$2"
+    shift 2
+    local required=("$@")
+
+    echo ""
+    echo "━━━ $label ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+
+    for path in "${required[@]}"; do
+        if [ ! -e "$path" ]; then
+            echo "  SKIP — required data not found: $path"
+            RESULTS+=("SKIP  $label")
+            ((SKIP++))
+            return
+        fi
+    done
+
+    local start
+    start=$(date +%s)
+
+    if $JULIA train.jl "$toml"; then
+        local elapsed=$(( $(date +%s) - start ))
+        echo "  PASS — ${elapsed}s"
+        RESULTS+=("PASS  $label  (${elapsed}s)")
+        ((PASS++))
+    else
+        local elapsed=$(( $(date +%s) - start ))
+        echo "  FAIL — ${elapsed}s  (exit code $?)"
+        RESULTS+=("FAIL  $label  (${elapsed}s)")
+        ((FAIL++))
+    fi
+}
+
+run_train "train.jl LinearSurgeModel" "examples/LinearSurgeModel.toml" \
+    "test_data/surge_schureman_2011.nc" \
+    "test_data/era5_wind_stress_2011_testing.jld2" \
+    "test_data/surge_schureman_2012.nc" \
+    "test_data/era5_wind_stress_2012_validation.jld2"
+
+run_train "train.jl ConvSurgeModel" "examples/ConvSurgeModel.toml" \
+    "test_data/surge_schureman_2011.nc" \
+    "test_data/era5_wind_stress_2011_testing.jld2" \
+    "test_data/surge_schureman_2012.nc" \
+    "test_data/era5_wind_stress_2012_validation.jld2"
+
+run_train "train.jl AttentionSurgeModel" "examples/AttentionSurgeModel.toml" \
+    "test_data/surge_schureman_2011.nc" \
+    "test_data/era5_wind_stress_2011_testing.jld2" \
+    "test_data/surge_schureman_2012.nc" \
+    "test_data/era5_wind_stress_2012_validation.jld2"
+
+run_train "train.jl DeepONetTideModel" "examples/DeepONetTideModel.toml" \
+    "test_data/tides_schureman_2011.nc" \
+    "test_data/tides_schureman_2012.nc"
+
+run_train "train.jl ProductTideModel" "examples/ProductTideModel.toml" \
+    "test_data/tides_schureman_2011.nc" \
+    "test_data/tides_schureman_2012.nc"
+
+run_train "train.jl ConvWaveModel" "examples/ConvWaveModel.toml" \
+    "test_data/waves_2021"
+
+run_train "train.jl DeepONetWaveModel" "examples/DeepONetWaveModel.toml" \
+    "test_data/waves_2021"
+
+run_train "train.jl ConvInteractionModel" "examples/ConvInteractionModel.toml" \
+    "test_data/tides_schureman_2011.nc" \
+    "test_data/surge_schureman_2011.nc" \
+    "test_data/tides_schureman_2012.nc" \
+    "test_data/surge_schureman_2012.nc"
+
 # ──────────────────────────────────────────────────────────────────────────────
 # Summary
 # ──────────────────────────────────────────────────────────────────────────────

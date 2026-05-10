@@ -153,7 +153,8 @@ function preprocess(model::AbstractInteractionModel, input::Dict{String, TimeSer
         zeros(Float32, nstations, ntimes_valid),
         times_valid, names, lons, lats, qty, string(typeof(model)),
     )
-    return (x_station, x_ts_norm), Dict{String, TimeSeries}("waterlevel" => out_ts)
+    out_key = first(get(settings, "out_quantities", ["waterlevel"]))
+    return (x_station, x_ts_norm), Dict{String, TimeSeries}(out_key => out_ts)
 end
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -172,7 +173,8 @@ function postprocess!(output::Dict{String, TimeSeries}, model::AbstractInteracti
     settings   = get_settings(model)
     output_mu  = Float32(get(settings, "output_mu",  0.0))
     output_std = Float32(get(settings, "output_std", 1.0))
-    output["waterlevel"].values .= y[:, 1, :] .* output_std .+ output_mu
+    out_key = first(keys(output))
+    output[out_key].values .= y[:, 1, :] .* output_std .+ output_mu
 end
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -207,7 +209,7 @@ function train_model!(model::AbstractInteractionModel, train_settings::TrainingS
 
     # Populate output metadata on first call
     if !haskey(settings, "out_names")
-        ts_ref = target["waterlevel"]
+        ts_ref = first(values(target))
         settings["out_names"]    = get_names(ts_ref)
         settings["out_lons"]     = Float64.(get_longitudes(ts_ref))
         settings["out_lats"]     = Float64.(get_latitudes(ts_ref))
@@ -221,7 +223,7 @@ function train_model!(model::AbstractInteractionModel, train_settings::TrainingS
     ntimes_valid = size(x_ts, 3) ÷ nstations
 
     # Build raw target: (1, nstations * ntimes_valid)
-    wl_vals = Float32.(get_values(target["waterlevel"]))
+    wl_vals = Float32.(get_values(first(values(target))))
     y_raw   = reshape(wl_vals[:, nlags:end], 1, :)
 
     # Temporal train/val split

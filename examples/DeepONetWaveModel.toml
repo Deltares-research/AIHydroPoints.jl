@@ -1,0 +1,65 @@
+# DeepONetWaveModel — strided Conv branch + dot-product station merge
+#
+# Usage:
+#   pixi run julia --project train.jl examples/DeepONetWaveModel.toml
+#
+# Increase nepochs to 50+ for a meaningful training run.
+
+[run_info]
+runid       = "example"
+description = "DeepONet wave model trained on 2021 KNMI Harmonie wind."
+
+[model_settings]
+model_name = "DeepONetWaveModel"
+nlags      = 16
+wind_scale = 0.5
+wave_scale = 3.0
+
+[model_settings.model_pars]
+nchannel   = [32, 32, 32, 16]
+activation = "swish"
+
+[train_settings]
+nepochs          = 5
+nbatches         = 256
+learning_rate    = 1.0e-3
+lr_decay_factor  = 0.1
+lr_decay_rate    = 400
+patience         = 5
+validation_split = 0.2
+
+[data_settings.model_io]
+input  = ["wind_speed", "wind_direction"]
+target = ["wave_height"]
+
+[[data_settings.files]]
+path      = "test_data/waves_2021"
+format    = "noos"
+source    = "knmi_harmonie40_wind"
+split     = "training"
+timerange = ["2021-01-01", "2021-09-30T23:00:00"]
+variables = ["wind_speed", "wind_direction"]
+
+[[data_settings.files]]
+path      = "test_data/waves_2021"
+format    = "noos"
+source    = "swan_dcsm_harmonie"
+split     = "training"
+timerange = ["2021-01-01", "2021-09-30T23:00:00"]
+variables = ["wave_height"]
+
+[[data_settings.files]]
+path      = "test_data/waves_2021"
+format    = "noos"
+source    = "knmi_harmonie40_wind"
+split     = "testing"
+timerange = ["2021-10-01", "2021-12-31T23:00:00"]
+variables = ["wind_speed", "wind_direction"]
+
+[[data_settings.files]]
+path      = "test_data/waves_2021"
+format    = "noos"
+source    = "swan_dcsm_harmonie"
+split     = "testing"
+timerange = ["2021-10-01", "2021-12-31T23:00:00"]
+variables = ["wave_height"]

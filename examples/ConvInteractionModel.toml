@@ -1,0 +1,84 @@
+# ConvInteractionModel — convolutional tide-surge interaction model
+#
+# The interaction model captures non-linear tide-surge interaction: the part of
+# the waterlevel signal that cannot be explained by adding a linear tide model
+# and a linear surge model.  The proper target is the residual:
+#
+#   target = observed_waterlevel - tide_prediction - linear_surge_prediction
+#
+# PLACEHOLDER TARGET
+# This example uses surge as a stand-in for the interaction target (loaded
+# from the same surge file, aliased to "interaction").  This lets the pipeline
+# run end-to-end but produces meaningless results.  Replace with a real
+# residual target when available.
+#
+# Usage:
+#   pixi run julia --project train.jl examples/ConvInteractionModel.toml
+#
+# Increase nepochs to 100+ for a meaningful training run.
+
+[run_info]
+runid       = "example"
+description = "Interaction model (dummy target) trained on 2011 Schureman tides and surge."
+
+[model_settings]
+model_name = "ConvInteractionModel"
+nlags      = 16
+
+[model_settings.model_pars]
+channels = [64, 32, 16, 1]
+
+[train_settings]
+nepochs          = 5
+nbatches         = 64
+learning_rate    = 1.0e-3
+lr_decay_factor  = 0.1
+lr_decay_rate    = 400
+patience         = 5
+validation_split = 0.2
+
+[data_settings.model_io]
+input  = ["tide", "surge"]
+target = ["interaction"]
+
+# ── Training split ─────────────────────────────────────────────────────────────
+
+[[data_settings.files]]
+path      = "test_data/tides_schureman_2011.nc"
+format    = "netcdf"
+split     = "training"
+variables = [{name = "waterlevel", as = "tide"}]
+
+[[data_settings.files]]
+path      = "test_data/surge_schureman_2011.nc"
+format    = "netcdf"
+split     = "training"
+variables = ["surge"]
+
+# Surge loaded again as "interaction" — placeholder target
+[[data_settings.files]]
+path      = "test_data/surge_schureman_2011.nc"
+format    = "netcdf"
+split     = "training"
+variables = [{name = "surge", as = "interaction"}]
+
+# ── Testing split ──────────────────────────────────────────────────────────────
+
+[[data_settings.files]]
+path      = "test_data/tides_schureman_2012.nc"
+format    = "netcdf"
+split     = "testing"
+variables = [{name = "waterlevel", as = "tide"}]
+
+[[data_settings.files]]
+path      = "test_data/surge_schureman_2012.nc"
+format    = "netcdf"
+split     = "testing"
+variables = ["surge"]
+
+# Surge loaded again as "interaction" — placeholder target
+[[data_settings.files]]
+path      = "test_data/surge_schureman_2012.nc"
+format    = "netcdf"
+split     = "testing"
+variables = [{name = "surge", as = "interaction"}]
