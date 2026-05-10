@@ -39,8 +39,8 @@ end
 """Settings with output metadata pre-filled (for tests that bypass train_model!)."""
 function make_settings(; nstations=2, nwind=3, nlags=4)
     return Dict{String, Any}(
-        "nstations"    => nstations,
-        "nwind"        => nwind,
+        "nlocations_output"    => nstations,
+        "nlocations_input"        => nwind,
         "nlags"        => nlags,
         "out_names"    => ["s$i" for i in 1:nstations],
         "out_lons"     => Float64.(1:nstations),
@@ -54,7 +54,7 @@ end
 # ──────────────────────────────────────────────────────────────────────────────
 
 @testset "LinearSurgeModel construction" begin
-    settings = Dict{String, Any}("nstations" => 2, "nwind" => 3, "nlags" => 4)
+    settings = Dict{String, Any}("nlocations_output" => 2, "nlocations_input" => 3, "nlags" => 4)
     m = LinearSurgeModel(settings)
 
     @test m isa AbstractFluxModel
@@ -111,7 +111,7 @@ end
 @testset "LinearSurgeModel train_model!" begin
     nwind = 3; nstations = 2; ntimes = 50; nlags = 4
     # Start with no output metadata in settings
-    settings = Dict{String, Any}("nstations" => nstations, "nwind" => nwind, "nlags" => nlags)
+    settings = Dict{String, Any}("nlocations_output" => nstations, "nlocations_input" => nwind, "nlags" => nlags)
     m        = LinearSurgeModel(settings)
     input    = make_surge_input(nwind=nwind, ntimes=ntimes)
     target   = make_surge_target(nstations=nstations, ntimes=ntimes)
@@ -134,7 +134,7 @@ end
 
     # With validation_split
     ts_val = TrainingSettings(nepochs=3, nbatches=16, learning_rate=1e-3, validation_split=0.2)
-    m2 = LinearSurgeModel(Dict{String,Any}("nstations" => nstations, "nwind" => nwind, "nlags" => nlags))
+    m2 = LinearSurgeModel(Dict{String,Any}("nlocations_output" => nstations, "nlocations_input" => nwind, "nlags" => nlags))
     train_losses2, val_losses2 = train_model!(m2, ts_val, input, target)
     @test length(val_losses2) == ts_val.nepochs
     @test eltype(val_losses2) == Float32

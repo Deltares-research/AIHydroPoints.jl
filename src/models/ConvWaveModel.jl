@@ -79,9 +79,9 @@ Required keys in `settings`:
 
 | Key | Description |
 |---|---|
-| `"nstations"` | Number of output stations |
-| `"nwind"`     | Number of input wind stations |
-| `"nlags"`     | Number of lagged time steps |
+| `"nlocations_output"` | Number of output locations |
+| `"nlocations_input"`  | Number of input wind locations |
+| `"nlags"`             | Number of lagged time steps |
 
 Optional keys (with defaults):
 
@@ -112,12 +112,12 @@ end
 """
     ConvWaveModel(settings::Dict{String, Any}) -> ConvWaveModel
 
-Construct a `ConvWaveModel`.  Requires `"nstations"`, `"nwind"`, `"nlags"` in
+Construct a `ConvWaveModel`.  Requires `"nlocations_output"`, `"nlocations_input"`, `"nlags"` in
 `settings`.  `nlags` must equal `2^length(nchannel)`.
 """
 function ConvWaveModel(settings::Dict{String, Any})
-    nstations = settings["nstations"]
-    nwind     = settings["nwind"]
+    nstations = settings["nlocations_output"]
+    nwind     = settings["nlocations_input"]
     nlags     = settings["nlags"]
     n_ch      = get(settings, "n_input_channels", 64)
     mp        = get(settings, "model_pars",

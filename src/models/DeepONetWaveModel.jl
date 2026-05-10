@@ -68,9 +68,9 @@ Required keys in `settings`:
 
 | Key | Description |
 |---|---|
-| `"nstations"` | Number of output stations |
-| `"nwind"`     | Number of input wind stations |
-| `"nlags"`     | Number of lagged time steps (`= 2^length(nchannel)`) |
+| `"nlocations_output"` | Number of output locations |
+| `"nlocations_input"`  | Number of input wind locations |
+| `"nlags"`             | Number of lagged time steps (`= 2^length(nchannel)`) |
 
 Optional keys (with defaults):
 
@@ -102,12 +102,12 @@ end
 """
     DeepONetWaveModel(settings::Dict{String, Any}) -> DeepONetWaveModel
 
-Construct a `DeepONetWaveModel`. Requires `"nstations"`, `"nwind"`, `"nlags"`.
+Construct a `DeepONetWaveModel`. Requires `"nlocations_output"`, `"nlocations_input"`, `"nlags"`.
 `nlags` must equal `2^length(nchannel)`.
 """
 function DeepONetWaveModel(settings::Dict{String, Any})
-    nstations = settings["nstations"]
-    nwind     = settings["nwind"]
+    nstations = settings["nlocations_output"]
+    nwind     = settings["nlocations_input"]
     nlags     = settings["nlags"]
     mp        = get(settings, "model_pars",
                     Dict("nchannel" => [32, 32, 32, 16], "activation" => "swish"))

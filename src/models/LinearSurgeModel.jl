@@ -2,8 +2,8 @@
 #
 # Concrete subtype of AbstractSurgeModel for a linear surge model.
 # Uses a single Flux.Dense layer (identity activation) to predict storm surge
-# at nstations output locations from wind-stress and pressure forcing at nwind
-# input locations over nlags previous time steps.
+# at nlocations_output locations from wind-stress and pressure forcing at
+# nlocations_input locations over nlags previous time steps.
 
 using Flux
 
@@ -19,13 +19,13 @@ maps flattened wind-stress and pressure history to storm-surge predictions.
 model = LinearSurgeModel(settings::Dict{String, Any})
 ```
 
-Required keys in `settings`: `"nstations"`, `"nwind"`, `"nlags"`.
+Required keys in `settings`: `"nlocations_output"`, `"nlocations_input"`, `"nlags"`.
 
 ## Tensor layout
 
-`forward` flattens the `(1, 3*nwind, nlags, ntimes_valid)` tensor from
-`preprocess` to `(3*nwind*nlags, ntimes_valid)`, applies `Dense`, and reshapes
-to `(nstations, 1, ntimes_valid)`.
+`forward` flattens the `(1, 3*nlocations_input, nlags, ntimes_valid)` tensor from
+`preprocess` to `(3*nlocations_input*nlags, ntimes_valid)`, applies `Dense`, and reshapes
+to `(nlocations_output, 1, ntimes_valid)`.
 """
 mutable struct LinearSurgeModel <: AbstractSurgeModel
     flux_model
@@ -37,11 +37,11 @@ end
 
 Construct a `LinearSurgeModel` from `settings`.
 
-Required keys: `"nstations"` (Int), `"nwind"` (Int), `"nlags"` (Int).
+Required keys: `"nlocations_output"` (Int), `"nlocations_input"` (Int), `"nlags"` (Int).
 """
 function LinearSurgeModel(settings::Dict{String, Any})
-    nstations = settings["nstations"]
-    nwind     = settings["nwind"]
+    nstations = settings["nlocations_output"]
+    nwind     = settings["nlocations_input"]
     nlags     = settings["nlags"]
     chain     = Dense(3 * nwind * nlags => nstations)
     return LinearSurgeModel(chain, settings)

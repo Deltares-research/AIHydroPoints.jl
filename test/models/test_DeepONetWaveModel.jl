@@ -29,8 +29,8 @@ end
 function don_wave_make_settings(; nwind=DON_NWIND, nstations=DON_NSTATIONS, nlags=DON_NLAGS)
     s_names = ["s$i" for i in 1:nstations]
     return Dict{String, Any}(
-        "nstations"    => nstations,
-        "nwind"        => nwind,
+        "nlocations_output"    => nstations,
+        "nlocations_input"        => nwind,
         "nlags"        => nlags,
         "wind_scale"   => 0.5,
         "wave_scale"   => 3.0,
@@ -56,7 +56,7 @@ end
     @test get_settings(m) === settings
     @test get_flux_model(m) isa DeepONetWaveFlux
 
-    bad = Dict{String,Any}("nstations"=>3,"nwind"=>4,"nlags"=>3,
+    bad = Dict{String,Any}("nlocations_output"=>3,"nlocations_input"=>4,"nlags"=>3,
                             "model_pars"=>Dict("nchannel"=>[8,1]))
     @test_throws AssertionError DeepONetWaveModel(bad)
 end
@@ -110,8 +110,8 @@ end
     target = don_wave_make_input()
 
     settings = Dict{String, Any}(
-        "nstations"  => DON_NSTATIONS,
-        "nwind"      => DON_NWIND,
+        "nlocations_output"  => DON_NSTATIONS,
+        "nlocations_input"      => DON_NWIND,
         "nlags"      => DON_NLAGS,
         "model_pars" => Dict{String, Any}("nchannel" => [8, 1], "activation" => "relu"),
     )
@@ -121,8 +121,8 @@ end
     train_losses, val_losses = train_model!(m, ts, input, target)
 
     @test haskey(m.settings, "out_names")
-    @test haskey(m.settings, "nstations")
-    @test haskey(m.settings, "nwind")
+    @test haskey(m.settings, "nlocations_output")
+    @test haskey(m.settings, "nlocations_input")
     @test length(train_losses) == ts.nepochs
     @test eltype(train_losses) == Float32
     @test all(train_losses .>= 0f0)
@@ -130,8 +130,8 @@ end
 
     ts_val = TrainingSettings(nepochs=3, nbatches=32, learning_rate=1e-3, validation_split=0.2)
     m2 = DeepONetWaveModel(Dict{String, Any}(
-        "nstations"  => DON_NSTATIONS,
-        "nwind"      => DON_NWIND,
+        "nlocations_output"  => DON_NSTATIONS,
+        "nlocations_input"      => DON_NWIND,
         "nlags"      => DON_NLAGS,
         "model_pars" => Dict{String, Any}("nchannel" => [8, 1], "activation" => "relu"),
     ))

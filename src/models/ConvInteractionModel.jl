@@ -113,7 +113,7 @@ Required keys in `settings`:
 
 | Key | Description |
 |---|---|
-| `"nstations"` | Number of tide/surge/waterlevel stations |
+| `"nlocations_output"` | Number of tide/surge/waterlevel locations |
 | `"nlags"`     | Number of lagged time steps |
 
 Optional key:
@@ -142,11 +142,11 @@ end
 """
     ConvInteractionModel(settings::Dict{String, Any}) -> ConvInteractionModel
 
-Construct a `ConvInteractionModel`.  Requires `"nstations"` and `"nlags"` in
+Construct a `ConvInteractionModel`.  Requires `"nlocations_output"` and `"nlags"` in
 `settings`.  `nlags` must equal `2^length(model_pars["channels"])`.
 """
 function ConvInteractionModel(settings::Dict{String, Any})
-    nstations = settings["nstations"]
+    nstations = settings["nlocations_output"]
     nlags     = settings["nlags"]
     channels  = get(settings, "model_pars", Dict("channels" => [32, 16, 1]))["channels"]
 

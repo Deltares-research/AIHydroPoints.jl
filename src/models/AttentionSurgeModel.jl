@@ -64,7 +64,7 @@ dense trunk network for station metadata, merged via graph adjacency weights.
 model = AttentionSurgeModel(settings::Dict{String, Any}, gn::GraphNetwork)
 ```
 
-Required keys in `settings`: `"nstations"`, `"nwind"`, `"nlags"`, `"model_pars"`.
+Required keys in `settings`: `"nlocations_output"`, `"nlocations_input"`, `"nlags"`, `"model_pars"`.
 
 Required keys in `"model_pars"`:
 - `"nembed"`, `"theta"`, `"nheads"`, `"nlayers_branch"`, `"nlayers_trunk"`, `"nhidden_trunk"`
@@ -89,7 +89,7 @@ the spatial adjacency structure.
 """
 function AttentionSurgeModel(settings::Dict{String, Any}, gn::GraphNetwork)
     nlags   = settings["nlags"]
-    nwind   = settings["nwind"]
+    nwind   = settings["nlocations_input"]
     mp      = settings["model_pars"]
     nembed          = mp["nembed"]
     theta           = mp["theta"]
@@ -150,9 +150,9 @@ automatically by `train_model!` on first call).
 """
 function preprocess(model::AttentionSurgeModel, input::Dict{String, TimeSeries})
     settings  = get_settings(model)
-    nwind     = settings["nwind"]
+    nwind     = settings["nlocations_input"]
     nlags     = settings["nlags"]
-    nstations = settings["nstations"]
+    nstations = settings["nlocations_output"]
 
     stress_x, stress_y = _get_stress(input)
     press  = Float32.(2e-4 .* (get_values(input["pressure"]) .- 1e5))

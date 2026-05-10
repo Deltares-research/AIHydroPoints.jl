@@ -101,7 +101,7 @@ get!(model_settings, "out_quantities", collect(keys(train_target)))
 get!(model_settings, "out_names",      get_names(first_target))
 get!(model_settings, "out_lons",       get_longitudes(first_target))
 get!(model_settings, "out_lats",       get_latitudes(first_target))
-get!(model_settings, "nstations",      length(model_settings["out_names"])) # TODO: rename to nlocations_output see plan.md
+get!(model_settings, "nlocations_output", length(model_settings["out_names"]))
 
 all_settings = Dict{String,Any}(
     "run_info"       => Dict("runid" => runid, "description" => description),

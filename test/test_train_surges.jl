@@ -46,8 +46,8 @@ using Dates
         model_settings = Dict{String, Any}(
             "model_name" => "test_surge_model",
             "model_dir"  => model_dir,
-            "nstations"  => nstations,
-            "nwind"      => nwind,
+            "nlocations_output"  => nstations,
+            "nlocations_input"      => nwind,
             "nlags"      => 4,
         )
         train_settings = TrainingSettings(nepochs=2, nbatches=64, learning_rate=1e-3)

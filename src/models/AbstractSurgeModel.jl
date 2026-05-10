@@ -58,18 +58,18 @@ storm surge from wind-stress and pressure forcing at `nwind` locations over
 
 | Key | Description |
 |---|---|
-| `"nstations"` | Number of output (waterlevel) stations |
-| `"nwind"`     | Number of input (forcing) stations |
-| `"nlags"`     | Number of lagged time steps used as input |
+| `"nlocations_output"` | Number of output (waterlevel) locations |
+| `"nlocations_input"`  | Number of input (forcing) locations |
+| `"nlags"`             | Number of lagged time steps used as input |
 
 The following are populated automatically by `train_model!` on first call:
 `"out_names"`, `"out_lons"`, `"out_lats"`, `"out_quantity"`.
 
 ## Tensor layout
 
-`preprocess` produces a tensor of shape `(1, 3*nwind, nlags, ntimes_valid)`,
+`preprocess` produces a tensor of shape `(1, 3*nlocations_input, nlags, ntimes_valid)`,
 where the three feature blocks are `wind_x`, `wind_y`, and scaled pressure.
-`forward` must accept this 4-D tensor and return `(nstations, 1, ntimes_valid)`.
+`forward` must accept this 4-D tensor and return `(nlocations_output, 1, ntimes_valid)`.
 
 ## Concrete subtypes must implement
 
@@ -104,9 +104,9 @@ Requires `"out_names"`, `"out_lons"`, `"out_lats"` to be present in
 """
 function preprocess(model::AbstractSurgeModel, input::Dict{String, TimeSeries})
     settings  = get_settings(model)
-    nwind     = settings["nwind"]
+    nwind     = settings["nlocations_input"]
     nlags     = settings["nlags"]
-    nstations = settings["nstations"]
+    nstations = settings["nlocations_output"]
 
     stress_x, stress_y = _get_stress(input)
     press  = Float32.(2e-4 .* (get_values(input["pressure"]) .- 1e5))

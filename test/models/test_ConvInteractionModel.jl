@@ -34,14 +34,14 @@ end
 
 # nlags=8, channels=[32,16,1] → nlags == 2^3 == 8 ✓
 DEFAULT_SETTINGS = Dict{String, Any}(
-    "nstations"  => 3,
+    "nlocations_output"  => 3,
     "nlags"      => 8,
     "model_pars" => Dict{String, Any}("channels" => [32, 16, 1]),
 )
 
 function make_settings(; nstations=3)
     return Dict{String, Any}(
-        "nstations"  => nstations,
+        "nlocations_output"  => nstations,
         "nlags"      => 8,
         "model_pars" => Dict{String, Any}("channels" => [32, 16, 1]),
     )
@@ -61,7 +61,7 @@ end
 
     # nlags / channels mismatch should error
     bad = Dict{String, Any}(
-        "nstations"  => 3,
+        "nlocations_output"  => 3,
         "nlags"      => 4,
         "model_pars" => Dict{String, Any}("channels" => [32, 16, 1]),  # 3 layers → 2^3=8 ≠ 4
     )

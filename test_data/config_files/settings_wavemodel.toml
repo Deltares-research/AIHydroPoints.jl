@@ -2,8 +2,8 @@
 model_name = "wave_model_10to11_explyr3_3stations"
 model_dir = "wave_model_10to11_explyr3_3stations"
 use_gpu = true
-nstations = 11
-nwind = 10
+nlocations_output = 11
+nlocations_input = 10
 nlags = 16
 n_input_channels = 64
 wind_scale = 0.5

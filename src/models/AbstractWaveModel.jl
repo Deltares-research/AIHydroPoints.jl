@@ -45,9 +45,9 @@ wave height from lagged wind speed and direction at `nwind` locations.
 
 | Key | Description |
 |---|---|
-| `"nstations"` | Number of output (wave height) stations |
-| `"nwind"`     | Number of input (wind) stations |
-| `"nlags"`     | Number of lagged time steps used as input |
+| `"nlocations_output"` | Number of output (wave height) locations |
+| `"nlocations_input"`  | Number of input (wind) locations |
+| `"nlags"`             | Number of lagged time steps used as input |
 
 Optional settings keys (with defaults):
 
@@ -57,23 +57,23 @@ Optional settings keys (with defaults):
 | `"wave_scale"` | `3.0` | Divisor applied to wave height targets during training; multiplied back in postprocess! |
 
 The following are populated automatically by `train_model!` on first call:
-`"out_names"`, `"out_lons"`, `"out_lats"`, `"out_quantity"`, `"nstations"`, `"nwind"`.
+`"out_names"`, `"out_lons"`, `"out_lats"`, `"out_quantity"`.
 
 ## Tensor layout
 
 `preprocess` produces `(x_station, x_input)` where:
-- `x_station :: Bool  (nstations, nstations * ntimes_valid)` — one-hot station encoding
-- `x_input  :: Float32 (nlags, 2*nwind, nstations * ntimes_valid)` — lagged wind-stress blocks
+- `x_station :: Bool  (nlocations_output, nlocations_output * ntimes_valid)` — one-hot station encoding
+- `x_input  :: Float32 (nlags, 2*nlocations_input, nlocations_output * ntimes_valid)` — lagged wind-stress blocks
 
 Samples are ordered: for each valid time step (outer), then for each station (inner).
-`forward` must accept this tuple and return `(nstations, 1, ntimes_valid)`.
+`forward` must accept this tuple and return `(nlocations_output, 1, ntimes_valid)`.
 
 ## Input convention
 
 `input` and `target` must both contain:
-- `"wind_speed"` — wind speed in m/s `(nwind, ntimes)`
-- `"wind_direction"` — meteorological direction in degrees `(nwind, ntimes)`
-- `"wave_height"` — significant wave height in m `(nstations, ntimes)` (also carries station metadata)
+- `"wind_speed"` — wind speed in m/s `(nlocations_input, ntimes)`
+- `"wind_direction"` — meteorological direction in degrees `(nlocations_input, ntimes)`
+- `"wave_height"` — significant wave height in m `(nlocations_output, ntimes)` (also carries station metadata)
 
 ## Concrete subtypes must implement
 
@@ -95,8 +95,8 @@ Build one-hot station and lagged wind-stress tensors from `input`, and
 pre-allocate the output `TimeSeries`.
 
 Returns `((x_station, x_input), output)` where:
-- `x_station :: Bool  (nstations, nstations * ntimes_valid)` — one-hot
-- `x_input  :: Float32 (nlags, 2*nwind, nstations * ntimes_valid)` — wind stress blocks
+- `x_station :: Bool  (nlocations_output, nlocations_output * ntimes_valid)` — one-hot
+- `x_input  :: Float32 (nlags, 2*nlocations_input, nlocations_output * ntimes_valid)` — wind stress blocks
 - `output` is `Dict("wave_height" => ts)` with `ts.values` zero-initialised.
 
 `ntimes_valid = ntimes - nlags + 1`. Samples are ordered: for each valid time
@@ -115,7 +115,7 @@ function preprocess(model::AbstractWaveModel, input::Dict{String, TimeSeries})
     times        = get_times(u10)
     ntimes       = length(times)
     ntimes_valid = ntimes - nlags + 1
-    nstations    = settings["nstations"]
+    nstations    = settings["nlocations_output"]
     nwind        = size(get_values(u10), 1)
 
     wind_x, wind_y = _wave_wind_to_stress(get_values(u10), get_values(udir), wind_scale)
@@ -182,8 +182,8 @@ Train the model in-place using minibatch gradient descent (Adam) over
 `"wave_height"`.  Records where any input or target value is NaN are silently
 dropped.
 
-On first call, `"out_names"`, `"out_lons"`, `"out_lats"`, `"out_quantity"`,
-`"nstations"`, and `"nwind"` are added to the model settings from the data.
+On first call, `"out_names"`, `"out_lons"`, `"out_lats"`, and `"out_quantity"`
+are added to the model settings from the data.
 
 If `train_settings.validation_split > 0`, the last fraction of the time series
 (in the time dimension) is held out and its RMSE is shown in the progress bar.
@@ -205,8 +205,6 @@ function train_model!(model::AbstractWaveModel, train_settings::TrainingSettings
         settings["out_lons"]     = Float64.(get_longitudes(ts_ref))
         settings["out_lats"]     = Float64.(get_latitudes(ts_ref))
         settings["out_quantity"] = get_quantity(ts_ref)
-        settings["nstations"]    = length(get_names(ts_ref))
-        settings["nwind"]        = size(get_values(input["wind_speed"]), 1)
     end
 
     # Build full tiled tensors

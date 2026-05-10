@@ -36,8 +36,8 @@ end
 function wave_make_settings(; nwind=WAVE_NWIND, nstations=WAVE_NSTATIONS, nlags=WAVE_NLAGS)
     s_names = ["s$i" for i in 1:nstations]
     return Dict{String, Any}(
-        "nstations"        => nstations,
-        "nwind"            => nwind,
+        "nlocations_output"        => nstations,
+        "nlocations_input"            => nwind,
         "nlags"            => nlags,
         "wind_scale"       => 0.5,
         "wave_scale"       => 3.0,
@@ -65,7 +65,7 @@ end
     @test get_flux_model(m) isa Flux.Chain
 
     # nlags mismatch should throw
-    bad = Dict{String,Any}("nstations"=>3,"nwind"=>4,"nlags"=>3,
+    bad = Dict{String,Any}("nlocations_output"=>3,"nlocations_input"=>4,"nlags"=>3,
                             "model_pars"=>Dict("nchannel"=>[8,1]))
     @test_throws AssertionError ConvWaveModel(bad)
 end
@@ -123,8 +123,8 @@ end
 
     # Without out_names pre-set (train_model! should populate)
     settings = Dict{String, Any}(
-        "nstations"        => WAVE_NSTATIONS,
-        "nwind"            => WAVE_NWIND,
+        "nlocations_output"        => WAVE_NSTATIONS,
+        "nlocations_input"            => WAVE_NWIND,
         "nlags"            => WAVE_NLAGS,
         "n_input_channels" => 8,
         "model_pars"       => Dict{String, Any}("nchannel" => [8, 1], "activation" => "relu"),
@@ -135,8 +135,8 @@ end
     train_losses, val_losses = train_model!(m, ts, input, target)
 
     @test haskey(m.settings, "out_names")
-    @test haskey(m.settings, "nstations")
-    @test haskey(m.settings, "nwind")
+    @test haskey(m.settings, "nlocations_output")
+    @test haskey(m.settings, "nlocations_input")
     @test length(train_losses) == ts.nepochs
     @test eltype(train_losses) == Float32
     @test all(train_losses .>= 0f0)
@@ -145,7 +145,7 @@ end
     # With validation split
     ts_val = TrainingSettings(nepochs=3, nbatches=32, learning_rate=1e-3, validation_split=0.2)
     m2 = ConvWaveModel(Dict{String, Any}(
-        "nstations" => WAVE_NSTATIONS, "nwind" => WAVE_NWIND, "nlags" => WAVE_NLAGS,
+        "nlocations_output" => WAVE_NSTATIONS, "nlocations_input" => WAVE_NWIND, "nlags" => WAVE_NLAGS,
         "n_input_channels" => 8,
         "model_pars" => Dict{String, Any}("nchannel" => [8, 1], "activation" => "relu"),
     ))

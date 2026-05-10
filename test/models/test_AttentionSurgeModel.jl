@@ -61,8 +61,8 @@ end
 function attn_make_settings(; nstations=2, nwind=3, nlags=4,
                          out_lons=[3.5, 4.1], out_lats=[51.4, 51.9])
     return Dict{String, Any}(
-        "nstations"    => nstations,
-        "nwind"        => nwind,
+        "nlocations_output"    => nstations,
+        "nlocations_input"        => nwind,
         "nlags"        => nlags,
         "model_pars"   => attn_make_model_pars(),
         "out_names"    => ["s$i" for i in 1:nstations],
@@ -135,7 +135,7 @@ end
 
 @testset "AttentionSurgeModel train_model!" begin
     nwind = 3; nstations = 2; ntimes = 60; nlags = 4
-    settings = Dict{String,Any}("nstations" => nstations, "nwind" => nwind,
+    settings = Dict{String,Any}("nlocations_output" => nstations, "nlocations_input" => nwind,
                                 "nlags" => nlags, "model_pars" => attn_make_model_pars())
     m      = AttentionSurgeModel(settings, attn_make_graph_network(nwind=nwind, nstations=nstations))
     input  = attn_make_surge_input(nwind=nwind, ntimes=ntimes)
@@ -157,7 +157,7 @@ end
     # With validation_split
     ts_val = TrainingSettings(nepochs=3, nbatches=16, learning_rate=1e-3, validation_split=0.2)
     m2 = AttentionSurgeModel(
-        Dict{String,Any}("nstations" => nstations, "nwind" => nwind,
+        Dict{String,Any}("nlocations_output" => nstations, "nlocations_input" => nwind,
                          "nlags" => nlags, "model_pars" => attn_make_model_pars()),
         attn_make_graph_network(nwind=nwind, nstations=nstations))
     train_losses2, val_losses2 = train_model!(m2, ts_val, input, target)

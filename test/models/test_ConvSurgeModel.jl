@@ -30,8 +30,8 @@ end
 
 function conv_make_settings(; nstations=2, nwind=3, nlags=4)
     return Dict{String, Any}(
-        "nstations"    => nstations,
-        "nwind"        => nwind,
+        "nlocations_output"    => nstations,
+        "nlocations_input"        => nwind,
         "nlags"        => nlags,
         "out_names"    => ["s$i" for i in 1:nstations],
         "out_lons"     => Float64.(1:nstations),
@@ -45,7 +45,7 @@ end
 # ──────────────────────────────────────────────────────────────────────────────
 
 @testset "ConvSurgeModel construction" begin
-    settings = Dict{String, Any}("nstations" => 2, "nwind" => 3, "nlags" => 4)
+    settings = Dict{String, Any}("nlocations_output" => 2, "nlocations_input" => 3, "nlags" => 4)
     m = ConvSurgeModel(settings)
 
     @test m isa AbstractSurgeModel
@@ -59,7 +59,7 @@ end
 
     # With explicit model_pars
     s2 = Dict{String, Any}(
-        "nstations"  => 2, "nwind" => 3, "nlags" => 4,
+        "nlocations_output"  => 2, "nlocations_input" => 3, "nlags" => 4,
         "model_pars" => Dict{String, Any}("channels" => [8], "filtersize" => 5),
     )
     m2 = ConvSurgeModel(s2)
@@ -106,7 +106,7 @@ end
 
 @testset "ConvSurgeModel train_model!" begin
     nwind = 3; nstations = 2; ntimes = 50; nlags = 4
-    settings = Dict{String, Any}("nstations" => nstations, "nwind" => nwind, "nlags" => nlags)
+    settings = Dict{String, Any}("nlocations_output" => nstations, "nlocations_input" => nwind, "nlags" => nlags)
     m        = ConvSurgeModel(settings)
     input    = conv_make_surge_input(nwind=nwind, ntimes=ntimes)
     target   = conv_make_surge_target(nstations=nstations, ntimes=ntimes)
@@ -122,7 +122,7 @@ end
 
     # With validation split
     ts_val = TrainingSettings(nepochs=3, nbatches=16, learning_rate=1e-3, validation_split=0.2)
-    m2 = ConvSurgeModel(Dict{String, Any}("nstations" => nstations, "nwind" => nwind, "nlags" => nlags))
+    m2 = ConvSurgeModel(Dict{String, Any}("nlocations_output" => nstations, "nlocations_input" => nwind, "nlags" => nlags))
     _, val_losses2 = train_model!(m2, ts_val, input, target)
     @test length(val_losses2) == ts_val.nepochs
     @test all(val_losses2 .>= 0f0)

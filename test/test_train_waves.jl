@@ -55,8 +55,8 @@ using DataFrames
     settings = Dict{String, Any}(
         "model_name"        => "test_wave_model",
         "model_dir"         => model_dir,
-        "nstations"         => nstations,
-        "nwind"             => nwind,
+        "nlocations_output"         => nstations,
+        "nlocations_input"             => nwind,
         "nlags"             => 4,
         "wind_scale"        => 0.5,
         "wave_scale"        => 3.0,

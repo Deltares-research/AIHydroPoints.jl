@@ -2,8 +2,8 @@
 model_name = "TestSurgeModel"
 model_dir = "models/TestSurgeModel"
 use_gpu = false
-nstations = 5
-nwind = 9
+nlocations_output = 5
+nlocations_input = 9
 nlags = 16
 
     [SurgeSettings.model_pars]

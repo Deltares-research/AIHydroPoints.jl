@@ -37,7 +37,7 @@ implementations of `preprocess`, `postprocess!`, `train_model!`, and
 
 | Key | Description |
 |---|---|
-| `"nstations"` | Number of output (waterlevel) stations |
+| `"nlocations_output"` | Number of output (waterlevel) locations |
 | `"nlags"`     | Number of lagged time steps used as input |
 
 The following are populated automatically by `train_model!` on first call:
@@ -212,10 +212,9 @@ function train_model!(model::AbstractInteractionModel, train_settings::TrainingS
         settings["out_lons"]     = Float64.(get_longitudes(ts_ref))
         settings["out_lats"]     = Float64.(get_latitudes(ts_ref))
         settings["out_quantity"] = get_quantity(ts_ref)
-        settings["nstations"]    = length(get_names(ts_ref))
     end
 
-    nstations = settings["nstations"]
+    nstations = settings["nlocations_output"]
 
     # Build raw (unnormalized) input blocks
     x_station, x_ts = _build_interaction_blocks(model, input)

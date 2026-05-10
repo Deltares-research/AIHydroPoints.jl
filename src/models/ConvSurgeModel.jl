@@ -20,7 +20,7 @@ wind-stress and pressure history to predict storm surge.
 model = ConvSurgeModel(settings::Dict{String, Any})
 ```
 
-Required keys in `settings`: `"nstations"`, `"nwind"`, `"nlags"`.
+Required keys in `settings`: `"nlocations_output"`, `"nlocations_input"`, `"nlags"`.
 
 Optional key `"model_pars"` (Dict):
 - `"channels"` — output channels for each Conv1D layer (default `[32, 16]`)
@@ -29,14 +29,14 @@ Optional key `"model_pars"` (Dict):
 ## Architecture
 
 ```
-(3*nwind*nlags, ntimes)          ← flattened lag tensor from preprocess
-    reshape → (nlags, 3*nwind, ntimes)
-    Conv1D(filtersize, 3*nwind  → channels[1], relu, SamePad)
+(3*nlocations_input*nlags, ntimes)          ← flattened lag tensor from preprocess
+    reshape → (nlags, 3*nlocations_input, ntimes)
+    Conv1D(filtersize, 3*nlocations_input  → channels[1], relu, SamePad)
     Conv1D(filtersize, channels[1] → channels[2], relu, SamePad)
     ...
     flatten → (nlags * channels[end], ntimes)
-    Dense(nlags * channels[end] → nstations)
-(nstations, ntimes)
+    Dense(nlags * channels[end] → nlocations_output)
+(nlocations_output, ntimes)
 ```
 
 Each Conv1D layer uses `pad=SamePad()` (stride 1) so the lag dimension is
@@ -53,11 +53,11 @@ end
 
 Construct a `ConvSurgeModel` from `settings`.
 
-Required keys: `"nstations"` (Int), `"nwind"` (Int), `"nlags"` (Int).
+Required keys: `"nlocations_output"` (Int), `"nlocations_input"` (Int), `"nlags"` (Int).
 """
 function ConvSurgeModel(settings::Dict{String, Any})
-    nstations  = settings["nstations"]
-    nwind      = settings["nwind"]
+    nstations  = settings["nlocations_output"]
+    nwind      = settings["nlocations_input"]
     nlags      = settings["nlags"]
     mp         = get(settings, "model_pars", Dict{String, Any}())
     channels   = get(mp, "channels",   [32, 16])

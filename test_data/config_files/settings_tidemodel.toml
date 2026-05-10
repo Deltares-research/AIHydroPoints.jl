@@ -2,7 +2,7 @@
 model_name = "TestTideModel"
 model_dir = "models/TestTideModel"
 use_gpu = true
-nstations = 5
+nlocations_output = 5
 freqs = ["SSA", "K1", "O1", "Q1", "P1", "M2", "S2", "N2", "K2", "H"]
 
     [TideSettings.model_pars]

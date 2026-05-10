@@ -113,8 +113,8 @@ get!(model_settings, "in_quantities",  collect(keys(train_input)))
 get!(model_settings, "in_names",       get_names(first_input))
 get!(model_settings, "in_lons",        get_longitudes(first_input))
 get!(model_settings, "in_lats",        get_latitudes(first_input))
-get!(model_settings, "nstations",      length(model_settings["out_names"])) # TODO: rename to nlocations_output see plan.md
-get!(model_settings, "nwind",          length(model_settings["in_names"]))  # TODO: rename to nlocations_input see plan.md
+get!(model_settings, "nlocations_output", length(model_settings["out_names"]))
+get!(model_settings, "nlocations_input",  length(model_settings["in_names"]))
 
 all_settings = Dict{String,Any}(
     "run_info"       => Dict("runid" => runid, "description" => description),
