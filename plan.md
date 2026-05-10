@@ -15,15 +15,16 @@ The main goal of this project is to develop a machine learning model for predict
 6. [x] Make training scripts more similar and consistent — all four scripts use `load_data`, a shared `train_model!` interface, unified plotting, `runid`/`description` metadata, and write `run_settings.toml` for reproducibility.
 7. Make training fully controllable from the toml input file, and make it possible to run training from the command line with a specified toml file.
     a. [x] Formalize input checking and augmentation. 
-    b. [ ] Add a `create_model(settings, train_input)` factory function in the library that dispatches on `settings["model_name"]`.
+    b. [x] Add a `MODEL_REGISTRY` and `get_model_type(settings)` that converts `settings["model_name"]` to a Julia type once, enabling type dispatch everywhere instead of if/elseif on strings. Includes `validate_model_settings!` hook (default no-op) called from `validate_and_augment_settings!`, and `create_model` factory dispatching on model type.
+    c. [x] Add a `create_model(settings, train_input)` factory function in the library that dispatches on `settings["model_name"]`.
          - `AttentionSurgeModel` needs a `GraphNetwork` built from `train_input`; the factory builds it automatically.
          - The interaction script's `_synthesize_waterlevel` should be removed: instead load the surge file directly as the target variable, renamed to `"interaction"` via the `"as"` alias in `data_settings`. No special cases needed in the generic script. Note: this is a temporary placeholder — a meaningful interaction target (residual = observed − tide_pred − surge_pred) requires a well-trained surge model and observed waterlevel data, which are not yet available.
-    c. [ ] Create a generic `train.jl` that reads all settings from a TOML file passed as `ARGS[1]` and runs the shared skeleton: load data → augment settings → create model → train → save → plot.
-    d. [ ] Create example TOML files (one per model type) in `examples/`.
-    e. [ ] Clean up dead code: `train_surge.jl` and `train_waves.jl` each have two `model_type = ...` assignments (the first is unreachable); move `model_type` into the TOML.
-    f. [ ] Standardise `plot_series` calls: surge/waves/tide plot test only; interaction plots train+test. Standardise to test-only by default; add optional `"plot_train" = true` setting.
-    g. [ ] Set up structure for running experiments (e.g. `experiments/` folder with per-run TOML files).
-    h. [ ] Improve documentation of settings in `docs/settings.md`.
+    d. [ ] Create a generic `train.jl` that reads all settings from a TOML file passed as `ARGS[1]` and runs the shared skeleton: load data → augment settings → create model → train → save → plot.
+    e. [ ] Create example TOML files (one per model type) in `examples/`.
+    f. [ ] Clean up dead code: `train_surge.jl` and `train_waves.jl` each have two `model_type = ...` assignments (the first is unreachable); move `model_type` into the TOML.
+    g. [ ] Standardise `plot_series` calls: surge/waves/tide plot test only; interaction plots train+test. Standardise to test-only by default; add optional `"plot_train" = true` setting.
+    h. [ ] Set up structure for running experiments (e.g. `experiments/` folder with per-run TOML files).
+    i. [ ] Improve documentation of settings in `docs/settings.md`.
 8. Write a separate script for inference.
 9. Improve output during training
 10. Create leaderboard
@@ -59,8 +60,8 @@ concrete models) is fully implemented, tested, and all legacy source files remov
 interface, unified plotting, `runid`/`description` metadata, and write `run_settings.toml`
 for reproducibility. Smoke-tested via `check_training_scripts.sh`.
 
-Step 7 is in progress. 7a is complete: `validate_and_augment_settings!` lives in
-`src/input_processing.jl`, all training scripts use it, `"nstations"`/`"nwind"` renamed
-to `"nlocations_output"`/`"nlocations_input"` everywhere, 472 tests pass.
+Step 7 is in progress. 7a–7c complete: `validate_and_augment_settings!` in
+`src/input_processing.jl`; `MODEL_REGISTRY`, `get_model_type`, `validate_model_settings!`
+hook, and `create_model` factory in `src/model_registry.jl`. 490 tests pass.
 
 

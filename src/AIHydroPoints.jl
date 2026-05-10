@@ -89,6 +89,9 @@ export AbstractInteractionModel
 include("models/ConvInteractionModel.jl")
 export ConvInteractionModel, InteractionInputLayer, ConvInteractionFlux
 
+include("model_registry.jl")
+export MODEL_REGISTRY, get_model_type, validate_model_settings!, create_model
+
 
 # Methods in the interface for time series
 # getters for the fields

@@ -96,5 +96,8 @@ function validate_and_augment_settings!(
         get!(model_settings, "nlocations_input", length(model_settings["in_names"]))
     end
 
+    # ── Model-specific validation hook ───────────────────────────────────────
+    validate_model_settings!(get_model_type(model_settings), model_settings)
+
     return nothing
 end
