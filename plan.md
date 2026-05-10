@@ -19,7 +19,7 @@ The main goal of this project is to develop a machine learning model for predict
     c. [x] Add a `create_model(settings, train_input)` factory function in the library that dispatches on `settings["model_name"]`.
          - `AttentionSurgeModel` needs a `GraphNetwork` built from `train_input`; the factory builds it automatically.
          - The interaction script's `_synthesize_waterlevel` should be removed: instead load the surge file directly as the target variable, renamed to `"interaction"` via the `"as"` alias in `data_settings`. No special cases needed in the generic script. Note: this is a temporary placeholder — a meaningful interaction target (residual = observed − tide_pred − surge_pred) requires a well-trained surge model and observed waterlevel data, which are not yet available.
-    d. [ ] Create a generic `train.jl` that reads all settings from a TOML file passed as `ARGS[1]` and runs the shared skeleton: load data → augment settings → create model → train → save → plot.
+    d. [x] Create a generic `train.jl` that reads all settings from a TOML file passed as `ARGS[1]` and runs the shared skeleton: load data → augment settings → create model → train → save → plot.
     e. [ ] Create example TOML files (one per model type) in `examples/`.
     f. [ ] Clean up dead code: `train_surge.jl` and `train_waves.jl` each have two `model_type = ...` assignments (the first is unreachable); move `model_type` into the TOML.
     g. [ ] Standardise `plot_series` calls: surge/waves/tide plot test only; interaction plots train+test. Standardise to test-only by default; add optional `"plot_train" = true` setting.
@@ -60,8 +60,8 @@ concrete models) is fully implemented, tested, and all legacy source files remov
 interface, unified plotting, `runid`/`description` metadata, and write `run_settings.toml`
 for reproducibility. Smoke-tested via `check_training_scripts.sh`.
 
-Step 7 is in progress. 7a–7c complete: `validate_and_augment_settings!` in
-`src/input_processing.jl`; `MODEL_REGISTRY`, `get_model_type`, `validate_model_settings!`
-hook, and `create_model` factory in `src/model_registry.jl`. 490 tests pass.
+Step 7 is in progress. 7a–7d complete: `validate_and_augment_settings!`, model registry
+with type dispatch, `create_model` factory, `toml_read`, `TrainingSettings(Dict)`, and
+generic `train.jl`. Smoke-tested against ConvSurgeModel TOML. 490 tests pass.
 
 

@@ -60,6 +60,18 @@ All fields are shared across every model type.
 end
 
 """
+    TrainingSettings(d::Dict) -> TrainingSettings
+
+Construct a `TrainingSettings` from a plain dict (e.g. read from TOML).
+Unknown keys are silently ignored; missing keys get their default values.
+"""
+function TrainingSettings(d::Dict)
+    valid  = Set(fieldnames(TrainingSettings))
+    kwargs = Dict{Symbol,Any}(Symbol(k) => v for (k, v) in d if Symbol(k) ∈ valid)
+    return TrainingSettings(; kwargs...)
+end
+
+"""
     to_dict(ts::TrainingSettings) -> Dict{String,Any}
 
 Convert a `TrainingSettings` to a plain dict suitable for TOML serialisation.

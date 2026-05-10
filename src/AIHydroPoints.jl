@@ -19,7 +19,7 @@ include("tidal_comps.jl")
 export primary_frequencies_as_doodson, get_doodson_eqvals, constituents, lunar2solar, robust_timedelta_sec
 
 include("toml_utils.jl")
-export toml_write
+export toml_write, toml_read
 
 include("data_loading.jl")
 export load_data
