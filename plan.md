@@ -14,19 +14,22 @@ The main goal of this project is to develop a machine learning model for predict
 5. [x] Clean up the code and make it more modular and reusable.
 6. [x] Make training scripts more similar and consistent — all four scripts use `load_data`, a shared `train_model!` interface, unified plotting, `runid`/`description` metadata, and write `run_settings.toml` for reproducibility.
 7. Make training fully controllable from the toml input file, and make it possible to run training from the command line with a specified toml file.
-    a. [ ] Formalize input checking and augmentation
-    b. [ ] Create a generic train script
-    c. [ ] Create examples 
-    d. [ ] set up structure for running experiments
-    e. [ ] simplify running experiments
-    e. [ ] improve documentation of input
-8. Write a separate script for inference
-9. Rename `"nstations"` / `"nwind"` to `"nlocations_output"` / `"nlocations_input"` throughout all model settings and constructors for consistency across model types (wave, surge, interaction all use different informal names today).
-10. Improve output during training
-11. Create leaderboard
-12. Create a baseline for each model type
-13. Create script for real-time forecasts
-14. Create an environment for online demos
+    a. [ ] Formalize input checking and augmentation. See [plan_7a.md](plan_7a.md) for full design.
+    b. [ ] Add a `create_model(settings, train_input)` factory function in the library that dispatches on `settings["model_name"]`.
+         - `AttentionSurgeModel` needs a `GraphNetwork` built from `train_input`; the factory builds it automatically.
+         - The interaction script's `_synthesize_waterlevel` should be removed: instead load the surge file directly as the target variable, renamed to `"interaction"` via the `"as"` alias in `data_settings`. No special cases needed in the generic script. Note: this is a temporary placeholder — a meaningful interaction target (residual = observed − tide_pred − surge_pred) requires a well-trained surge model and observed waterlevel data, which are not yet available.
+    c. [ ] Create a generic `train.jl` that reads all settings from a TOML file passed as `ARGS[1]` and runs the shared skeleton: load data → augment settings → create model → train → save → plot.
+    d. [ ] Create example TOML files (one per model type) in `examples/`.
+    e. [ ] Clean up dead code: `train_surge.jl` and `train_waves.jl` each have two `model_type = ...` assignments (the first is unreachable); move `model_type` into the TOML.
+    f. [ ] Standardise `plot_series` calls: surge/waves/tide plot test only; interaction plots train+test. Standardise to test-only by default; add optional `"plot_train" = true` setting.
+    g. [ ] Set up structure for running experiments (e.g. `experiments/` folder with per-run TOML files).
+    h. [ ] Improve documentation of settings in `docs/settings.md`.
+8. Write a separate script for inference.
+9. Improve output during training
+10. Create leaderboard
+11. Create a baseline for each model type
+12. Create script for real-time forecasts
+13. Create an environment for online demos
 
 ## Checklist for each step:
 - all source should eventually be in src/ and all tests should be in test/ and test data should be in test_data/
@@ -55,5 +58,10 @@ concrete models) is fully implemented, tested, and all legacy source files remov
 `train_waves.jl`, `train_interaction.jl`. All use `load_data`, a shared `train_model!`
 interface, unified plotting, `runid`/`description` metadata, and write `run_settings.toml`
 for reproducibility. Smoke-tested via `check_training_scripts.sh`.
+
+Step 7 is in progress. Analysis of the four training scripts shows they share an identical
+skeleton (env setup → load data → augment settings → construct model → train → save →
+plot); the only script-specific parts are model construction and (temporarily) the
+interaction script's target. Design for 7a is documented in plan_7a.md.
 
 
