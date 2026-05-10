@@ -56,6 +56,10 @@ mkdir(temp_dir) # create a new empty temp directory
       include("test_data_loading.jl")
    end
 
+   @testset "input_processing" begin
+      include("test_input_processing.jl")
+   end
+
    @testset "abstract model interface" begin
       include("models/test_abstract_model.jl")
    end
