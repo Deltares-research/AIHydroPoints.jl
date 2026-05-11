@@ -1,14 +1,18 @@
 # Settings Reference
 
-A training run is configured by a single TOML file with up to five top-level tables:
+A run is configured by a single TOML file.  The required tables differ between
+`scripts/train.jl` and `scripts/predict.jl`:
 
-| Table | Required | Purpose |
-|---|---|---|
-| `[run_info]` | yes | Run identifier and description |
-| `[model_settings]` | yes | Model architecture and inference-time parameters |
-| `[train_settings]` | yes | Training hyperparameters |
-| `[data_settings]` | yes | Data files and input/output routing |
-| `[output_settings]` | no | What outputs to produce (plots, etc.) |
+| Table | `train.jl` | `predict.jl` | Purpose |
+|---|---|---|---|
+| `[run_info]` | yes | no | Run identifier and description |
+| `[model_settings]` | yes | yes | Model directory (and architecture for training) |
+| `[train_settings]` | yes | no | Training hyperparameters |
+| `[data_settings]` | yes | yes | Data files and input/output routing |
+| `[output_settings]` | no | no | What outputs to produce (plots, etc.) |
+
+For `predict.jl`, `[model_settings]` only requires `model_dir` — the full architecture
+settings are loaded automatically from `model_dir/model_settings.toml`.
 
 Model settings are split into two distinct parts:
 
@@ -64,6 +68,7 @@ Concrete models: `LinearSurgeModel`, `ConvSurgeModel`, `AttentionSurgeModel`.
 
 | Key | Description |
 |---|---|
+| `"model_name"` | Model type; must match a key in `MODEL_REGISTRY` (e.g. `"ConvSurgeModel"`). |
 | `"nlocations_output"` | Number of output (surge) stations. |
 | `"nlocations_input"` | Number of input (wind/pressure) locations. |
 | `"nlags"` | Number of lagged time steps used as input. |
@@ -72,8 +77,7 @@ Concrete models: `LinearSurgeModel`, `ConvSurgeModel`, `AttentionSurgeModel`.
 
 | Key | Default | Description |
 |---|---|---|
-| `"model_name"` | `"MySurgeModel"` | Used for file naming. |
-| `"model_dir"` | `"MySurgeModel"` | Directory for saved model files. |
+| `"model_dir"` | derived from `runid` + `model_name` | Directory for saved model files. |
 | `"use_gpu"` | `false` | Whether to use GPU. |
 | `"model_pars"` | model-dependent | Architecture parameters (see below). |
 
@@ -113,14 +117,14 @@ Concrete models: `DeepONetTideModel`, `ProductTideModel`.
 
 | Key | Description |
 |---|---|
+| `"model_name"` | Model type; must match a key in `MODEL_REGISTRY` (e.g. `"DeepONetTideModel"`). |
 | `"freqs"` | List of named tidal constituents (e.g. `["M2", "S2", "K1"]`). |
 
 ### Optional keys (with defaults)
 
 | Key | Default | Description |
 |---|---|---|
-| `"model_name"` | `"MyTideModel"` | Used for file naming. |
-| `"model_dir"` | `"MyTideModel"` | Directory for saved model files. |
+| `"model_dir"` | derived from `runid` + `model_name` | Directory for saved model files. |
 | `"use_gpu"` | `false` | Whether to use GPU. |
 | `"model_pars"` | model-dependent | Architecture parameters (see below). |
 
@@ -154,6 +158,7 @@ Concrete models: `ConvWaveModel`, `DeepONetWaveModel`.
 
 | Key | Description |
 |---|---|
+| `"model_name"` | Model type; must match a key in `MODEL_REGISTRY` (e.g. `"ConvWaveModel"`). |
 | `"nlocations_output"` | Number of output (wave height) stations. |
 | `"nlocations_input"` | Number of input (wind) locations. |
 | `"nlags"` | Number of lagged time steps; must equal `2^length(model_pars["nchannel"])`. |
@@ -162,8 +167,7 @@ Concrete models: `ConvWaveModel`, `DeepONetWaveModel`.
 
 | Key | Default | Description |
 |---|---|---|
-| `"model_name"` | `"MyWaveModel"` | Used for file naming. |
-| `"model_dir"` | `"MyWaveModel"` | Directory for saved model files. |
+| `"model_dir"` | derived from `runid` + `model_name` | Directory for saved model files. |
 | `"use_gpu"` | `false` | Whether to use GPU. |
 | `"wind_scale"` | `0.5` | Divisor applied to wind stress values at input. |
 | `"wave_scale"` | `3.0` | Divisor applied to wave height targets during training. |
@@ -197,6 +201,7 @@ Concrete models: `ConvInteractionModel`.
 
 | Key | Description |
 |---|---|
+| `"model_name"` | Model type; must match a key in `MODEL_REGISTRY` (e.g. `"ConvInteractionModel"`). |
 | `"nlocations_output"` | Number of output (interaction) stations. |
 | `"nlags"` | Number of lagged time steps; must equal `2^length(model_pars["channels"])`. |
 
@@ -204,8 +209,7 @@ Concrete models: `ConvInteractionModel`.
 
 | Key | Default | Description |
 |---|---|---|
-| `"model_name"` | `"MyInteractionModel"` | Used for file naming. |
-| `"model_dir"` | `"MyInteractionModel"` | Directory for saved model files. |
+| `"model_dir"` | derived from `runid` + `model_name` | Directory for saved model files. |
 | `"use_gpu"` | `false` | Whether to use GPU. |
 | `"model_pars"` | `Dict("channels" => [32, 16, 1])` | Architecture parameters (see below). |
 
@@ -251,14 +255,9 @@ nchannel   = [64, 64, 64, 1]
 activation = "swish"
 ```
 
-Saving:
+Saving (done automatically by `train()`):
 
 ```julia
-toml_write(get_settings(model), joinpath(save_dir, "settings.toml"))
-```
-
-Model weights are saved separately:
-
-```julia
-save_params(model, joinpath(save_dir, "model_params.jld2"))
+toml_write(joinpath(save_dir, "model_settings.toml"), get_settings(model); overwrite=true)
+save_params(model, joinpath(save_dir, "params.jld2"); overwrite=true)
 ```

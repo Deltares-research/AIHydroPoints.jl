@@ -6,7 +6,7 @@ We want to have a single `load_data` function that can load any dataset based on
 and return input and target time series already separated per split.
 
 
-## Example: surge model (`train_surge.jl`)
+## Example: surge model
 
 The script loads:
 - a NetCDF file with the surge time series (quantity `"surge"`)
@@ -129,7 +129,7 @@ When training and validation come from the same file, repeat the entry with diff
 
 ---
 
-## Example: wave model (`train_waves.jl`)
+## Example: wave model
 
 The script loads a directory of NOOS files covering 2021, then splits by time:
 training = Jan–Sep, testing = Oct–Dec.  Input is wind speed and direction; target
@@ -214,8 +214,8 @@ windows out of a single source file.
 **`files[].locations`** — optional list of location names to load from the file.  When
 omitted, all locations in the file are loaded.
 
-**`files[].path`** — relative to the TOML file's directory (or script working directory;
-TBD).  Absolute paths are also accepted.  For `format = "noos"`, `path` is a directory
+**`files[].path`** — relative to the directory containing the TOML file.
+Absolute paths are also accepted.  For `format = "noos"`, `path` is a directory
 loaded via `NoosTimeSeriesCollection`; for other formats it is a file path.
 
 **`files[].source`** — required for `format = "noos"`.  Selects a sub-collection by
