@@ -249,30 +249,3 @@ function train_model!(model::AbstractSurgeModel, train_settings::TrainingSetting
     return train_losses, val_losses
 end
 
-# ──────────────────────────────────────────────────────────────────────────────
-# plot_series — shared across all surge models
-# ──────────────────────────────────────────────────────────────────────────────
-
-"""
-    plot_series(model::AbstractSurgeModel, input, target, series_name; kwargs...)
-
-Run inference on `input`, compare predictions to `target["surge"]`, and save one
-PNG per station to the model's save directory.
-
-## Keyword arguments
-
-- `save_dir::String` — output directory (default: `get_settings(model)["model_dir"]`)
-- `timerange` — restrict plot time window; passed to `_plot_station_series`
-- `station_names` — restrict to named stations; passed to `_plot_station_series`
-"""
-function plot_series(model::AbstractSurgeModel,
-                     input::Dict{String, TimeSeries},
-                     target::Dict{String, TimeSeries},
-                     series_name::String;
-                     save_dir::String = get(get_settings(model), "model_dir", "."),
-                     timerange      = nothing,
-                     station_names  = nothing)
-    output = predict(model, input)
-    _plot_station_series(output, target, save_dir, series_name;
-                         timerange, station_names)
-end

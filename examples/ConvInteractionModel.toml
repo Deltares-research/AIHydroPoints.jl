@@ -21,6 +21,10 @@
 runid       = "example"
 description = "Interaction model (dummy target) trained on 2011 Schureman tides and surge."
 
+[output_settings]
+plot_train = true
+plot_test  = true
+
 [model_settings]
 model_name = "ConvInteractionModel"
 nlags      = 16

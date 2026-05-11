@@ -34,7 +34,7 @@ include("models/training_settings.jl")
 export TrainingSettings, to_dict
 
 include("models/abstract_model.jl")
-export AbstractModel, get_settings, save_params, load_params!, train_model!, plot_series
+export AbstractModel, get_settings, save_params, load_params!, train_model!, write_outputs
 
 include("models/abstract_flux_model.jl")
 export AbstractFluxModel, MyFluxModel

@@ -1,13 +1,23 @@
 # Settings Reference
 
+A training run is configured by a single TOML file with up to five top-level tables:
+
+| Table | Required | Purpose |
+|---|---|---|
+| `[run_info]` | yes | Run identifier and description |
+| `[model_settings]` | yes | Model architecture and inference-time parameters |
+| `[train_settings]` | yes | Training hyperparameters |
+| `[data_settings]` | yes | Data files and input/output routing |
+| `[output_settings]` | no | What outputs to produce (plots, etc.) |
+
 Model settings are split into two distinct parts:
 
 - **Model settings** — a plain `Dict{String,Any}` holding all fields needed to construct the
-  model and run inference.  These are saved alongside every trained model as `settings.toml`
+  model and run inference.  These are saved alongside every trained model as `model_settings.toml`
   so the model can be reconstructed without any training infrastructure.
 
 - **`TrainingSettings`** — a struct holding all fields that control the training loop only.
-  These are not needed for inference and are not saved in `settings.toml`.
+  These are not needed for inference and are not saved in `model_settings.toml`.
 
 ---
 
@@ -31,10 +41,22 @@ Shared across all model types.
 
 ---
 
+## output_settings
+
+Optional table.  All keys default to the values shown.
+
+| Key | Default | Description |
+|---|---|---|
+| `plot_train` | `false` | Plot predictions vs observations for the training split. |
+| `plot_test` | `true` | Plot predictions vs observations for the testing split. |
+| `plot_fft` | `false` | Add FFT spectral panels to each station plot. |
+
+---
+
 ## Surge model settings
 
-The surge model takes lagged wind stress and pressure at `nwind` forcing locations and
-predicts storm surge at `nstations` output stations.
+The surge model takes lagged wind stress and pressure at `nlocations_input` forcing locations
+and predicts storm surge at `nlocations_output` output stations.
 
 Concrete models: `LinearSurgeModel`, `ConvSurgeModel`, `AttentionSurgeModel`.
 
@@ -42,8 +64,8 @@ Concrete models: `LinearSurgeModel`, `ConvSurgeModel`, `AttentionSurgeModel`.
 
 | Key | Description |
 |---|---|
-| `"nstations"` | Number of output (surge) stations. |
-| `"nwind"` | Number of input (wind) stations. |
+| `"nlocations_output"` | Number of output (surge) stations. |
+| `"nlocations_input"` | Number of input (wind/pressure) locations. |
 | `"nlags"` | Number of lagged time steps used as input. |
 
 ### Optional keys (with defaults)
@@ -55,9 +77,10 @@ Concrete models: `LinearSurgeModel`, `ConvSurgeModel`, `AttentionSurgeModel`.
 | `"use_gpu"` | `false` | Whether to use GPU. |
 | `"model_pars"` | model-dependent | Architecture parameters (see below). |
 
-### Auto-populated by `train_model!`
+### Auto-populated by `validate_and_augment_settings!`
 
-`"out_names"`, `"out_lons"`, `"out_lats"`, `"out_quantity"`.
+`"out_names"`, `"out_lons"`, `"out_lats"`, `"out_quantities"`, `"nlocations_output"`,
+`"in_names"`, `"in_lons"`, `"in_lats"`, `"in_quantities"`, `"nlocations_input"`, `"model_dir"`.
 
 ### `model_pars` for `ConvSurgeModel`
 
@@ -101,9 +124,10 @@ Concrete models: `DeepONetTideModel`, `ProductTideModel`.
 | `"use_gpu"` | `false` | Whether to use GPU. |
 | `"model_pars"` | model-dependent | Architecture parameters (see below). |
 
-### Auto-populated by `train_model!`
+### Auto-populated by `validate_and_augment_settings!`
 
-`"out_names"`, `"out_lons"`, `"out_lats"`, `"out_quantity"`, `"nstations"`.
+`"out_names"`, `"out_lons"`, `"out_lats"`, `"out_quantities"`, `"nlocations_output"`, `"model_dir"`.
+(Tide models have no loaded inputs so `in_*` keys are not set.)
 
 ### `model_pars` for `DeepONetTideModel`
 
@@ -119,9 +143,10 @@ Concrete models: `DeepONetTideModel`, `ProductTideModel`.
 
 ## Wave model settings
 
-The wave model takes lagged wind speed and direction at `nwind` input locations and predicts
-significant wave height at `nstations` output stations.  Station identity is encoded via a
-one-hot vector so each (station × time) pair is an independent sample.
+The wave model takes lagged wind speed and direction at `nlocations_input` input locations
+and predicts significant wave height at `nlocations_output` output stations.  Station
+identity is encoded via a one-hot vector so each (station × time) pair is an independent
+sample.
 
 Concrete models: `ConvWaveModel`, `DeepONetWaveModel`.
 
@@ -129,8 +154,8 @@ Concrete models: `ConvWaveModel`, `DeepONetWaveModel`.
 
 | Key | Description |
 |---|---|
-| `"nstations"` | Number of output (wave height) stations. |
-| `"nwind"` | Number of input (wind) stations. |
+| `"nlocations_output"` | Number of output (wave height) stations. |
+| `"nlocations_input"` | Number of input (wind) locations. |
 | `"nlags"` | Number of lagged time steps; must equal `2^length(model_pars["nchannel"])`. |
 
 ### Optional keys (with defaults)
@@ -145,9 +170,10 @@ Concrete models: `ConvWaveModel`, `DeepONetWaveModel`.
 | `"n_input_channels"` | `64` | Channels in the first convolutional layer (`ConvWaveModel` only). |
 | `"model_pars"` | model-dependent | Architecture parameters (see below). |
 
-### Auto-populated by `train_model!`
+### Auto-populated by `validate_and_augment_settings!`
 
-`"out_names"`, `"out_lons"`, `"out_lats"`, `"out_quantity"`, `"nstations"`, `"nwind"`.
+`"out_names"`, `"out_lons"`, `"out_lats"`, `"out_quantities"`, `"nlocations_output"`,
+`"in_names"`, `"in_lons"`, `"in_lats"`, `"in_quantities"`, `"nlocations_input"`, `"model_dir"`.
 
 ### `model_pars` for `ConvWaveModel`
 
@@ -171,7 +197,7 @@ Concrete models: `ConvInteractionModel`.
 
 | Key | Description |
 |---|---|
-| `"nstations"` | Number of tide/surge/interaction stations. |
+| `"nlocations_output"` | Number of output (interaction) stations. |
 | `"nlags"` | Number of lagged time steps; must equal `2^length(model_pars["channels"])`. |
 
 ### Optional keys (with defaults)
@@ -183,10 +209,13 @@ Concrete models: `ConvInteractionModel`.
 | `"use_gpu"` | `false` | Whether to use GPU. |
 | `"model_pars"` | `Dict("channels" => [32, 16, 1])` | Architecture parameters (see below). |
 
-### Auto-populated by `train_model!`
+### Auto-populated by `validate_and_augment_settings!` and `train_model!`
 
-`"out_names"`, `"out_lons"`, `"out_lats"`, `"out_quantity"`, `"input_mu"`, `"input_std"`,
-`"output_mu"`, `"output_std"`.
+`validate_and_augment_settings!`: `"out_names"`, `"out_lons"`, `"out_lats"`, `"out_quantities"`,
+`"nlocations_output"`, `"in_names"`, `"in_lons"`, `"in_lats"`, `"in_quantities"`,
+`"nlocations_input"`, `"model_dir"`.
+
+`train_model!`: `"input_mu"`, `"input_std"`, `"output_mu"`, `"output_std"` (Z-score statistics).
 
 ### `model_pars` for `ConvInteractionModel`
 
@@ -204,11 +233,11 @@ A `[model_pars]` subsection holds the architecture dict.
 Example for `ConvWaveModel`:
 
 ```toml
-model_name = "ConvWaveModel"
-model_dir  = "models/ConvWaveModel"
-nstations  = 3
-nwind      = 3
-nlags      = 16
+model_name         = "ConvWaveModel"
+model_dir          = "models/ConvWaveModel"
+nlocations_output  = 3
+nlocations_input   = 3
+nlags              = 16
 wind_scale = 0.5
 wave_scale = 3.0
 n_input_channels = 64

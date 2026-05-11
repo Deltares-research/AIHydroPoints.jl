@@ -284,30 +284,3 @@ function train_model!(model::AbstractWaveModel, train_settings::TrainingSettings
     return train_losses, val_losses
 end
 
-# ──────────────────────────────────────────────────────────────────────────────
-# plot_series — shared across all wave models
-# ──────────────────────────────────────────────────────────────────────────────
-
-"""
-    plot_series(model::AbstractWaveModel, input, target, series_name; kwargs...)
-
-Run inference on `input`, compare predictions to `target["wave_height"]`, and
-save one PNG per station to the model's save directory.
-
-## Keyword arguments
-
-- `save_dir::String` — output directory (default: `get_settings(model)["model_dir"]`)
-- `timerange` — restrict plot time window
-- `station_names` — restrict to named stations
-"""
-function plot_series(model::AbstractWaveModel,
-                     input::Dict{String, TimeSeries},
-                     target::Dict{String, TimeSeries},
-                     series_name::String;
-                     save_dir::String = get(get_settings(model), "model_dir", "."),
-                     timerange      = nothing,
-                     station_names  = nothing)
-    output = predict(model, input)
-    _plot_station_series(output, target, save_dir, series_name;
-                         timerange, station_names)
-end

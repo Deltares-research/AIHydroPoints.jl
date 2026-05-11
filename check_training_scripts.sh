@@ -169,6 +169,49 @@ run_train "train.jl ConvInteractionModel" "examples/ConvInteractionModel.toml" \
     "test_data/tides_schureman_2012.nc" \
     "test_data/surge_schureman_2012.nc"
 
+# ── predict.jl smoke-tests ────────────────────────────────────────────────────
+# These depend on a model trained by the corresponding train.jl run above,
+# so they are placed after the train.jl entries.
+
+run_predict() {
+    local label="$1"
+    local toml="$2"
+    shift 2
+    local required=("$@")
+
+    echo ""
+    echo "━━━ $label ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+
+    for path in "${required[@]}"; do
+        if [ ! -e "$path" ]; then
+            echo "  SKIP — required data not found: $path"
+            RESULTS+=("SKIP  $label")
+            ((SKIP++))
+            return
+        fi
+    done
+
+    local start
+    start=$(date +%s)
+
+    if $JULIA predict.jl "$toml"; then
+        local elapsed=$(( $(date +%s) - start ))
+        echo "  PASS — ${elapsed}s"
+        RESULTS+=("PASS  $label  (${elapsed}s)")
+        ((PASS++))
+    else
+        local elapsed=$(( $(date +%s) - start ))
+        echo "  FAIL — ${elapsed}s  (exit code $?)"
+        RESULTS+=("FAIL  $label  (${elapsed}s)")
+        ((FAIL++))
+    fi
+}
+
+run_predict "predict.jl ConvSurgeModel" "examples/predict_ConvSurgeModel.toml" \
+    "training_output/example_ConvSurgeModel/model_settings.toml" \
+    "test_data/surge_schureman_2012.nc" \
+    "test_data/era5_wind_stress_2012_validation.jld2"
+
 # ──────────────────────────────────────────────────────────────────────────────
 # Summary
 # ──────────────────────────────────────────────────────────────────────────────

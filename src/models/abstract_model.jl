@@ -133,17 +133,19 @@ function train_model!(model::AbstractModel, train_settings::TrainingSettings,
 end
 
 """
-    plot_series(model::AbstractModel, input::Dict{String, TimeSeries},
-                target::Dict{String, TimeSeries}, series_name::String; kwargs...)
+    write_outputs(model::AbstractModel, data::Dict, output_settings::Dict)
 
-Run inference on `input`, compare predictions to `target`, and save one PNG per
-output station to the model's save directory.  `series_name` is used as a suffix
-in the output file names.
+Generate outputs (plots, statistics, saved predictions, etc.) for all enabled
+splits according to `output_settings`.
 
-Must be implemented by every concrete subtype of `AbstractModel` (or inherited
-from an intermediate abstract type such as `AbstractSurgeModel` or `AbstractTideModel`).
+`data` is the dict returned by `load_data`, mapping split labels (e.g.
+`"training"`, `"testing"`) to `(input=..., target=...)` namedtuples.
+
+`output_settings` is a plain dict controlling which outputs to produce.
+`AbstractFluxModel` provides a default implementation covering all current models.
+
+Must be implemented (or inherited) by every concrete subtype of `AbstractModel`.
 """
-function plot_series(model::AbstractModel, input::Dict{String, TimeSeries},
-                     target::Dict{String, TimeSeries}, series_name::String; kwargs...)
-    error("plot_series not implemented for $(typeof(model))")
+function write_outputs(model::AbstractModel, data::Dict, output_settings::Dict)
+    error("write_outputs not implemented for $(typeof(model))")
 end

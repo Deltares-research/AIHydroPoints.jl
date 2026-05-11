@@ -96,6 +96,12 @@ function validate_and_augment_settings!(
         get!(model_settings, "nlocations_input", length(model_settings["in_names"]))
     end
 
+    # ── Populate output_settings defaults ────────────────────────────────────
+    out = get!(all_settings, "output_settings", Dict{String,Any}())
+    get!(out, "plot_train", false)
+    get!(out, "plot_test",  true)
+    get!(out, "plot_fft",   false)
+
     # ── Model-specific validation hook ───────────────────────────────────────
     validate_model_settings!(get_model_type(model_settings), model_settings)
 

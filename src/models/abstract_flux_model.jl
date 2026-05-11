@@ -235,3 +235,40 @@ end
 
 get_flux_model(m::MyFluxModel) = m.flux_model
 get_settings(m::MyFluxModel)   = m.settings
+
+# ──────────────────────────────────────────────────────────────────────────────
+# write_outputs — default implementation for all AbstractFluxModel subtypes
+# ──────────────────────────────────────────────────────────────────────────────
+
+"""
+    write_outputs(model::AbstractFluxModel, data::Dict, output_settings::Dict)
+
+Generate outputs for all enabled splits.  `data` is the dict returned by
+`load_data`; `output_settings` controls what to produce.
+
+Supported keys (all optional, defaults shown):
+
+| Key | Default | Description |
+|---|---|---|
+| `"plot_train"` | `false` | Plot predictions vs observations for the training split. |
+| `"plot_test"` | `true` | Plot predictions vs observations for the testing split. |
+| `"plot_fft"` | `false` | Add FFT spectral panels to each station plot. |
+"""
+function write_outputs(model::AbstractFluxModel, data::Dict, output_settings::Dict)
+    save_dir = get(get_settings(model), "model_dir", ".")
+    plot_fft = get(output_settings, "plot_fft", false)
+
+    if get(output_settings, "plot_train", false) && haskey(data, "training")
+        output = predict(model, data["training"].input)
+        _plot_station_series(output, data["training"].target, save_dir, "train";
+                             show_fft = plot_fft)
+    end
+
+    if get(output_settings, "plot_test", true) && haskey(data, "testing")
+        output = predict(model, data["testing"].input)
+        _plot_station_series(output, data["testing"].target, save_dir, "test";
+                             show_fft = plot_fft)
+    end
+
+    return nothing
+end

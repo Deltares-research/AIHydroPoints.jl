@@ -21,11 +21,11 @@ The main goal of this project is to develop a machine learning model for predict
          - The interaction script's `_synthesize_waterlevel` should be removed: instead load the surge file directly as the target variable, renamed to `"interaction"` via the `"as"` alias in `data_settings`. No special cases needed in the generic script. Note: this is a temporary placeholder — a meaningful interaction target (residual = observed − tide_pred − surge_pred) requires a well-trained surge model and observed waterlevel data, which are not yet available.
     d. [x] Create a generic `train.jl` that reads all settings from a TOML file passed as `ARGS[1]` and runs the shared skeleton: load data → augment settings → create model → train → save → plot.
     e. [x] Create example TOML files (one per model type) in `examples/`. All 8 smoke-test via `train.jl` in `check_training_scripts.sh`. Fixed `AbstractInteractionModel` hardcoded `"waterlevel"` key to use `out_quantities` from settings.
-    f. [ ] Clean up dead code: `train_surge.jl` and `train_waves.jl` each have two `model_type = ...` assignments (the first is unreachable); move `model_type` into the TOML.
-    g. [ ] Standardise `plot_series` calls: surge/waves/tide plot test only; interaction plots train+test. Standardise to test-only by default; add optional `"plot_train" = true` setting.
+    f. [x] Clean up dead code: removed duplicate `model_type =` assignments; replaced if/elseif model construction blocks with `create_model`; removed redundant `test_output = predict(...)` lines; refactored `train_interaction.jl` to load surge as `"interaction"` target instead of synthesising it.
+    g. [x] Replace `plot_series` with `write_outputs(model, data, output_settings)`: moves all output logic into the model, controlled by `[output_settings]` TOML section (`plot_train`, `plot_test`, `plot_fft`). Default: test only. Defaults are filled into `all_settings` by `validate_and_augment_settings!` so they appear in `run_settings.toml`.
     h. [ ] Set up structure for running experiments (e.g. `experiments/` folder with per-run TOML files).
     i. [ ] Improve documentation of settings in `docs/settings.md`.
-8. Write a separate script for inference.
+8. [x] Write a separate script for inference: `predict.jl` mirrors `train.jl` — reads a TOML with `[model_settings]` (model_dir), `[data_settings]`, and `[output_settings]`; loads trained weights and runs `write_outputs`. Example TOML at `examples/predict_ConvSurgeModel.toml`. Smoke-tested via `check_training_scripts.sh`.
 9. Improve output during training
 10. Create leaderboard
 11. Create a baseline for each model type

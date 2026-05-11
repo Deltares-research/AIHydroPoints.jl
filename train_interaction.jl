@@ -9,16 +9,16 @@
 #
 #   target = observed_waterlevel - tide_prediction - linear_surge_prediction
 #
-# SYNTHETIC TARGET USED HERE
-# The test data do not include observed waterlevel, so we synthesise a dummy
-# target as tide + surge.  This lets the code run end-to-end but produces
-# meaningless results: the model is asked to learn the trivial identity
-# waterlevel = tide + surge, which contains no residual interaction at all.
-# Do not interpret the loss values or evaluation plots as meaningful.
+# PLACEHOLDER TARGET USED HERE
+# A proper residual target requires observed waterlevel data and a well-trained
+# surge model, which are not yet available.  As a placeholder the surge file is
+# loaded twice: once as the "surge" input and once as the "interaction" target.
+# This lets the pipeline run end-to-end but the model learns a trivial mapping
+# and results are not meaningful.
 
 model_type  = "ConvInteractionModel"
 runid       = "dummy"
-description = "Synthetic test case: target is tide + surge (no real interaction signal)."
+description = "Placeholder run: surge used as interaction target (no real residual signal)."
 
 # ──────────────────────────────────────────────
 # Set up environment and load dependencies
@@ -39,11 +39,13 @@ mkpath(save_dir)
 # ──────────────────────────────────────────────
 # Data settings
 # ──────────────────────────────────────────────
-# Target waterlevel is synthesised from tide + surge below, so model_io only
-# routes the raw loaded variables.  Both splits load the same two quantities.
+# The surge file is loaded twice per split: once as "surge" (input) and once as
+# "interaction" (target placeholder).  Replace the interaction entries with a
+# real residual file when available.
 data_dir = joinpath(@__DIR__, "test_data")
 data_settings = Dict{String,Any}(
     "files" => [
+        # ── Training split ─────────────────────────────────────────────────
         Dict("path"      => joinpath(data_dir, "tides_schureman_2011.nc"),
              "format"    => "netcdf",
              "split"     => "training",
@@ -52,6 +54,11 @@ data_settings = Dict{String,Any}(
              "format"    => "netcdf",
              "split"     => "training",
              "variables" => ["surge"]),
+        Dict("path"      => joinpath(data_dir, "surge_schureman_2011.nc"),
+             "format"    => "netcdf",
+             "split"     => "training",
+             "variables" => [Dict("name" => "surge", "as" => "interaction")]),
+        # ── Testing split ──────────────────────────────────────────────────
         Dict("path"      => joinpath(data_dir, "tides_schureman_2012.nc"),
              "format"    => "netcdf",
              "split"     => "testing",
@@ -60,34 +67,22 @@ data_settings = Dict{String,Any}(
              "format"    => "netcdf",
              "split"     => "testing",
              "variables" => ["surge"]),
+        Dict("path"      => joinpath(data_dir, "surge_schureman_2012.nc"),
+             "format"    => "netcdf",
+             "split"     => "testing",
+             "variables" => [Dict("name" => "surge", "as" => "interaction")]),
     ],
-    "model_io" => Dict("input" => ["tide", "surge"], "target" => ["tide", "surge"]),
+    "model_io" => Dict("input" => ["tide", "surge"], "target" => ["interaction"]),
 )
 
 # ──────────────────────────────────────────────
 # Load data
 # ──────────────────────────────────────────────
 data = load_data(data_settings)
-train_input = data["training"].input
-test_input  = data["testing"].input
-
-# Synthesise a dummy target (tide + surge) for code testing only.
-# Replace with: observed_waterlevel - tide_prediction - linear_surge_prediction
-function _synthesize_waterlevel(input::Dict{String, TimeSeries})
-    ts_tide  = input["tide"]
-    ts_surge = input["surge"]
-    TimeSeries(
-        Float32.(get_values(ts_tide) .+ get_values(ts_surge)),
-        get_times(ts_tide),
-        get_names(ts_tide),
-        Float64.(get_longitudes(ts_tide)),
-        Float64.(get_latitudes(ts_tide)),
-        "waterlevel",
-        "synthetic",
-    )
-end
-train_target = Dict{String, TimeSeries}("waterlevel" => _synthesize_waterlevel(train_input))
-test_target  = Dict{String, TimeSeries}("waterlevel" => _synthesize_waterlevel(test_input))
+train_input  = data["training"].input
+train_target = data["training"].target
+test_input   = data["testing"].input
+test_target  = data["testing"].target
 
 # ──────────────────────────────────────────────
 # Model settings
@@ -124,7 +119,7 @@ toml_write(joinpath(save_dir, "run_settings.toml"), all_settings; overwrite=true
 # ──────────────────────────────────────────────
 # Create model
 # ──────────────────────────────────────────────
-model = ConvInteractionModel(model_settings)
+model = create_model(model_settings, train_input)
 
 # ──────────────────────────────────────────────
 # Train
@@ -141,14 +136,4 @@ toml_write(joinpath(save_dir, "model_settings.toml"), get_settings(model); overw
 # Plots
 # ──────────────────────────────────────────────
 save_loss_plot(joinpath(save_dir, "losses.png"), train_losses, val_losses; overwrite=true)
-
-# ──────────────────────────────────────────────
-# Run inference on test set
-# ──────────────────────────────────────────────
-test_output = predict(model, test_input)
-
-# ──────────────────────────────────────────────
-# Evaluation plots
-# ──────────────────────────────────────────────
-plot_series(model, train_input, train_target, "train")
-plot_series(model, test_input,  test_target,  "test")
+write_outputs(model, data, Dict{String,Any}("plot_train" => true))

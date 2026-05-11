@@ -4,8 +4,7 @@
 #   "ConvWaveModel"     — WaveInputLayer + strided Conv (exp channel modulation)
 #   "DeepONetWaveModel" — strided Conv branch + dot-product station merge
 
-model_type  = "ConvWaveModel"      # "ConvWaveModel" | "DeepONetWaveModel"
-model_type  = "DeepONetWaveModel"
+model_type  = "DeepONetWaveModel"  # "ConvWaveModel" | "DeepONetWaveModel"
 runid       = "dummy"
 description = "Reference case trained on 2021 KNMI Harmonie wind (Jan–Sep)."
 
@@ -121,13 +120,7 @@ toml_write(joinpath(save_dir, "run_settings.toml"), all_settings; overwrite=true
 # ──────────────────────────────────────────────
 # Create model
 # ──────────────────────────────────────────────
-if model_type == "ConvWaveModel"
-    model = ConvWaveModel(model_settings)
-elseif model_type == "DeepONetWaveModel"
-    model = DeepONetWaveModel(model_settings)
-else
-    error("Unknown model_type: $model_type")
-end
+model = create_model(model_settings, train_input)
 
 # ──────────────────────────────────────────────
 # Train
@@ -146,11 +139,6 @@ toml_write(joinpath(save_dir, "model_settings.toml"), get_settings(model); overw
 save_loss_plot(joinpath(save_dir, "losses.png"), train_losses, val_losses; overwrite=true)
 
 # ──────────────────────────────────────────────
-# Run inference on test set
-# ──────────────────────────────────────────────
-test_output = predict(model, test_input)
-
-# ──────────────────────────────────────────────
 # Evaluation plots
 # ──────────────────────────────────────────────
-plot_series(model, test_input, test_target, "test")
+write_outputs(model, data, Dict{String,Any}())

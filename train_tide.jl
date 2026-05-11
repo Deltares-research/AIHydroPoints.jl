@@ -108,13 +108,7 @@ toml_write(joinpath(save_dir, "run_settings.toml"), all_settings; overwrite=true
 # ──────────────────────────────────────────────
 # Create model
 # ──────────────────────────────────────────────
-if model_type == "DeepONetTideModel"
-    model = DeepONetTideModel(model_settings)
-elseif model_type == "ProductTideModel"
-    model = ProductTideModel(model_settings)
-else
-    error("Unknown model_type: $model_type")
-end
+model = create_model(model_settings, train_input)
 
 # ──────────────────────────────────────────────
 # Train
@@ -133,11 +127,6 @@ toml_write(joinpath(save_dir, "model_settings.toml"), get_settings(model); overw
 save_loss_plot(joinpath(save_dir, "losses.png"), train_losses, val_losses; overwrite=true)
 
 # ──────────────────────────────────────────────
-# Run inference on test set
-# ──────────────────────────────────────────────
-test_output = predict(model, test_input)
-
-# ──────────────────────────────────────────────
 # Evaluation plots
 # ──────────────────────────────────────────────
-plot_series(model, test_input, test_target, "test")
+write_outputs(model, data, Dict{String,Any}())

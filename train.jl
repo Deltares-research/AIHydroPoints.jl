@@ -12,6 +12,9 @@
 #   [model_settings]  — model_name, model_dir (optional), model-specific keys
 #   [train_settings]  — nepochs, nbatches, learning_rate, ...
 #   [data_settings]   — files, model_io
+#
+# Optional table:
+#   [output_settings] — plot_train (default false), plot_test (default true)
 
 length(ARGS) == 1 ||
     error("Usage: julia train.jl <settings.toml>\nGot ARGS = $(ARGS)")
@@ -49,15 +52,10 @@ model = create_model(model_settings, train_input)
 # ── Train ─────────────────────────────────────────────────────────────────────
 train_losses, val_losses = train_model!(model, train_settings, train_input, train_target)
 
-# ── Save ──────────────────────────────────────────────────────────────────────
+# ── Plots and other outputs────────────────────────────────────────────────────
 save_params(model, joinpath(save_dir, "params.jld2"); overwrite=true)
 toml_write(joinpath(save_dir, "model_settings.toml"), get_settings(model); overwrite=true)
 
-# ── Plots ─────────────────────────────────────────────────────────────────────
 save_loss_plot(joinpath(save_dir, "losses.png"), train_losses, val_losses; overwrite=true)
 
-if haskey(data, "testing")
-    test_input  = data["testing"].input
-    test_target = data["testing"].target
-    plot_series(model, test_input, test_target, "test")
-end
+write_outputs(model, data, get(all_settings, "output_settings", Dict{String,Any}()))

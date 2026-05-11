@@ -2,10 +2,10 @@
 #
 # Select which model to train by changing model_type below:
 #   "LinearSurgeModel"    — single Dense layer (fast baseline)
+#   "ConvSurgeModel"      — strided Conv with exponential channel modulation
 #   "AttentionSurgeModel" — transformer branch + dense trunk + graph adjacency
 
-model_type  = "LinearSurgeModel"   # "LinearSurgeModel" | "ConvSurgeModel" | "AttentionSurgeModel"
-model_type  = "ConvSurgeModel"     # "LinearSurgeModel" | "ConvSurgeModel" | "AttentionSurgeModel"
+model_type  = "ConvSurgeModel"   # "LinearSurgeModel" | "ConvSurgeModel" | "AttentionSurgeModel"
 runid       = "dummy"
 description = "Reference case trained on 2011 ERA5 wind stress and Schureman surge."
 
@@ -50,11 +50,11 @@ data_settings = Dict{String,Any}(
     ],
     "model_io" => Dict("input" => ["stress_x", "stress_y", "pressure"], "target" => ["surge"]),
 )
+
 # ──────────────────────────────────────────────
 # Load data
 # ──────────────────────────────────────────────
 data = load_data(data_settings)
-# shorthands for train/test splits
 train_input  = data["training"].input
 train_target = data["training"].target
 test_input   = data["testing"].input
@@ -63,7 +63,6 @@ test_target  = data["testing"].target
 # ──────────────────────────────────────────────
 # Model settings
 # ──────────────────────────────────────────────
-
 model_settings = Dict{String, Any}(
     "model_name" => model_type,
     "model_dir"  => save_dir,
@@ -115,20 +114,7 @@ toml_write(joinpath(save_dir, "run_settings.toml"), all_settings; overwrite=true
 # ──────────────────────────────────────────────
 # Create model
 # ──────────────────────────────────────────────
-if model_type == "LinearSurgeModel"
-    model = LinearSurgeModel(model_settings)
-elseif model_type == "ConvSurgeModel"
-    model = ConvSurgeModel(model_settings)
-elseif model_type == "AttentionSurgeModel"
-    wind_ts    = train_input["stress_x"]
-    surge_ts   = train_target["surge"]
-    in_points  = collect(zip(get_latitudes(wind_ts),  get_longitudes(wind_ts)))
-    out_points = collect(zip(get_latitudes(surge_ts), get_longitudes(surge_ts)))
-    gn    = GraphNetwork(in_points, out_points)
-    model = AttentionSurgeModel(model_settings, gn)
-else
-    error("Unknown model_type: $model_type")
-end
+model = create_model(model_settings, train_input)
 
 # ──────────────────────────────────────────────
 # Train
@@ -145,13 +131,4 @@ toml_write(joinpath(save_dir, "model_settings.toml"), get_settings(model); overw
 # Plots
 # ──────────────────────────────────────────────
 save_loss_plot(joinpath(save_dir, "losses.png"), train_losses, val_losses; overwrite=true)
-
-# ──────────────────────────────────────────────
-# Run inference on test set
-# ──────────────────────────────────────────────
-test_output = predict(model, test_input)
-
-# ──────────────────────────────────────────────
-# Evaluation plots
-# ──────────────────────────────────────────────
-plot_series(model, test_input, test_target, "test")
+write_outputs(model, data, Dict{String,Any}())
