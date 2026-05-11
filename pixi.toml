@@ -8,3 +8,4 @@ version = "0.1.0"
 
 [dependencies]
 julia = ">=1.12.5,<1.13"
+parallel = ">=20260422,<20260423"

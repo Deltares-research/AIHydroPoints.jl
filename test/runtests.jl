@@ -64,6 +64,10 @@ mkdir(temp_dir) # create a new empty temp directory
       include("test_model_registry.jl")
    end
 
+   @testset "pipeline" begin
+      include("test_pipeline.jl")
+   end
+
    @testset "abstract model interface" begin
       include("models/test_abstract_model.jl")
    end
