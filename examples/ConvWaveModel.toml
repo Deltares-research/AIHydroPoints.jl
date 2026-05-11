@@ -34,7 +34,7 @@ input  = ["wind_speed", "wind_direction"]
 target = ["wave_height"]
 
 [[data_settings.files]]
-path      = "test_data/waves_2021"
+path      = "../test_data/waves_2021"
 format    = "noos"
 source    = "knmi_harmonie40_wind"
 split     = "training"
@@ -42,7 +42,7 @@ timerange = ["2021-01-01", "2021-09-30T23:00:00"]
 variables = ["wind_speed", "wind_direction"]
 
 [[data_settings.files]]
-path      = "test_data/waves_2021"
+path      = "../test_data/waves_2021"
 format    = "noos"
 source    = "swan_dcsm_harmonie"
 split     = "training"
@@ -50,7 +50,7 @@ timerange = ["2021-01-01", "2021-09-30T23:00:00"]
 variables = ["wave_height"]
 
 [[data_settings.files]]
-path      = "test_data/waves_2021"
+path      = "../test_data/waves_2021"
 format    = "noos"
 source    = "knmi_harmonie40_wind"
 split     = "testing"
@@ -58,7 +58,7 @@ timerange = ["2021-10-01", "2021-12-31T23:00:00"]
 variables = ["wind_speed", "wind_direction"]
 
 [[data_settings.files]]
-path      = "test_data/waves_2021"
+path      = "../test_data/waves_2021"
 format    = "noos"
 source    = "swan_dcsm_harmonie"
 split     = "testing"

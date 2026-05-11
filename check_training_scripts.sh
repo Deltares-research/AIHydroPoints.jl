@@ -73,25 +73,6 @@ run_script() {
 # Scripts
 # ──────────────────────────────────────────────────────────────────────────────
 
-run_script "train_tide" "train_tide.jl" \
-    "test_data/tides_schureman_2011.nc" \
-    "test_data/tides_schureman_2012.nc"
-
-run_script "train_surge" "train_surge.jl" \
-    "test_data/surge_schureman_2011.nc" \
-    "test_data/era5_wind_stress_2011_testing.jld2" \
-    "test_data/surge_schureman_2012.nc" \
-    "test_data/era5_wind_stress_2012_validation.jld2"
-
-run_script "train_waves" "train_waves.jl" \
-    "test_data/waves_2021"
-
-run_script "train_interaction" "train_interaction.jl" \
-    "test_data/tides_schureman_2011.nc" \
-    "test_data/surge_schureman_2011.nc" \
-    "test_data/tides_schureman_2012.nc" \
-    "test_data/surge_schureman_2012.nc"
-
 run_script "analyse_tides_schureman" "analyse_tides_schureman.jl" \
     "test_data/DCSM-FM_0_5nm_2010_5stations_his.jld2"
 
@@ -118,7 +99,7 @@ run_train() {
     local start
     start=$(date +%s)
 
-    if $JULIA train.jl "$toml"; then
+    if $JULIA scripts/train.jl "$toml"; then
         local elapsed=$(( $(date +%s) - start ))
         echo "  PASS — ${elapsed}s"
         RESULTS+=("PASS  $label  (${elapsed}s)")
@@ -194,7 +175,7 @@ run_predict() {
     local start
     start=$(date +%s)
 
-    if $JULIA predict.jl "$toml"; then
+    if $JULIA scripts/predict.jl "$toml"; then
         local elapsed=$(( $(date +%s) - start ))
         echo "  PASS — ${elapsed}s"
         RESULTS+=("PASS  $label  (${elapsed}s)")
@@ -208,7 +189,7 @@ run_predict() {
 }
 
 run_predict "predict.jl ConvSurgeModel" "examples/predict_ConvSurgeModel.toml" \
-    "training_output/example_ConvSurgeModel/model_settings.toml" \
+    "examples/training_output/example_ConvSurgeModel/model_settings.toml" \
     "test_data/surge_schureman_2012.nc" \
     "test_data/era5_wind_stress_2012_validation.jld2"
 

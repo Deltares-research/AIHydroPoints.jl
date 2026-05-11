@@ -92,6 +92,12 @@ export ConvInteractionModel, InteractionInputLayer, ConvInteractionFlux
 include("model_registry.jl")
 export MODEL_REGISTRY, get_model_type, validate_model_settings!, create_model
 
+include("train.jl")
+export train
+
+include("predict.jl")
+export predict
+
 
 # Methods in the interface for time series
 # getters for the fields

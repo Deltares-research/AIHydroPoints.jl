@@ -48,20 +48,20 @@ target = ["interaction"]
 # ── Training split ─────────────────────────────────────────────────────────────
 
 [[data_settings.files]]
-path      = "test_data/tides_schureman_2011.nc"
+path      = "../test_data/tides_schureman_2011.nc"
 format    = "netcdf"
 split     = "training"
 variables = [{name = "waterlevel", as = "tide"}]
 
 [[data_settings.files]]
-path      = "test_data/surge_schureman_2011.nc"
+path      = "../test_data/surge_schureman_2011.nc"
 format    = "netcdf"
 split     = "training"
 variables = ["surge"]
 
 # Surge loaded again as "interaction" — placeholder target
 [[data_settings.files]]
-path      = "test_data/surge_schureman_2011.nc"
+path      = "../test_data/surge_schureman_2011.nc"
 format    = "netcdf"
 split     = "training"
 variables = [{name = "surge", as = "interaction"}]
@@ -69,20 +69,20 @@ variables = [{name = "surge", as = "interaction"}]
 # ── Testing split ──────────────────────────────────────────────────────────────
 
 [[data_settings.files]]
-path      = "test_data/tides_schureman_2012.nc"
+path      = "../test_data/tides_schureman_2012.nc"
 format    = "netcdf"
 split     = "testing"
 variables = [{name = "waterlevel", as = "tide"}]
 
 [[data_settings.files]]
-path      = "test_data/surge_schureman_2012.nc"
+path      = "../test_data/surge_schureman_2012.nc"
 format    = "netcdf"
 split     = "testing"
 variables = ["surge"]
 
 # Surge loaded again as "interaction" — placeholder target
 [[data_settings.files]]
-path      = "test_data/surge_schureman_2012.nc"
+path      = "../test_data/surge_schureman_2012.nc"
 format    = "netcdf"
 split     = "testing"
 variables = [{name = "surge", as = "interaction"}]

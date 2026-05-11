@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+# bin/predict — run the AIHydroPoints inference pipeline
+#
+# Usage:
+#   bin/predict path/to/settings.toml
+
+REPO="$(cd "$(dirname "$0")/.." && pwd)"
+SCRIPT="$REPO/scripts/predict.jl"
+
+if command -v pixi &>/dev/null; then
+    exec pixi run julia "--project=$REPO" "$SCRIPT" "$@"
+elif command -v julia &>/dev/null; then
+    exec julia "--project=$REPO" "$SCRIPT" "$@"
+else
+    echo "Error: neither 'pixi' nor 'julia' found on PATH." >&2
+    echo "Install Julia (https://julialang.org/downloads) or pixi (https://pixi.sh)." >&2
+    exit 1
+fi

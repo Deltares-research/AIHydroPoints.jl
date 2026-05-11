@@ -35,13 +35,13 @@ input  = ["waterlevel"]
 target = ["waterlevel"]
 
 [[data_settings.files]]
-path      = "test_data/tides_schureman_2011.nc"
+path      = "../test_data/tides_schureman_2011.nc"
 format    = "netcdf"
 split     = "training"
 variables = ["waterlevel"]
 
 [[data_settings.files]]
-path      = "test_data/tides_schureman_2012.nc"
+path      = "../test_data/tides_schureman_2012.nc"
 format    = "netcdf"
 split     = "testing"
 variables = ["waterlevel"]
