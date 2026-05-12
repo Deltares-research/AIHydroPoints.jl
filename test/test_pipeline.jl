@@ -30,6 +30,9 @@ model_dir    = joinpath(examples_dir, "training_output", "example_LinearSurgeMod
         ts_dir = joinpath(model_dir, "testing_timeseries")
         @test isdir(ts_dir)
         @test !isempty(readdir(ts_dir))
+
+        # per-station stats CSV is produced
+        @test isfile(joinpath(model_dir, "stats_testing.csv"))
     end
 
     @testset "predict" begin

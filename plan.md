@@ -29,7 +29,7 @@ The main goal of this project is to develop a machine learning model for predict
 9. Improve output during training (see [docs/output_settings.md](docs/output_settings.md) for the target design)
     a. [x] plot timeseries for surge
     b. [x] scatter for surge
-    c. [ ] stats per station for surge
+    c. [x] stats per station for surge
     d. [ ] output series for surge
     c. [ ] aggregated values (aggregated stats, predict time, number of model pars, ...)
     d. [ ] time-selection
@@ -73,8 +73,8 @@ Steps 7 and 8 are complete. `validate_and_augment_settings!`, model registry, `c
 `train.jl`, `predict.jl`, 8 example TOMLs in `examples/`. All smoke-test clean (11 PASS).
 501 tests pass.
 
-Step 9 in progress. 9a–9b complete: `write_outputs` migrated to `[[output_settings.outputs]]`
-array design; timeseries plots in `<name>_timeseries/`, scatter plots in `<name>_scatter/`
-(using `MultiTimeSeries.scatter`). Design documented in `docs/output_settings.md`. 505 tests pass.
+Step 9 in progress. 9a–9c complete: timeseries plots (`<name>_timeseries/`), scatter plots
+(`<name>_scatter/`, via `MultiTimeSeries.scatter`), per-station stats (`stats_<name>.csv`,
+via `MultiTimeSeries.compute_statistics`). Design in `docs/output_settings.md`. 511 tests pass.
 
 

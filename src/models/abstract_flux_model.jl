@@ -261,10 +261,11 @@ function write_outputs(model::AbstractFluxModel, data::Dict, output_settings::Di
         name      = get(entry, "name",      split)
         timerange = get(entry, "timerange", nothing)
 
-        do_timeseries = get(entry, "timeseries", split == "testing")
-        do_scatter    = get(entry, "scatter",    false)
+        do_timeseries = get(entry, "timeseries",   split == "testing")
+        do_scatter    = get(entry, "scatter",      false)
+        do_stats      = get(entry, "write_stats",  split == "testing")
 
-        if do_timeseries || do_scatter
+        if do_timeseries || do_scatter || do_stats
             out = predict(model, data[split].input)
 
             if do_timeseries
@@ -279,6 +280,12 @@ function write_outputs(model::AbstractFluxModel, data::Dict, output_settings::Di
                 mkpath(subdir)
                 _plot_station_scatter(out, data[split].target, subdir;
                                       timerange = timerange)
+            end
+
+            if do_stats
+                _write_station_stats(out, data[split].target,
+                                     joinpath(save_dir, "stats_$(name).csv");
+                                     timerange = timerange)
             end
         end
     end

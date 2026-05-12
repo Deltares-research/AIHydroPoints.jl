@@ -30,6 +30,17 @@ end
     @test isfile(joinpath(subdir, "StationB.png"))
 end
 
+@testset "_write_station_stats" begin
+    path = joinpath(temp_dir, "stats_test.csv")
+    AIHydroPoints._write_station_stats(_plot_ts_pred, _plot_ts_true, path)
+    @test isfile(path)
+    lines = readlines(path)
+    @test length(lines) == 3          # header + 2 stations
+    @test startswith(lines[1], "location_id")
+    @test occursin("StationA", lines[2])
+    @test occursin("StationB", lines[3])
+end
+
 @testset "save_loss_plot" begin
     train_losses = [1.0, 0.8, 0.6]
     val_losses   = [1.1, 0.9, 0.7]
