@@ -27,8 +27,8 @@ The main goal of this project is to develop a machine learning model for predict
     i. [x] Improve documentation of settings in `docs/settings.md` and `docs/data_input_settings.md`: clarified train vs predict required tables, moved `model_name` to required keys, fixed stale code examples, resolved TBD on path resolution.
 8. [x] Write a separate script for inference: `predict.jl` mirrors `train.jl` — reads a TOML with `[model_settings]` (model_dir), `[data_settings]`, and `[output_settings]`; loads trained weights and runs `write_outputs`. Example TOML at `examples/predict_ConvSurgeModel.toml`. Smoke-tested via `check_training_scripts.sh`.
 9. Improve output during training (see [docs/output_settings.md](docs/output_settings.md) for the target design)
-    a. [ ] plot timeseries for surge
-    b. [ ] scatter for surge
+    a. [x] plot timeseries for surge
+    b. [x] scatter for surge
     c. [ ] stats per station for surge
     d. [ ] output series for surge
     c. [ ] aggregated values (aggregated stats, predict time, number of model pars, ...)
@@ -69,8 +69,12 @@ concrete models) is fully implemented, tested, and all legacy source files remov
 interface, unified plotting, `runid`/`description` metadata, and write `run_settings.toml`
 for reproducibility. Smoke-tested via `check_training_scripts.sh`.
 
-Step 7 is in progress. 7a–7e complete: `validate_and_augment_settings!`, model registry,
-`create_model`, `train.jl`, 8 example TOMLs in `examples/`. All smoke-test clean via
-`check_training_scripts.sh` (13 PASS). 490 tests pass.
+Steps 7 and 8 are complete. `validate_and_augment_settings!`, model registry, `create_model`,
+`train.jl`, `predict.jl`, 8 example TOMLs in `examples/`. All smoke-test clean (11 PASS).
+501 tests pass.
+
+Step 9 in progress. 9a–9b complete: `write_outputs` migrated to `[[output_settings.outputs]]`
+array design; timeseries plots in `<name>_timeseries/`, scatter plots in `<name>_scatter/`
+(using `MultiTimeSeries.scatter`). Design documented in `docs/output_settings.md`. 505 tests pass.
 
 

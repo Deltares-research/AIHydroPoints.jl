@@ -261,12 +261,25 @@ function write_outputs(model::AbstractFluxModel, data::Dict, output_settings::Di
         name      = get(entry, "name",      split)
         timerange = get(entry, "timerange", nothing)
 
-        if get(entry, "timeseries", split == "test")
+        do_timeseries = get(entry, "timeseries", split == "testing")
+        do_scatter    = get(entry, "scatter",    false)
+
+        if do_timeseries || do_scatter
             out = predict(model, data[split].input)
-            subdir = joinpath(save_dir, "$(name)_timeseries")
-            mkpath(subdir)
-            _plot_station_series(out, data[split].target, subdir;
-                                 timerange = timerange)
+
+            if do_timeseries
+                subdir = joinpath(save_dir, "$(name)_timeseries")
+                mkpath(subdir)
+                _plot_station_series(out, data[split].target, subdir;
+                                     timerange = timerange)
+            end
+
+            if do_scatter
+                subdir = joinpath(save_dir, "$(name)_scatter")
+                mkpath(subdir)
+                _plot_station_scatter(out, data[split].target, subdir;
+                                      timerange = timerange)
+            end
         end
     end
 

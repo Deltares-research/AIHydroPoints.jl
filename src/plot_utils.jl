@@ -87,6 +87,48 @@ function _plot_station_series(output::Dict{String, TimeSeries},
 end
 
 # ──────────────────────────────────────────────────────────────────────────────
+# Scatter plot helper
+# ──────────────────────────────────────────────────────────────────────────────
+
+"""
+    _plot_station_scatter(output, target, save_dir;
+                          timerange=nothing, station_names=nothing)
+
+Internal helper used by `write_outputs`.  Produces a predicted-vs-observed
+scatter plot per station and saves one PNG per station to `save_dir`
+(which must already exist).
+"""
+function _plot_station_scatter(output::Dict{String, TimeSeries},
+                                target::Dict{String, TimeSeries},
+                                save_dir::String;
+                                timerange     = nothing,
+                                station_names = nothing)
+
+    out_key = first(keys(output))
+    ts_pred = output[out_key]
+    ts_true = target[out_key]
+
+    t_start = get_times(ts_pred)[1]
+    t_end   = get_times(ts_pred)[end]
+    ts_true = select_timespan(ts_true, t_start, t_end)
+
+    if !isnothing(station_names)
+        ts_pred = select_locations_by_names(ts_pred, station_names)
+        ts_true = select_locations_by_names(ts_true, station_names)
+    end
+    if !isnothing(timerange)
+        ts_pred = select_timespan(ts_pred, timerange[1], timerange[2])
+        ts_true = select_timespan(ts_true, timerange[1], timerange[2])
+    end
+
+    names = get_names(ts_pred)
+    for (i, station) in enumerate(names)
+        p = scatter(ts_true, ts_pred; location_index=i)
+        savefig(p, joinpath(save_dir, "$(station).png"))
+    end
+end
+
+# ──────────────────────────────────────────────────────────────────────────────
 # Loss plot
 # ──────────────────────────────────────────────────────────────────────────────
 

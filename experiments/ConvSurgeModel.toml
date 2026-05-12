@@ -61,7 +61,7 @@ series_format = "netcdf"
     [[output_settings.outputs]]
     write_stats = true
     fft = false
-    scatter = false
+    scatter = true
     write_series = false
     timeseries = true
     split = "testing"
