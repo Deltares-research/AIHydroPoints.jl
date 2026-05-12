@@ -41,6 +41,41 @@ end
     @test occursin("StationB", lines[3])
 end
 
+@testset "_write_station_series" begin
+    @testset "netcdf" begin
+        AIHydroPoints._write_station_series(_plot_ts_pred, _plot_ts_true,
+                                            temp_dir, "test", "netcdf")
+        @test isfile(joinpath(temp_dir, "series_test.nc"))
+    end
+
+    @testset "jld2" begin
+        AIHydroPoints._write_station_series(_plot_ts_pred, _plot_ts_true,
+                                            temp_dir, "test", "jld2")
+        @test isfile(joinpath(temp_dir, "series_test.jld2"))
+    end
+
+    @testset "noos" begin
+        AIHydroPoints._write_station_series(_plot_ts_pred, _plot_ts_true,
+                                            temp_dir, "test", "noos")
+        subdir = joinpath(temp_dir, "series_test")
+        @test isdir(subdir)
+        @test isfile(joinpath(subdir, "StationA.noos"))
+        @test isfile(joinpath(subdir, "StationB.noos"))
+    end
+
+    @testset "overwrite" begin
+        # second call should not error (overwrites existing files)
+        AIHydroPoints._write_station_series(_plot_ts_pred, _plot_ts_true,
+                                            temp_dir, "test", "netcdf")
+        @test isfile(joinpath(temp_dir, "series_test.nc"))
+    end
+
+    @testset "unknown format" begin
+        @test_throws ErrorException AIHydroPoints._write_station_series(
+            _plot_ts_pred, _plot_ts_true, temp_dir, "test", "csv")
+    end
+end
+
 @testset "save_loss_plot" begin
     train_losses = [1.0, 0.8, 0.6]
     val_losses   = [1.1, 0.9, 0.7]

@@ -18,7 +18,7 @@ channels   = [32, 16]
 filtersize = 3
 
 [train_settings]
-nepochs          = 100
+nepochs          = 400
 nbatches         = 64
 learning_rate    = 1.0e-3
 lr_decay_factor  = 0.1
@@ -62,7 +62,7 @@ series_format = "netcdf"
     write_stats = true
     fft = false
     scatter = true
-    write_series = false
+    write_series = true
     timeseries = true
     split = "testing"
 

@@ -169,6 +169,65 @@ function _write_station_stats(output::Dict{String, TimeSeries},
 end
 
 # ──────────────────────────────────────────────────────────────────────────────
+# Series output
+# ──────────────────────────────────────────────────────────────────────────────
+
+"""
+    _write_station_series(output, target, save_dir, name, format;
+                          timerange=nothing, station_names=nothing)
+
+Internal helper used by `write_outputs`.  Writes the predicted time series to
+`save_dir` using `format` (`"netcdf"`, `"jld2"`, or `"noos"`).
+
+- `"netcdf"` / `"jld2"`: single file `series_<name>.<ext>` in `save_dir`.
+- `"noos"`: one file per station inside `series_<name>/`.
+
+Existing files are overwritten.
+"""
+function _write_station_series(output::Dict{String, TimeSeries},
+                                target::Dict{String, TimeSeries},
+                                save_dir::String,
+                                name::String,
+                                format::String;
+                                timerange     = nothing,
+                                station_names = nothing)
+
+    out_key = first(keys(output))
+    ts_pred = output[out_key]
+    ts_true = target[out_key]
+
+    t_start = get_times(ts_pred)[1]
+    t_end   = get_times(ts_pred)[end]
+    ts_true = select_timespan(ts_true, t_start, t_end)
+
+    if !isnothing(station_names)
+        ts_pred = select_locations_by_names(ts_pred, station_names)
+    end
+    if !isnothing(timerange)
+        ts_pred = select_timespan(ts_pred, timerange[1], timerange[2])
+    end
+
+    if format == "netcdf"
+        path = joinpath(save_dir, "series_$(name).nc")
+        isfile(path) && rm(path)
+        write_to_netcdf(ts_pred, path)
+    elseif format == "jld2"
+        path = joinpath(save_dir, "series_$(name).jld2")
+        isfile(path) && rm(path)
+        write_to_jld2(ts_pred, path)
+    elseif format == "noos"
+        subdir = joinpath(save_dir, "series_$(name)")
+        isdir(subdir) && rm(subdir; recursive=true)
+        mkpath(subdir)
+        for (i, station) in enumerate(get_names(ts_pred))
+            write_single_noos_file(joinpath(subdir, "$(station).noos"), ts_pred, i)
+        end
+    else
+        error("Unknown series_format: \"$format\". Use \"netcdf\", \"jld2\", or \"noos\".")
+    end
+end
+
+# ──────────────────────────────────────────────────────────────────────────────
 # Loss plot
 # ──────────────────────────────────────────────────────────────────────────────
 

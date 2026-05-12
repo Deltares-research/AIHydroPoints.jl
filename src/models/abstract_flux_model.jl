@@ -264,8 +264,9 @@ function write_outputs(model::AbstractFluxModel, data::Dict, output_settings::Di
         do_timeseries = get(entry, "timeseries",   split == "testing")
         do_scatter    = get(entry, "scatter",      false)
         do_stats      = get(entry, "write_stats",  split == "testing")
+        do_series     = get(entry, "write_series", false)
 
-        if do_timeseries || do_scatter || do_stats
+        if do_timeseries || do_scatter || do_stats || do_series
             out = predict(model, data[split].input)
 
             if do_timeseries
@@ -286,6 +287,12 @@ function write_outputs(model::AbstractFluxModel, data::Dict, output_settings::Di
                 _write_station_stats(out, data[split].target,
                                      joinpath(save_dir, "stats_$(name).csv");
                                      timerange = timerange)
+            end
+
+            if do_series
+                fmt = get(output_settings, "series_format", "netcdf")
+                _write_station_series(out, data[split].target, save_dir, name, fmt;
+                                      timerange = timerange)
             end
         end
     end
