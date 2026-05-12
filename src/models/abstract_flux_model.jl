@@ -243,31 +243,31 @@ get_settings(m::MyFluxModel)   = m.settings
 """
     write_outputs(model::AbstractFluxModel, data::Dict, output_settings::Dict)
 
-Generate outputs for all enabled splits.  `data` is the dict returned by
-`load_data`; `output_settings` controls what to produce.
+Generate outputs for all entries in `output_settings["outputs"]`.  `data` is
+the dict returned by `load_data`.  Each entry selects a split (and optionally a
+`timerange` sub-window) and controls which outputs to produce.
 
-Supported keys (all optional, defaults shown):
-
-| Key | Default | Description |
-|---|---|---|
-| `"plot_train"` | `false` | Plot predictions vs observations for the training split. |
-| `"plot_test"` | `true` | Plot predictions vs observations for the testing split. |
-| `"plot_fft"` | `false` | Add FFT spectral panels to each station plot. |
+See `docs/output_settings.md` for the full schema and defaults.
 """
 function write_outputs(model::AbstractFluxModel, data::Dict, output_settings::Dict)
-    save_dir = get(get_settings(model), "model_dir", ".")
-    plot_fft = get(output_settings, "plot_fft", false)
+    save_dir = get_settings(model)["model_dir"]
+    outputs  = get(output_settings, "outputs",
+                   [Dict{String,Any}("split" => "test")])
 
-    if get(output_settings, "plot_train", false) && haskey(data, "training")
-        output = predict(model, data["training"].input)
-        _plot_station_series(output, data["training"].target, save_dir, "train";
-                             show_fft = plot_fft)
-    end
+    for entry in outputs
+        split = entry["split"]
+        haskey(data, split) || continue
 
-    if get(output_settings, "plot_test", true) && haskey(data, "testing")
-        output = predict(model, data["testing"].input)
-        _plot_station_series(output, data["testing"].target, save_dir, "test";
-                             show_fft = plot_fft)
+        name      = get(entry, "name",      split)
+        timerange = get(entry, "timerange", nothing)
+
+        if get(entry, "timeseries", split == "test")
+            out = predict(model, data[split].input)
+            subdir = joinpath(save_dir, "$(name)_timeseries")
+            mkpath(subdir)
+            _plot_station_series(out, data[split].target, subdir;
+                                 timerange = timerange)
+        end
     end
 
     return nothing

@@ -26,7 +26,16 @@ The main goal of this project is to develop a machine learning model for predict
     h. [x] Move pipeline logic into `src/train.jl` (`train(toml)`) and `src/predict.jl` (`predict(toml)`), exported from the package. Root `train.jl` and `predict.jl` become thin CLI wrappers. Users can call `train`/`predict` directly after `using AIHydroPoints`.
     i. [x] Improve documentation of settings in `docs/settings.md` and `docs/data_input_settings.md`: clarified train vs predict required tables, moved `model_name` to required keys, fixed stale code examples, resolved TBD on path resolution.
 8. [x] Write a separate script for inference: `predict.jl` mirrors `train.jl` — reads a TOML with `[model_settings]` (model_dir), `[data_settings]`, and `[output_settings]`; loads trained weights and runs `write_outputs`. Example TOML at `examples/predict_ConvSurgeModel.toml`. Smoke-tested via `check_training_scripts.sh`.
-9. Improve output during training
+9. Improve output during training (see [docs/output_settings.md](docs/output_settings.md) for the target design)
+    a. [ ] plot timeseries for surge
+    b. [ ] scatter for surge
+    c. [ ] stats per station for surge
+    d. [ ] output series for surge
+    c. [ ] aggregated values (aggregated stats, predict time, number of model pars, ...)
+    d. [ ] time-selection
+    e. [ ] refine output_settings
+    f. [ ] similar for tides, waves and interaction
+    g. [ ] extend for tides
 10. Create leaderboard
 11. Create a baseline for each model type
 12. Create script for real-time forecasts

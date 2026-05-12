@@ -30,26 +30,22 @@ end
 # ──────────────────────────────────────────────────────────────────────────────
 
 """
-    _plot_station_series(output, target, save_dir, series_name;
-                         timerange=nothing, station_names=nothing, show_fft=false)
+    _plot_station_series(output, target, save_dir;
+                         timerange=nothing, station_names=nothing)
 
-Internal helper used by `plot_series` implementations.  Compares `output` from
-`predict` to `target` ground truth per station and saves one PNG per station.
+Internal helper used by `write_outputs`.  Compares `output` from `predict` to
+`target` ground truth per station and saves one PNG per station to `save_dir`
+(which must already exist).
 
 `output` and `target` must share the same primary key (e.g. `"surge"` or
 `"waterlevel"`).  Target times are aligned to the output times automatically,
 which handles lag trimming in surge models.
-
-If `show_fft=true`, two additional FFT spectral panels are added per station
-(4-panel layout instead of 2-panel).
 """
 function _plot_station_series(output::Dict{String, TimeSeries},
                                target::Dict{String, TimeSeries},
-                               save_dir::String,
-                               series_name::String;
-                               timerange       = nothing,
-                               station_names   = nothing,
-                               show_fft::Bool  = false)
+                               save_dir::String;
+                               timerange     = nothing,
+                               station_names = nothing)
 
     out_key = first(keys(output))
     ts_pred = output[out_key]
@@ -85,16 +81,8 @@ function _plot_station_series(output::Dict{String, TimeSeries},
         plot!(p1, times, pred[i, :]; label="Predicted")
         p2 = plot(times, errors[i, :]; label="Residual", xlabel="Time", ylabel=qty)
 
-        if show_fft
-            p3 = plot_fft(truth[i, :], times, "Observations")
-            plot_fft!(p3, pred[i, :], times, "Predicted")
-            p4 = plot_fft(errors[i, :], times, "Residual")
-            plot(p1, p2, p3, p4; layout=(4, 1), size=(800, 1200))
-        else
-            plot(p1, p2; layout=(2, 1), size=(800, 600))
-        end
-
-        savefig(joinpath(save_dir, "$(station)_$(series_name).png"))
+        plot(p1, p2; layout=(2, 1), size=(800, 600))
+        savefig(joinpath(save_dir, "$(station).png"))
     end
 end
 

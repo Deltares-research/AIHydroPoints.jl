@@ -98,9 +98,18 @@ function validate_and_augment_settings!(
 
     # ── Populate output_settings defaults ────────────────────────────────────
     out = get!(all_settings, "output_settings", Dict{String,Any}())
-    get!(out, "plot_train", false)
-    get!(out, "plot_test",  true)
-    get!(out, "plot_fft",   false)
+    get!(out, "series_format", "netcdf")
+    get!(out, "write_summary", true)
+    if !haskey(out, "outputs")
+        out["outputs"] = [Dict{String,Any}(
+            "split"        => "testing",
+            "timeseries"   => true,
+            "fft"          => false,
+            "scatter"      => false,
+            "write_stats"  => true,
+            "write_series" => false,
+        )]
+    end
 
     # ── Model-specific validation hook ───────────────────────────────────────
     validate_model_settings!(get_model_type(model_settings), model_settings)
