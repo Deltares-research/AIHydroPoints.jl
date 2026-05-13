@@ -8,7 +8,10 @@ optionally `[output_settings]` from `input_toml`, then:
 1. Loads trained model settings from `model_dir/model_settings.toml`.
 2. Reconstructs the model and loads weights from `model_dir/params.jld2`.
 3. Loads data via `load_data`.
-4. Calls `write_outputs` to produce any requested plots.
+4. Calls `write_outputs` to produce any requested outputs.
+
+Outputs are written to `predict_output/<runid>_<model_name>/` relative to the
+TOML file, keeping them separate from the training output directory.
 
 Relative paths in the TOML (data files, `model_dir`) are resolved relative
 to the directory containing `input_toml`, so the TOML is portable regardless
@@ -38,6 +41,13 @@ function predict(input_toml::String)
     model_settings = toml_read(joinpath(model_dir, "model_settings.toml"))
     model = create_model(model_settings, Dict{String,TimeSeries}())
     load_params!(model, joinpath(model_dir, "params.jld2"))
+
+    # Derive a predict-specific output dir so outputs never land in training_output
+    runid      = get(get(all_settings, "run_info", Dict()), "runid", "predict")
+    model_name = model_settings["model_name"]
+    predict_dir = joinpath(toml_dir, "predict_output", "$(runid)_$(model_name)")
+    mkpath(predict_dir)
+    model_settings["model_dir"] = predict_dir
 
     data = load_data(all_settings["data_settings"])
 

@@ -60,9 +60,19 @@ series_format = "netcdf"
 
     [[output_settings.outputs]]
     write_stats = true
-    fft = false
+    fft = true
     scatter = true
     write_series = true
     timeseries = true
     split = "testing"
+
+    [[output_settings.outputs]]
+    split        = "testing"
+    name         = "storm_andrea_2012"
+    timerange    = ["2012-01-02", "2012-01-08"]
+    timeseries   = true
+    fft          = false
+    scatter      = true
+    write_stats  = true
+    write_series = false
 

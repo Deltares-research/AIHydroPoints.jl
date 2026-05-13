@@ -30,12 +30,12 @@ The main goal of this project is to develop a machine learning model for predict
     a. [x] plot timeseries for surge
     b. [x] scatter for surge
     c. [x] stats per station for surge
-    d. [ ] output series for surge
-    c. [ ] aggregated values (aggregated stats, predict time, number of model pars, ...)
-    d. [ ] time-selection
-    e. [ ] refine output_settings
-    f. [ ] similar for tides, waves and interaction
-    g. [ ] extend for tides
+    d. [x] output series for surge
+    e. [x] aggregated values (aggregated stats, predict time, number of model pars, ...)
+    f. [x] time-selection and fft plots
+    g. [x] refine output_settings
+    h. [ ] similar for tides, waves and interaction
+    i. [ ] extend for tides
 10. Create leaderboard
 11. Create a baseline for each model type
 12. Create script for real-time forecasts
@@ -73,8 +73,9 @@ Steps 7 and 8 are complete. `validate_and_augment_settings!`, model registry, `c
 `train.jl`, `predict.jl`, 8 example TOMLs in `examples/`. All smoke-test clean (11 PASS).
 501 tests pass.
 
-Step 9 in progress. 9a–9c complete: timeseries plots (`<name>_timeseries/`), scatter plots
-(`<name>_scatter/`, via `MultiTimeSeries.scatter`), per-station stats (`stats_<name>.csv`,
-via `MultiTimeSeries.compute_statistics`). Design in `docs/output_settings.md`. 511 tests pass.
+Step 9 in progress. 9a–9f complete: timeseries plots, scatter, per-station stats, series
+output, `summary.toml`, FFT plots (`<name>_fft/`, via `hatyan_core.fft_series` + `plot`),
+and `timerange` per-entry filtering (strings accepted by `select_timespan`).
+Design in `docs/output_settings.md`. 527 tests pass.
 
 

@@ -1,29 +1,66 @@
 using Plots
-using FFTW
 using Statistics
 using Printf: @sprintf
 using CSV
+using hatyan_core: fft_series, TimeSeries, get_values, get_times, get_names,
+                   get_longitudes, get_latitudes, get_quantity, get_source,
+                   get_frequencies, get_amplitudes
 
 # ──────────────────────────────────────────────────────────────────────────────
-# FFT plotting helpers (used by _plot_station_series and by tides.jl)
+# FFT plot helper
 # ──────────────────────────────────────────────────────────────────────────────
 
-function plot_fft(signal, times, label)
-    n  = length(signal)
-    dt = (times[2] - times[1]).value / 3.6e6
-    fft_out = fftshift(FFTW.fft(signal)) * 2 / n
-    freqs   = fftshift(fftfreq(n, 1/dt))
-    plot(freqs, abs.(fft_out); xlabel="Frequency (1/Hrs)", ylabel="Amplitude",
-         xlims=(0, 0.5), label)
-end
+"""
+    _plot_station_fft(output, target, save_dir;
+                      timerange=nothing, station_names=nothing)
 
-function plot_fft!(fig, signal, times, label)
-    n  = length(signal)
-    dt = (times[2] - times[1]).value / 3.6e6
-    fft_out = fftshift(FFTW.fft(signal)) * 2 / n
-    freqs   = fftshift(fftfreq(n, 1/dt))
-    plot!(fig, freqs, abs.(fft_out); xlabel="Frequency (1/Hrs)", ylabel="Amplitude",
-          xlims=(0, 0.5), label)
+Internal helper used by `write_outputs`.  Produces a 2-panel FFT plot per
+station (observed + predicted spectra on top, residual spectrum below) and
+saves one PNG per station to `save_dir` (which must already exist).
+"""
+function _plot_station_fft(output::Dict{String, TimeSeries},
+                            target::Dict{String, TimeSeries},
+                            save_dir::String;
+                            timerange     = nothing,
+                            station_names = nothing)
+
+    out_key = first(keys(output))
+    ts_pred = output[out_key]
+    ts_true = target[out_key]
+
+    t_start = get_times(ts_pred)[1]
+    t_end   = get_times(ts_pred)[end]
+    ts_true = select_timespan(ts_true, t_start, t_end)
+
+    if !isnothing(station_names)
+        ts_pred = select_locations_by_names(ts_pred, station_names)
+        ts_true = select_locations_by_names(ts_true, station_names)
+    end
+    if !isnothing(timerange)
+        ts_pred = select_timespan(ts_pred, timerange[1], timerange[2])
+        ts_true = select_timespan(ts_true, timerange[1], timerange[2])
+    end
+
+    residual_vals = get_values(ts_true) .- get_values(ts_pred)
+    ts_residual   = TimeSeries(residual_vals, get_times(ts_pred),
+                               get_names(ts_pred), get_longitudes(ts_pred),
+                               get_latitudes(ts_pred), get_quantity(ts_pred),
+                               get_source(ts_pred) * " | residual")
+
+    fs_true     = fft_series(ts_true)
+    fs_pred     = fft_series(ts_pred)
+    fs_residual = fft_series(ts_residual)
+    names       = get_names(ts_pred)
+    freqs_cpd   = get_frequencies(fs_true) .* 86400.0   # Hz → cycles/day
+
+    for (i, station) in enumerate(names)
+        # observations + predicted overlaid on one panel
+        p1 = plot(fs_true; location_index=i, label="Observations")
+        plot!(p1, freqs_cpd, get_amplitudes(fs_pred)[i, :]; label="Predicted")
+        p2 = plot(fs_residual; location_index=i, label="Residual")
+        plot(p1, p2; layout=(2, 1), size=(800, 600))
+        savefig(joinpath(save_dir, "$(station).png"))
+    end
 end
 
 # ──────────────────────────────────────────────────────────────────────────────

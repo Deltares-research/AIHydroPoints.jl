@@ -28,7 +28,7 @@ include("input_processing.jl")
 export validate_and_augment_settings!
 
 include("plot_utils.jl")
-export save_loss_plot, plot_fft, plot_fft!
+export save_loss_plot
 
 include("models/training_settings.jl")
 export TrainingSettings, to_dict

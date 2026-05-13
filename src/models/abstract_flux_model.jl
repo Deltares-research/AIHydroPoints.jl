@@ -13,6 +13,7 @@
 
 using Flux
 using JLD2
+using Statistics: mean
 
 # ──────────────────────────────────────────────────────────────────────────────
 # AbstractFluxModel
@@ -262,11 +263,12 @@ function write_outputs(model::AbstractFluxModel, data::Dict, output_settings::Di
         timerange = get(entry, "timerange", nothing)
 
         do_timeseries = get(entry, "timeseries",   split == "testing")
+        do_fft        = get(entry, "fft",          false)
         do_scatter    = get(entry, "scatter",      false)
         do_stats      = get(entry, "write_stats",  split == "testing")
         do_series     = get(entry, "write_series", false)
 
-        if do_timeseries || do_scatter || do_stats || do_series
+        if do_timeseries || do_fft || do_scatter || do_stats || do_series
             out = predict(model, data[split].input)
 
             if do_timeseries
@@ -274,6 +276,13 @@ function write_outputs(model::AbstractFluxModel, data::Dict, output_settings::Di
                 mkpath(subdir)
                 _plot_station_series(out, data[split].target, subdir;
                                      timerange = timerange)
+            end
+
+            if do_fft
+                subdir = joinpath(save_dir, "$(name)_fft")
+                mkpath(subdir)
+                _plot_station_fft(out, data[split].target, subdir;
+                                  timerange = timerange)
             end
 
             if do_scatter
@@ -295,6 +304,38 @@ function write_outputs(model::AbstractFluxModel, data::Dict, output_settings::Di
                                       timerange = timerange)
             end
         end
+    end
+
+    if get(output_settings, "write_summary", true)
+        settings = get_settings(model)
+        summary  = Dict{String,Any}()
+        summary["model_name"]    = settings["model_name"]
+        summary["out_quantities"] = settings["out_quantities"]
+        summary["n_params"]      = sum(length, Flux.trainables(get_flux_model(model)))
+        if haskey(output_settings, "train_time_s")
+            summary["train_time_s"] = output_settings["train_time_s"]
+        end
+
+        for entry in outputs
+            split = entry["split"]
+            haskey(data, split) || continue
+            name = get(entry, "name", split)
+
+            t0  = time()
+            out = predict(model, data[split].input)
+            summary["predict_time_$(name)_s"] = round(time() - t0; digits=3)
+
+            out_key  = first(keys(out))
+            ts_pred  = out[out_key]
+            ts_true  = data[split].target[out_key]
+            t_start  = get_times(ts_pred)[1]
+            t_end    = get_times(ts_pred)[end]
+            ts_true  = select_timespan(ts_true, t_start, t_end)
+            errors   = get_values(ts_true) .- get_values(ts_pred)
+            summary["rmse_$(name)"] = round(sqrt(mean(abs2, errors)); digits=6)
+        end
+
+        toml_write(joinpath(save_dir, "summary.toml"), summary; overwrite=true)
     end
 
     return nothing

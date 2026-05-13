@@ -22,6 +22,25 @@ end
     @test isfile(joinpath(subdir, "StationB.png"))
 end
 
+@testset "_plot_station_fft" begin
+    subdir = joinpath(temp_dir, "fft_test")
+    mkpath(subdir)
+    AIHydroPoints._plot_station_fft(_plot_ts_pred, _plot_ts_true, subdir)
+    @test isfile(joinpath(subdir, "StationA.png"))
+    @test isfile(joinpath(subdir, "StationB.png"))
+end
+
+@testset "timerange filtering" begin
+    subdir = joinpath(temp_dir, "timerange_test")
+    mkpath(subdir)
+    # restrict to first 10 hours — files should still be produced
+    t0 = Dates.format(DateTime(2012,1,1),        "yyyy-mm-ddTHH:MM:SS")
+    t1 = Dates.format(DateTime(2012,1,1)+Hour(9), "yyyy-mm-ddTHH:MM:SS")
+    AIHydroPoints._plot_station_series(_plot_ts_pred, _plot_ts_true, subdir;
+                                       timerange=[t0, t1])
+    @test isfile(joinpath(subdir, "StationA.png"))
+end
+
 @testset "_plot_station_scatter" begin
     subdir = joinpath(temp_dir, "scatter_test")
     mkpath(subdir)

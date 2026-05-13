@@ -30,4 +30,9 @@ split     = "testing"
 variables = ["stress_x", "stress_y", "pressure"]
 
 [output_settings]
-plot_test = false
+write_summary = false
+
+[[output_settings.outputs]]
+split       = "testing"
+timeseries  = true
+write_stats = true

@@ -33,8 +33,8 @@ the label in output file names; if omitted, the `split` label is used.
 | `write_stats` | `true` if split is `"testing"`, else `false` | Write per-station statistics (RMSE, bias, correlation) to `stats_<name>.csv`. |
 | `write_series` | `false` | Write predicted time series to `series_<name>.<ext>` in `series_format`. |
 
-If no `[[output_settings.outputs]]` entries are given, a single default test entry is used
-(equivalent to `split = "test"` with per-entry defaults applied).
+If no `[[output_settings.outputs]]` entries are given, a single default entry is used
+(equivalent to `split = "testing"` with per-entry defaults applied).
 
 ---
 
@@ -99,19 +99,24 @@ write_series = false
 
 ## Current status
 
-The `[[output_settings.outputs]]` design described above is **not yet implemented**.
+The `[[output_settings.outputs]]` design is implemented in
+`src/models/abstract_flux_model.jl` (`write_outputs`) and
+`src/plot_utils.jl` (helpers).
 
-What is currently implemented (in `src/models/abstract_flux_model.jl`) is a simpler
-flat `[output_settings]` with three global boolean keys:
+### Implemented
 
-| Key | Default | Description |
+| Feature | Key | Notes |
 |---|---|---|
-| `plot_train` | `false` | Plot predictions vs observations for the training split. |
-| `plot_test` | `true` | Plot predictions vs observations for the testing split. |
-| `plot_fft` | `false` | Add FFT spectral panels to each station plot. |
+| Time-series plot | `timeseries` | `_plot_station_series`; 2-panel (predicted + residual) |
+| FFT plot | `fft` | `_plot_station_fft`; 2-panel (obs + pred spectrum, residual spectrum); uses `hatyan_core.fft_series` |
+| Scatter plot | `scatter` | `_plot_station_scatter`; uses `MultiTimeSeries.scatter` |
+| Per-station stats | `write_stats` | `_write_station_stats`; uses `MultiTimeSeries.compute_statistics`; writes CSV |
+| Series output | `write_series` | `_write_station_series`; supports `"netcdf"`, `"jld2"`, `"noos"` |
+| Run summary | `write_summary` | writes `summary.toml` with `model_name`, `out_quantities`, `n_params`, `train_time_s`, `rmse_<name>`, `predict_time_<name>_s` |
+| `timerange` per entry | `timerange` | ISO-8601 strings; restricts all outputs to the specified window |
 
-These produce one PNG per station (2-panel or 4-panel with FFT) via
-`_plot_station_series` in `src/plot_utils.jl`. No scatter, no stats, no series output,
-no event windows.
+### Not yet implemented
 
-Migration to the new design is tracked under step 9 of `plan.md`.
+| Feature | Key | Tracked in |
+|---|---|---|
+| Tides / waves / interaction | — | plan.md 9h–9i |

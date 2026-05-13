@@ -33,10 +33,24 @@ model_dir    = joinpath(examples_dir, "training_output", "example_LinearSurgeMod
 
         # per-station stats CSV is produced
         @test isfile(joinpath(model_dir, "stats_testing.csv"))
+
+        # summary.toml is produced with expected keys
+        summary = toml_read(joinpath(model_dir, "summary.toml"))
+        @test haskey(summary, "model_name")
+        @test haskey(summary, "out_quantities")
+        @test haskey(summary, "n_params")
+        @test haskey(summary, "train_time_s")
+        @test haskey(summary, "rmse_testing")
+        @test haskey(summary, "predict_time_testing_s")
     end
 
     @testset "predict" begin
         predict(predict_toml)
+        predict_dir = joinpath(examples_dir, "predict_output",
+                               "example_predict_LinearSurgeModel")
+        @test isdir(predict_dir)
+        @test isdir(joinpath(predict_dir, "testing_timeseries"))
+        @test isfile(joinpath(predict_dir, "stats_testing.csv"))
     end
 
 end
