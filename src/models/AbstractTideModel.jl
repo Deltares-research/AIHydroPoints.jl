@@ -143,10 +143,16 @@ On first call, `"out_names"`, `"out_lons"`, `"out_lats"`, and `"out_quantity"`
 are added to model settings from `target["waterlevel"]`.
 
 Returns `(train_losses, val_losses)` as `Vector{Float32}` per epoch.
-`val_losses` is empty when `validation_split == 0`.
+`val_losses` is empty when `validation_split == 0` and no explicit validation
+data is provided.
+
+If `val_input` / `val_target` are supplied they are used directly and
+`validation_split` is ignored.
 """
 function train_model!(model::AbstractTideModel, train_settings::TrainingSettings,
-                      input::Dict{String, TimeSeries}, target::Dict{String, TimeSeries})
+                      input::Dict{String, TimeSeries}, target::Dict{String, TimeSeries};
+                      val_input::Union{Dict{String,TimeSeries},Nothing}  = nothing,
+                      val_target::Union{Dict{String,TimeSeries},Nothing} = nothing)
 
     settings = get_settings(model)
 
@@ -160,21 +166,30 @@ function train_model!(model::AbstractTideModel, train_settings::TrainingSettings
     end
 
     (x_station, x_doodson), _ = preprocess(model, input)
-    ntimes    = size(x_doodson, 2)
+    ntimes = size(x_doodson, 2)
 
     y_all = Float32.(get_values(target["waterlevel"]))   # (nstations, ntimes)
 
-    # Temporal train/validation split
-    n_val   = round(Int, train_settings.validation_split * ntimes)
-    has_val = n_val > 0
-    n_train = ntimes - n_val
-
-    x_st      = x_station[:, :, 1:n_train]
-    x_w       = x_doodson[:, 1:n_train]
-    y         = y_all[:, 1:n_train]
-    x_st_val  = has_val ? x_station[:, :, n_train+1:end] : nothing
-    x_w_val   = has_val ? x_doodson[:, n_train+1:end]    : nothing
-    y_val     = has_val ? y_all[:, n_train+1:end]         : nothing
+    # Validation data: explicit split takes priority over validation_split
+    if !isnothing(val_input)
+        (x_st_val, x_w_val), _ = preprocess(model, val_input)
+        y_val   = Float32.(get_values(val_target["waterlevel"]))
+        has_val = true
+        n_train = ntimes
+        x_st    = x_station
+        x_w     = x_doodson
+        y       = y_all
+    else
+        n_val   = round(Int, train_settings.validation_split * ntimes)
+        has_val = n_val > 0
+        n_train = ntimes - n_val
+        x_st      = x_station[:, :, 1:n_train]
+        x_w       = x_doodson[:, 1:n_train]
+        y         = y_all[:, 1:n_train]
+        x_st_val  = has_val ? x_station[:, :, n_train+1:end] : nothing
+        x_w_val   = has_val ? x_doodson[:, n_train+1:end]    : nothing
+        y_val     = has_val ? y_all[:, n_train+1:end]         : nothing
+    end
 
     flux_model = get_flux_model(model)
     opt_state  = Flux.setup(Adam(train_settings.learning_rate), flux_model)

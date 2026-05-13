@@ -22,7 +22,7 @@ nfeats  = 64
 nlayers = 4
 
 [train_settings]
-nepochs          = 10
+nepochs          = 2000
 nbatches         = 64
 learning_rate    = 5.0e-3
 lr_decay_factor  = 0.1
@@ -35,9 +35,15 @@ input  = ["waterlevel"]
 target = ["waterlevel"]
 
 [[data_settings.files]]
-path      = "../test_data/tides_schureman_2011.nc"
+path      = "../test_data/tides_schureman_2010.nc"
 format    = "netcdf"
 split     = "training"
+variables = ["waterlevel"]
+
+[[data_settings.files]]
+path      = "../test_data/tides_schureman_2011.nc"
+format    = "netcdf"
+split     = "validation"
 variables = ["waterlevel"]
 
 [[data_settings.files]]
@@ -59,3 +65,32 @@ tidal_analysis_constituents = "month"  # "year" requires ~1 year of data; use "m
     timeseries = true
     tidal_analysis = true
     split = "testing"
+
+    [[output_settings.outputs]]
+    write_stats = true
+    fft = true
+    scatter = true
+    write_series = true
+    timeseries = true
+    tidal_analysis = true
+    split = "validation"
+
+    [[output_settings.outputs]]
+    write_stats = true
+    fft = true
+    scatter = true
+    write_series = true
+    timeseries = true
+    tidal_analysis = true
+    split = "training"
+
+    [[output_settings.outputs]]
+    split        = "testing"
+    name         = "storm_andrea_2012"
+    timerange    = ["2012-01-02", "2012-01-08"]
+    timeseries   = true
+    fft          = false
+    scatter      = false
+    write_stats  = true
+    write_series = false
+

@@ -49,7 +49,10 @@ function train(input_toml::String)
 
     model = create_model(model_settings, train_input)
     t0 = time()
-    train_losses, val_losses = train_model!(model, train_settings, train_input, train_target)
+    val_input  = haskey(data, "validation") ? data["validation"].input  : nothing
+    val_target = haskey(data, "validation") ? data["validation"].target : nothing
+    train_losses, val_losses = train_model!(model, train_settings, train_input, train_target;
+                                            val_input=val_input, val_target=val_target)
     train_time_s = round(time() - t0; digits=1)
 
     save_params(model, joinpath(save_dir, "params.jld2"); overwrite=true)

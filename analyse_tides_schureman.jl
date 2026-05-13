@@ -21,7 +21,9 @@ using Statistics
 # Configuration
 # ──────────────────────────────────────────────
 year       = length(ARGS) >= 1 ? ARGS[1] : "2010"
-input_file = joinpath(@__DIR__, "test_data", "DCSM-FM_0_5nm_$(year)_5stations_his.jld2")
+
+# input_file = joinpath(@__DIR__, "test_data", "DCSM-FM_0_5nm_$(year)_5stations_his.jld2")
+input_file = joinpath(@__DIR__, "data","DCSM-FM_0_5nm_2010_5stations_his.jld2") # temporary check
 output_dir = joinpath(@__DIR__, "output_tides_$(year)")
 method     = "schureman"
 
@@ -35,7 +37,9 @@ mkpath(output_dir)
 # Load data
 # ──────────────────────────────────────────────
 @info "Loading $input_file"
-ts = JLD2TimeSeries(input_file, varname="waterlevel")
+# ts = JLD2TimeSeries(input_file, varname="waterlevel")
+ts = JLD2TimeSeries(input_file,)
+
 @show ts
 
 stations  = get_names(ts)

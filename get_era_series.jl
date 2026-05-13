@@ -48,13 +48,13 @@ zarr_data = RasterStack(zarr_url; lazy=true)
 # Selection parameters
 #
 # time range
-tstart=DateTime(2008,1,1)
-tend=DateTime(2009,1,1)
+tstart=DateTime(2010,1,1)
+tend=DateTime(2011,1,1)
 # points coordinates
 x_points = [ 3.0, 3.75, 4.25, 5.25, 6.5, 0.0,  5.0, 0.0, 0.0]
 y_points = [51.5,52.0 ,53.0 ,53.25,53.75,56.0,56.0,60.0,50.25]
 # filenames for output
-output_files = ["era5_2008_9points_$(quantity).jld2" for quantity in ["wind_stress_x","wind_stress_y","mean_sea_level_pressure"]]
+output_files = ["era5_2010_9points_$(quantity).jld2" for quantity in ["wind_stress_x","wind_stress_y","mean_sea_level_pressure"]]
 
 function download_points_from_maps(dataset,variable_name,start_time::DateTime,end_time::DateTime,x_points,y_points,source,time_chunksize=240)
     println("Downloading variable $(variable_name) for points and time range...")

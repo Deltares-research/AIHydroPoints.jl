@@ -196,6 +196,8 @@ function _write_station_stats(output::Dict{String, TimeSeries},
     if !isnothing(station_names)
         ts_pred = select_locations_by_names(ts_pred, station_names)
         ts_true = select_locations_by_names(ts_true, station_names)
+    else
+        ts_pred = select_locations_by_names(ts_pred, get_names(ts_true))
     end
     if !isnothing(timerange)
         ts_pred = select_timespan(ts_pred, timerange[1], timerange[2])

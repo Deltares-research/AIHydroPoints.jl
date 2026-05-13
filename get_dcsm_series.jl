@@ -28,8 +28,8 @@ source="DCSM-FM_0_5nm_1980-2023"
 his_data=ZarrTimeSeries(url_or_filename, quantity, source)
 
 # Select time range
-start_date = DateTime(2012,1,1)
-end_date = DateTime(2013,1,1)
+start_date = DateTime(2010,1,1)
+end_date = DateTime(2011,1,1)
 println("Selecting time range from $(start_date) to $(end_date) and downloading data. Please wait...")
 his_data_timesel = select_timespan(his_data, start_date, end_date)
 println("Time range selected.")
@@ -40,8 +40,12 @@ station_ids = find_location_index(station_names, all_station_names)
 his_data_selected = select_locations_by_ids(his_data_timesel, station_ids)
 
 
+# Coarsen to hourly values (if needed)
+# Use function select_timerange_with_fill(ts::AbstractTimeSeries, time_range::StepRange{DateTime, <:TimePeriod}; fill_value=nothing)
+his_data_selected = select_timerange_with_fill(his_data_selected, DateTime(2010,1,1):Hour(1):DateTime(2011,1,1); fill_value=0.0)
+
 # Save to local file
-output_file = joinpath("data","DCSM-FM_0_5nm_2012_5stations_his.jld2")
+output_file = joinpath("data","DCSM-FM_0_5nm_2010_5stations_his.jld2")
 if isfile(output_file)
     rm(output_file)
     # error("Output file $(output_file) already exists. Please remove it before running this script.")

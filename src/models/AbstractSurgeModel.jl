@@ -175,10 +175,16 @@ If `train_settings.validation_split > 0`, the last fraction of the time series
 is held out as a validation set and its RMSE is shown in the progress bar.
 
 Returns `(train_losses, val_losses)` as `Vector{Float32}` per epoch.
-`val_losses` is empty when `validation_split == 0`.
+`val_losses` is empty when `validation_split == 0` and no explicit validation
+data is provided.
+
+If `val_input` / `val_target` are supplied they are used directly and
+`validation_split` is ignored.
 """
 function train_model!(model::AbstractSurgeModel, train_settings::TrainingSettings,
-                      input::Dict{String, TimeSeries}, target::Dict{String, TimeSeries})
+                      input::Dict{String, TimeSeries}, target::Dict{String, TimeSeries};
+                      val_input::Union{Dict{String,TimeSeries},Nothing}  = nothing,
+                      val_target::Union{Dict{String,TimeSeries},Nothing} = nothing)
 
     settings = get_settings(model)
 
@@ -200,14 +206,25 @@ function train_model!(model::AbstractSurgeModel, train_settings::TrainingSetting
     ts_target = first(values(target))
     y_all = Float32.(get_values(ts_target))[:, nlags:end]
 
-    # Temporal train/validation split
-    n_val   = round(Int, train_settings.validation_split * nfull)
-    has_val = n_val > 0
-    n_train = nfull - n_val
-    x = x_all[:, 1:n_train]
-    y = y_all[:, 1:n_train]
-    x_val = has_val ? x_all[:, n_train+1:end] : nothing
-    y_val = has_val ? y_all[:, n_train+1:end] : nothing
+    # Validation data: explicit split takes priority over validation_split
+    if !isnothing(val_input)
+        val_tensor, _ = preprocess(model, val_input)
+        _, nf_v, nl_v, nv = size(val_tensor)
+        x_val   = reshape(val_tensor, nf_v * nl_v, nv)
+        y_val   = Float32.(get_values(first(values(val_target))))[:, nlags:end]
+        has_val = true
+        n_train = nfull
+        x       = x_all
+        y       = y_all
+    else
+        n_val   = round(Int, train_settings.validation_split * nfull)
+        has_val = n_val > 0
+        n_train = nfull - n_val
+        x       = x_all[:, 1:n_train]
+        y       = y_all[:, 1:n_train]
+        x_val   = has_val ? x_all[:, n_train+1:end] : nothing
+        y_val   = has_val ? y_all[:, n_train+1:end] : nothing
+    end
 
     # Training loop
     flux_model = get_flux_model(model)
