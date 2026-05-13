@@ -39,7 +39,7 @@ DEFAULT_SETTINGS = Dict{String, Any}(
     "model_pars" => Dict{String, Any}("channels" => [32, 16, 1]),
 )
 
-function make_settings(; nstations=3)
+function make_cim_settings(; nstations=3)
     return Dict{String, Any}(
         "nlocations_output"  => nstations,
         "nlags"      => 8,
@@ -52,7 +52,7 @@ end
 # ──────────────────────────────────────────────────────────────────────────────
 
 @testset "ConvInteractionModel construction" begin
-    m = ConvInteractionModel(make_settings())
+    m = ConvInteractionModel(make_cim_settings())
     @test m isa AbstractInteractionModel
     @test m isa AbstractFluxModel
     @test m isa AbstractModel
@@ -74,7 +74,7 @@ end
 
 @testset "ConvInteractionModel preprocess" begin
     nstations = 3; ntimes = 50; nlags = 8
-    m = ConvInteractionModel(make_settings(nstations=nstations))
+    m = ConvInteractionModel(make_cim_settings(nstations=nstations))
     input, _ = inter_make_data(nstations=nstations, ntimes=ntimes)
 
     (x_station, x_ts), output = preprocess(m, input)
@@ -102,7 +102,7 @@ end
 @testset "ConvInteractionModel forward" begin
     nstations = 3; nlags = 8; ntimes = 14   # nsamples = nstations * ntimes must be exact
     nsamples  = nstations * ntimes
-    m = ConvInteractionModel(make_settings(nstations=nstations))
+    m = ConvInteractionModel(make_cim_settings(nstations=nstations))
 
     x_station = Flux.onehotbatch(rand(1:nstations, nsamples), 1:nstations)
     x_ts      = randn(Float32, nlags, 2, nsamples)
@@ -119,7 +119,7 @@ end
 
 @testset "ConvInteractionModel train_model!" begin
     nstations = 3; ntimes = 80
-    m = ConvInteractionModel(make_settings(nstations=nstations))
+    m = ConvInteractionModel(make_cim_settings(nstations=nstations))
     input, target = inter_make_data(nstations=nstations, ntimes=ntimes)
 
     ts = TrainingSettings(nepochs=3, nbatches=16, learning_rate=1e-3)
@@ -145,7 +145,7 @@ end
 
     # With validation split
     ts_val = TrainingSettings(nepochs=3, nbatches=16, learning_rate=1e-3, validation_split=0.2)
-    m2 = ConvInteractionModel(make_settings(nstations=nstations))
+    m2 = ConvInteractionModel(make_cim_settings(nstations=nstations))
     train_losses2, val_losses2 = train_model!(m2, ts_val, input, target)
     @test length(val_losses2) == ts_val.nepochs
     @test all(val_losses2 .>= 0f0)
@@ -157,7 +157,7 @@ end
 
 @testset "ConvInteractionModel predict" begin
     nstations = 3; ntimes = 60; nlags = 8
-    m = ConvInteractionModel(make_settings(nstations=nstations))
+    m = ConvInteractionModel(make_cim_settings(nstations=nstations))
     input, target = inter_make_data(nstations=nstations, ntimes=ntimes)
 
     ts = TrainingSettings(nepochs=2, nbatches=16, learning_rate=1e-3)
@@ -181,7 +181,7 @@ end
 # ──────────────────────────────────────────────────────────────────────────────
 
 @testset "ConvInteractionModel save/load params" begin
-    m  = ConvInteractionModel(make_settings())
+    m  = ConvInteractionModel(make_cim_settings())
     fn = joinpath(temp_dir, "conv_interaction_params.jld2")
 
     save_params(m, fn)
@@ -192,7 +192,7 @@ end
     bad_path = joinpath(temp_dir, "nonexistent_dir", "params.jld2")
     @test_throws ErrorException save_params(m, bad_path)
 
-    m2 = ConvInteractionModel(make_settings())
+    m2 = ConvInteractionModel(make_cim_settings())
     load_params!(m2, fn)
     @test Flux.state(get_flux_model(m2)) == Flux.state(get_flux_model(m))
 end

@@ -47,10 +47,15 @@ split     = "testing"
 variables = ["waterlevel"]
 
 [output_settings]
+write_summary = true
+series_format = "netcdf"
 tidal_analysis_constituents = "month"  # "year" requires ~1 year of data; use "month" for short test runs
 
-[[output_settings.outputs]]
-split          = "testing"
-timeseries     = true
-tidal_analysis = true
-write_stats    = true
+    [[output_settings.outputs]]
+    write_stats = true
+    fft = true
+    scatter = true
+    write_series = true
+    timeseries = true
+    tidal_analysis = true
+    split = "testing"

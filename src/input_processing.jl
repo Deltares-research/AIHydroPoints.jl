@@ -102,12 +102,13 @@ function validate_and_augment_settings!(
     get!(out, "write_summary", true)
     if !haskey(out, "outputs")
         out["outputs"] = [Dict{String,Any}(
-            "split"        => "testing",
-            "timeseries"   => true,
-            "fft"          => false,
-            "scatter"      => false,
-            "write_stats"  => true,
-            "write_series" => false,
+            "split"           => "testing",
+            "timeseries"      => true,
+            "fft"             => false,
+            "scatter"         => false,
+            "write_stats"     => true,
+            "write_series"    => false,
+            "tidal_analysis"  => false,
         )]
     end
 

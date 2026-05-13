@@ -37,7 +37,7 @@ function make_surge_target(; nstations=2, ntimes=30)
 end
 
 """Settings with output metadata pre-filled (for tests that bypass train_model!)."""
-function make_settings(; nstations=2, nwind=3, nlags=4)
+function make_lsm_settings(; nstations=2, nwind=3, nlags=4)
     return Dict{String, Any}(
         "nlocations_output"    => nstations,
         "nlocations_input"        => nwind,
@@ -72,7 +72,7 @@ end
 
 @testset "LinearSurgeModel preprocess" begin
     nwind = 3; nstations = 2; ntimes = 30; nlags = 4
-    m     = LinearSurgeModel(make_settings(nstations=nstations, nwind=nwind, nlags=nlags))
+    m     = LinearSurgeModel(make_lsm_settings(nstations=nstations, nwind=nwind, nlags=nlags))
     nvalid = ntimes - nlags + 1
 
     for use_wind_keys in (false, true)
@@ -95,7 +95,7 @@ end
 
 @testset "LinearSurgeModel forward" begin
     nwind = 3; nstations = 2; nlags = 4; ntimes = 20
-    m = LinearSurgeModel(make_settings(nstations=nstations, nwind=nwind, nlags=nlags))
+    m = LinearSurgeModel(make_lsm_settings(nstations=nstations, nwind=nwind, nlags=nlags))
 
     x = zeros(Float32, 1, 3*nwind, nlags, ntimes)
     y = forward(m, x)
@@ -147,7 +147,7 @@ end
 
 @testset "LinearSurgeModel predict" begin
     nwind = 3; nstations = 2; ntimes = 30; nlags = 4
-    m      = LinearSurgeModel(make_settings(nstations=nstations, nwind=nwind, nlags=nlags))
+    m      = LinearSurgeModel(make_lsm_settings(nstations=nstations, nwind=nwind, nlags=nlags))
     input  = make_surge_input(nwind=nwind, ntimes=ntimes)
 
     output = predict(m, input)
@@ -165,7 +165,7 @@ end
 # ──────────────────────────────────────────────────────────────────────────────
 
 @testset "LinearSurgeModel save/load params" begin
-    m  = LinearSurgeModel(make_settings())
+    m  = LinearSurgeModel(make_lsm_settings())
 
     W_orig = copy(get_flux_model(m).weight)
     b_orig = copy(get_flux_model(m).bias)

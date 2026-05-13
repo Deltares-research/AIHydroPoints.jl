@@ -14,6 +14,7 @@
 using Flux
 using JLD2
 using Statistics: mean
+using hatyan_core: constituent_list
 
 # ──────────────────────────────────────────────────────────────────────────────
 # AbstractFluxModel
@@ -262,13 +263,15 @@ function write_outputs(model::AbstractFluxModel, data::Dict, output_settings::Di
         name      = get(entry, "name",      split)
         timerange = get(entry, "timerange", nothing)
 
-        do_timeseries = get(entry, "timeseries",   split == "testing")
-        do_fft        = get(entry, "fft",          false)
-        do_scatter    = get(entry, "scatter",      false)
-        do_stats      = get(entry, "write_stats",  split == "testing")
-        do_series     = get(entry, "write_series", false)
+        do_timeseries     = get(entry, "timeseries",      split == "testing")
+        do_fft            = get(entry, "fft",             false)
+        do_scatter        = get(entry, "scatter",         false)
+        do_stats          = get(entry, "write_stats",     split == "testing")
+        do_series         = get(entry, "write_series",    false)
+        do_tidal_analysis = get(entry, "tidal_analysis",  false) &&
+                            model isa AbstractTideModel
 
-        if do_timeseries || do_fft || do_scatter || do_stats || do_series
+        if do_timeseries || do_fft || do_scatter || do_stats || do_series || do_tidal_analysis
             out = predict(model, data[split].input)
 
             if do_timeseries
@@ -302,6 +305,18 @@ function write_outputs(model::AbstractFluxModel, data::Dict, output_settings::Di
                 fmt = get(output_settings, "series_format", "netcdf")
                 _write_station_series(out, data[split].target, save_dir, name, fmt;
                                       timerange = timerange)
+            end
+
+            if do_tidal_analysis
+                subdir = joinpath(save_dir, "$(name)_tidal_analysis")
+                mkpath(subdir)
+                clist_spec = get(output_settings, "tidal_analysis_constituents", "year")
+                clist = clist_spec isa Vector ? clist_spec : constituent_list(clist_spec)
+                max_c = get(output_settings, "tidal_analysis_max_constituents", 20)
+                _plot_station_tidal_analysis(out, data[split].target, subdir;
+                                             const_list       = clist,
+                                             max_constituents = max_c,
+                                             timerange        = timerange)
             end
         end
     end

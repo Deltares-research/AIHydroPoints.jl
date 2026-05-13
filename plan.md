@@ -34,8 +34,10 @@ The main goal of this project is to develop a machine learning model for predict
     e. [x] aggregated values (aggregated stats, predict time, number of model pars, ...)
     f. [x] time-selection and fft plots
     g. [x] refine output_settings
-    h. [ ] similar for tides, waves and interaction
-    i. [ ] extend for tides
+    h. [x] similar for tides, waves and interaction
+    i. [x] extend for tides: added `tidal_analysis = true` output option for tide models; runs hatyan_core `analysis` on obs and pred, saves per-station amplitude+phase comparison PNG to `<name>_tidal_analysis/`; `tidal_analysis_constituents` and `tidal_analysis_max_constituents` are configurable.
+    j. [ ] check with explicit validation data
+    k. [ ] feed all settings to create output?
 10. Create leaderboard
 11. Create a baseline for each model type
 12. Create script for real-time forecasts
@@ -73,9 +75,9 @@ Steps 7 and 8 are complete. `validate_and_augment_settings!`, model registry, `c
 `train.jl`, `predict.jl`, 8 example TOMLs in `examples/`. All smoke-test clean (11 PASS).
 501 tests pass.
 
-Step 9 in progress. 9a–9f complete: timeseries plots, scatter, per-station stats, series
-output, `summary.toml`, FFT plots (`<name>_fft/`, via `hatyan_core.fft_series` + `plot`),
-and `timerange` per-entry filtering (strings accepted by `select_timespan`).
-Design in `docs/output_settings.md`. 527 tests pass.
+Step 9 in progress. 9a–9h complete: all output types (timeseries, scatter, fft, stats,
+series, summary) work generically for all model types via `AbstractFluxModel.write_outputs`.
+Predict writes to `predict_output/` separately from `training_output/`. `plot_fft`/`plot_fft!`
+removed (replaced by `hatyan_core.fft_series`). 530 tests, 11 smoke tests pass.
 
 

@@ -4,7 +4,8 @@ using Printf: @sprintf
 using CSV
 using hatyan_core: fft_series, TimeSeries, get_values, get_times, get_names,
                    get_longitudes, get_latitudes, get_quantity, get_source,
-                   get_frequencies, get_amplitudes
+                   get_frequencies, get_amplitudes,
+                   analysis, get_constituent_names, constituent_list
 
 # ──────────────────────────────────────────────────────────────────────────────
 # FFT plot helper
@@ -261,6 +262,81 @@ function _write_station_series(output::Dict{String, TimeSeries},
         end
     else
         error("Unknown series_format: \"$format\". Use \"netcdf\", \"jld2\", or \"noos\".")
+    end
+end
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Tidal analysis plot helper
+# ──────────────────────────────────────────────────────────────────────────────
+
+"""
+    _plot_station_tidal_analysis(output, target, save_dir;
+                                 const_list=nothing, max_constituents=20,
+                                 timerange=nothing, station_names=nothing)
+
+Internal helper used by `write_outputs` for tide models.  Runs harmonic analysis
+on both the observed target and the model predictions, then saves a 2-panel
+comparison plot per station to `save_dir`:
+- Panel 1: amplitude bar chart (observations and predicted side by side).
+- Panel 2: phase scatter (observations and predicted overlaid).
+
+`const_list` is a `Vector{String}` of constituent names.  Defaults to
+`constituent_list("year")`.  Pass a shorter list (e.g. `constituent_list("month")`)
+for short time series.
+
+Failures in `analysis` (e.g. time series too short) are caught and logged so
+that the remaining outputs are not interrupted.
+"""
+function _plot_station_tidal_analysis(output::Dict{String, TimeSeries},
+                                       target::Dict{String, TimeSeries},
+                                       save_dir::String;
+                                       const_list    = nothing,
+                                       max_constituents::Integer = 20,
+                                       timerange     = nothing,
+                                       station_names = nothing)
+
+    isnothing(const_list) && (const_list = constituent_list("year"))
+
+    out_key = first(keys(output))
+    ts_pred = output[out_key]
+    ts_true = target[out_key]
+
+    t_start = get_times(ts_pred)[1]
+    t_end   = get_times(ts_pred)[end]
+    ts_true = select_timespan(ts_true, t_start, t_end)
+
+    if !isnothing(station_names)
+        ts_pred = select_locations_by_names(ts_pred, station_names)
+        ts_true = select_locations_by_names(ts_true, station_names)
+    end
+    if !isnothing(timerange)
+        ts_pred = select_timespan(ts_pred, timerange[1], timerange[2])
+        ts_true = select_timespan(ts_true, timerange[1], timerange[2])
+    end
+
+    tc_obs  = try
+        analysis(ts_true, const_list)
+    catch e
+        @warn "Tidal analysis failed for observations: $e"
+        return
+    end
+    tc_pred = try
+        analysis(ts_pred, const_list)
+    catch e
+        @warn "Tidal analysis failed for predictions: $e"
+        return
+    end
+
+    names = get_names(ts_pred)
+    for (i, station) in enumerate(names)
+        p = plot(tc_obs, tc_pred;
+                 location_index  = i,
+                 label_ref       = "Observations",
+                 label_comp      = "Predicted",
+                 max_constituents = max_constituents,
+                 size            = (900, 600),
+        )
+        savefig(p, joinpath(save_dir, "$(station).png"))
     end
 end
 

@@ -57,7 +57,7 @@ end
 
 # Make into Flux layer for some nice utilities, switch all params to non-trainable
 Flux.@layer Deembedder
-Flux.trainable(m::Deembedder) = ()
+Flux.trainable(m::Deembedder) = (;)
 
 struct SinCosPosEmbedder{T}
     weights::AbstractArray{T,2}
@@ -94,7 +94,7 @@ end
 
 # Make into Flux layer for some nice utilities, switch all params to non-trainable
 Flux.@layer SinCosPosEmbedder
-Flux.trainable(m::SinCosPosEmbedder) = ()
+Flux.trainable(m::SinCosPosEmbedder) = (;)
 
 #########################
 # Attention & Transformer

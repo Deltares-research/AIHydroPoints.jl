@@ -91,16 +91,21 @@ end
 
 # ── validate_and_augment_settings! calls the hook ────────────────────────────
 
-@testset "validate_and_augment_settings! calls validate_model_settings!" begin
-    hook_called = Ref(false)
+# Dummy model type used only to test the validate_model_settings! hook,
+# so we never overwrite methods on real model types.
+struct _TestHookModel <: AIHydroPoints.AbstractSurgeModel end
+AIHydroPoints.MODEL_REGISTRY["_TestHookModel"] = _TestHookModel
 
-    # Temporarily add a method for LinearSurgeModel that sets the flag
-    AIHydroPoints.validate_model_settings!(::Type{LinearSurgeModel}, ms::Dict) =
-        (hook_called[] = true; nothing)
+hook_called = Ref(false)
+AIHydroPoints.validate_model_settings!(::Type{_TestHookModel}, ::Dict) =
+    (hook_called[] = true; nothing)
+
+@testset "validate_and_augment_settings! calls validate_model_settings!" begin
+    hook_called[] = false
 
     all_settings = Dict{String,Any}(
         "run_info"       => Dict{String,Any}("runid" => "test"),
-        "model_settings" => Dict{String,Any}("model_name" => "LinearSurgeModel", "nlags" => 4),
+        "model_settings" => Dict{String,Any}("model_name" => "_TestHookModel", "nlags" => 4),
         "train_settings" => Dict{String,Any}(),
         "data_settings"  => Dict{String,Any}("model_io" => Dict("input" => ["stress_x"], "target" => ["surge"])),
     )
@@ -109,7 +114,4 @@ end
 
     validate_and_augment_settings!(all_settings, train_input, train_target)
     @test hook_called[]
-
-    # Restore default no-op
-    AIHydroPoints.validate_model_settings!(::Type{LinearSurgeModel}, ::Dict) = nothing
 end

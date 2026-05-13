@@ -34,8 +34,8 @@ cuDNN = "02a925ec-e4fe-4b08-9a7e-0d78e3d38ccd"
 hatyan_core = "503641d4-5328-4570-8fe0-06fcdaed00b2"
 
 [sources]
-MultiTimeSeries = {url = "https://github.com/robot144/MultiTimeSeries.jl"}
-hatyan_core     = {url = "https://github.com/robot144/hatyan_core.jl"}
+MultiTimeSeries = {url = "https://github.com/robot144/MultiTimeSeries.jl", rev = "main"}
+hatyan_core     = {url = "https://github.com/robot144/hatyan_core.jl", rev = "main"}
 
 [compat]
 AWS = "1.92.0"
