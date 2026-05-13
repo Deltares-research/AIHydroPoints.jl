@@ -36,7 +36,7 @@ The main goal of this project is to develop a machine learning model for predict
     g. [x] refine output_settings
     h. [x] similar for tides, waves and interaction
     i. [x] extend for tides: added `tidal_analysis = true` output option for tide models; runs hatyan_core `analysis` on obs and pred, saves per-station amplitude+phase comparison PNG to `<name>_tidal_analysis/`; `tidal_analysis_constituents` and `tidal_analysis_max_constituents` are configurable.
-    j. [ ] check with explicit validation data
+    j. [x] check with explicit validation data
     k. [ ] feed all settings to create output?
 10. Create leaderboard
 11. Create a baseline for each model type
