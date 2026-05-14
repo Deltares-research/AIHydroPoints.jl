@@ -1,21 +1,15 @@
-# ConvSurgeModel — strided convolutional surge model
+# LinearSurgeModel — single Dense layer surge model (fast baseline)
 #
 # Usage:
-#   pixi run julia --project train.jl examples/ConvSurgeModel.toml
-#
-# Increase nepochs to 100+ for a meaningful training run.
+#   pixi run julia --project train.jl experiments/LinearSurgeModel.toml
 
 [run_info]
 runid       = "2010_base"
-description = "Convolutional surge model trained on 2011 ERA5 wind stress and Schureman surge."
+description = "Linear surge model trained on 2011 ERA5 wind stress and Schureman surge."
 
 [model_settings]
-model_name = "ConvSurgeModel"
+model_name = "LinearSurgeModel"
 nlags      = 16
-
-[model_settings.model_pars]
-channels   = [32, 16]
-filtersize = 3
 
 [train_settings]
 nepochs          = 400
@@ -75,4 +69,3 @@ series_format = "netcdf"
     scatter      = true
     write_stats  = true
     write_series = false
-

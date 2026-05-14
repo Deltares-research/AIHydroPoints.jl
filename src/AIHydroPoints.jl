@@ -98,6 +98,9 @@ export train
 include("predict.jl")
 export predict
 
+include("leaderboard.jl")
+export find_run_dirs, load_leaderboard, sort_leaderboard
+
 
 # Methods in the interface for time series
 # getters for the fields

@@ -10,7 +10,7 @@
 # Increase nepochs to 500+ for a meaningful training run.
 
 [run_info]
-runid       = "example"
+runid       = "2010_base"
 description = "Product tide model trained on 2011 Schureman tides."
 
 [model_settings]

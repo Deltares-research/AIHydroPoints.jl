@@ -21,8 +21,10 @@ NCDatasets = "85f8d34a-cbdd-5861-8df4-14fed0d494ab"
 NetCDF = "30363a11-5582-574a-97bb-aa9a979735b9"
 ParameterSchedulers = "d7d3b36b-41b8-4d0d-a2bf-768c6151755e"
 Plots = "91a5bcdd-55d7-5caf-9e0b-520d859cae80"
+PrettyTables = "08abe8d2-0d0c-5749-adfa-8a2ac140af0d"
 Printf = "de0858da-6303-5e67-8744-51eddeeeb8d7"
 ProgressMeter = "92933f4c-e287-5a05-a399-4b506db050ca"
+QuartoNotebookRunner = "4c0109c6-14e9-4c88-93f0-2b974d3468f4"
 Rasters = "a3a2b9e3-a471-40c9-b274-f788e487c689"
 Revise = "295af30f-e4ad-537b-8983-00126c2a3abe"
 Statistics = "10745b16-79ce-11e8-11f9-7d13ad32a3b2"
@@ -34,8 +36,8 @@ cuDNN = "02a925ec-e4fe-4b08-9a7e-0d78e3d38ccd"
 hatyan_core = "503641d4-5328-4570-8fe0-06fcdaed00b2"
 
 [sources]
-MultiTimeSeries = {url = "https://github.com/robot144/MultiTimeSeries.jl", rev = "main"}
-hatyan_core     = {url = "https://github.com/robot144/hatyan_core.jl", rev = "main"}
+MultiTimeSeries = {rev = "main", url = "https://github.com/robot144/MultiTimeSeries.jl"}
+hatyan_core = {rev = "main", url = "https://github.com/robot144/hatyan_core.jl"}
 
 [compat]
 AWS = "1.92.0"
@@ -55,8 +57,10 @@ NCDatasets = "0.14.6"
 NetCDF = "0.12.2"
 ParameterSchedulers = "0.4.3"
 Plots = "1.40.9"
+PrettyTables = "3.3.2"
 Printf = "1.11.0"
 ProgressMeter = "1.10.2"
+QuartoNotebookRunner = "0.18.1"
 Rasters = "0.14.2"
 Revise = "3.8.0"
 Statistics = "1.11.1"

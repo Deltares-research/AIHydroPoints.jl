@@ -1,0 +1,46 @@
+---
+title: "Model Leaderboard"
+format:
+  html:
+    toc: false
+    embed-resources: true
+engine: julia
+---
+
+```{julia}
+#| echo: false
+#| output: false
+using Pkg
+Pkg.activate(joinpath(@__DIR__, ".."))
+using AIHydroPoints
+using DataFrames
+using PrettyTables
+```
+
+## Surge Leaderboard
+
+```{julia}
+#| echo: false
+settings = Dict(
+    "root_dirs"  => joinpath(@__DIR__, "training_output"),
+    "quantities" => ["surge"],
+    "sort_by"    => "rmse_testing",
+    "ascending"  => true,
+)
+
+lb = load_leaderboard(settings["root_dirs"]; quantities=settings["quantities"])
+
+if isempty(lb)
+    @warn "No runs found."
+else
+    lb = sort_leaderboard(lb, settings["sort_by"]; ascending=settings["ascending"])
+    lb[!, :rank] = 1:nrow(lb)
+    select!(lb, :rank, :)
+end
+
+display_cols = [:rank, :runid, :model_name, :out_quantities, :rmse_testing,
+                :n_params, :train_time_s]
+available = [c for c in display_cols if c in propertynames(lb)]
+pretty_table(lb[!, available]; backend=:html, stand_alone=false, column_labels=string.(available))
+```
+

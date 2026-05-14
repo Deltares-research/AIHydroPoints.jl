@@ -26,25 +26,12 @@ The main goal of this project is to develop a machine learning model for predict
     h. [x] Move pipeline logic into `src/train.jl` (`train(toml)`) and `src/predict.jl` (`predict(toml)`), exported from the package. Root `train.jl` and `predict.jl` become thin CLI wrappers. Users can call `train`/`predict` directly after `using AIHydroPoints`.
     i. [x] Improve documentation of settings in `docs/settings.md` and `docs/data_input_settings.md`: clarified train vs predict required tables, moved `model_name` to required keys, fixed stale code examples, resolved TBD on path resolution.
 8. [x] Write a separate script for inference: `predict.jl` mirrors `train.jl` — reads a TOML with `[model_settings]` (model_dir), `[data_settings]`, and `[output_settings]`; loads trained weights and runs `write_outputs`. Example TOML at `examples/predict_ConvSurgeModel.toml`. Smoke-tested via `check_training_scripts.sh`.
-9. Improve output during training (see [docs/output_settings.md](docs/output_settings.md) for the target design)
-    a. [x] plot timeseries for surge
-    b. [x] scatter for surge
-    c. [x] stats per station for surge
-    d. [x] output series for surge
-    e. [x] aggregated values (aggregated stats, predict time, number of model pars, ...)
-    f. [x] time-selection and fft plots
-    g. [x] refine output_settings
-    h. [x] similar for tides, waves and interaction
-    i. [x] extend for tides: added `tidal_analysis = true` output option for tide models; runs hatyan_core `analysis` on obs and pred, saves per-station amplitude+phase comparison PNG to `<name>_tidal_analysis/`; `tidal_analysis_constituents` and `tidal_analysis_max_constituents` are configurable.
-    j. [x] check with explicit validation data
-    k. [x] feed all settings to create output?
-    l. [x] check locations when using a trained model.
-    m. [x] filenames for model parameters
+9. [x] Improve output during training — all output types (timeseries, scatter, fft, stats, series, tidal analysis, summary) work generically for all model types via `write_outputs`; explicit validation splits; location alignment at inference; explicit `model_weights` key; `params_best.jld2` and epoch checkpoints. See `docs/output_settings.md`.
 10. Create leaderboard
-    a. [ ] read all summary files and filter for selected runs
-    b. [ ] sort by a configured field to get the best model at the top
-    c. [ ] present results. Nice table, csv exports, etc
-    d. [ ] think about structure for maintained leaderboeards
+    a. [x] read all summary files and filter for selected runs
+    b. [x] sort by a configured field to get the best model at the top
+    c. [x] present results. Nice table, csv exports, etc — `experiments/leaderboard.ipynb`
+    d. [ ] think about structure for maintained leaderboards
 11. Create a baseline for each model type
     a. [ ] surge baselines 1yr, 5yr 20yr (determine timespans)
 12. Create script for real-time forecasts
@@ -82,14 +69,9 @@ Steps 7 and 8 are complete. `validate_and_augment_settings!`, model registry, `c
 `train.jl`, `predict.jl`, 8 example TOMLs in `examples/`. All smoke-test clean (11 PASS).
 501 tests pass.
 
-Step 9 in progress. 9a–9m complete: all output types (timeseries, scatter, fft, stats,
-series, summary) work generically for all model types via `AbstractFluxModel.write_outputs`.
-`write_outputs` now receives full `all_settings` so `runid`, `description`, and other
-sections are available for summary logging. Explicit validation data (2010/2011/2012 splits)
-tested for ConvSurgeModel and ProductTideModel. RMSE in summary correctly respects
-per-entry `timerange`. Location alignment at inference time: wrong order is auto-corrected,
-extra locations are dropped, missing locations give a readable error. Model weights are
-explicit via `model_weights` in settings; `params_best.jld2` saved when validation data
-is provided; epoch checkpoints supported. 543 tests, 11 smoke tests pass.
+Steps 7–9 are complete. `validate_and_augment_settings!`, model registry, `create_model`,
+generic `train`/`predict` pipelines, 8 example TOMLs, full output suite, location alignment
+at inference, explicit model weights with best-val and epoch checkpoints.
+543 tests, 11 smoke tests pass.
 
 
