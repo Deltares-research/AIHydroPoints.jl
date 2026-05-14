@@ -109,6 +109,12 @@ function preprocess(model::AbstractWaveModel, input::Dict{String, TimeSeries})
     nlags      = settings["nlags"]
     wind_scale = Float32(get(settings, "wind_scale", 0.5))
 
+    if haskey(settings, "in_names")
+        in_names = settings["in_names"]
+        input = Dict(k => _check_and_align_locations(v, in_names, "input[\"$k\"]")
+                     for (k, v) in input)
+    end
+
     u10  = input["wind_speed"]
     udir = input["wind_direction"]
 

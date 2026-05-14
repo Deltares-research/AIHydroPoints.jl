@@ -192,3 +192,46 @@ end
     @test get_flux_model(m).weight ≈ W_orig
     @test get_flux_model(m).bias   ≈ b_orig
 end
+
+@testset "preprocess location alignment" begin
+    settings = make_lsm_settings(; nstations=2, nwind=3, nlags=4)
+    settings["in_names"] = ["w1", "w2", "w3"]
+    settings["model_dir"] = temp_dir
+    m = LinearSurgeModel(settings)
+
+    ntimes = 20
+    times  = collect(DateTime(2020,1,1) .+ Hour.(0:ntimes-1))
+    make_wind_ts(names) = TimeSeries(
+        randn(Float32, length(names), ntimes), times, names,
+        Float64.(1:length(names)), Float64.(51 .+ (1:length(names))), "stress", "test")
+
+    # correct order: works
+    input_ok = Dict(
+        "stress_x" => make_wind_ts(["w1","w2","w3"]),
+        "stress_y" => make_wind_ts(["w1","w2","w3"]),
+        "pressure" => make_wind_ts(["w1","w2","w3"]))
+    @test_nowarn AIHydroPoints.preprocess(m, input_ok)
+
+    # wrong order: reordered automatically, no error
+    input_shuffled = Dict(
+        "stress_x" => make_wind_ts(["w3","w1","w2"]),
+        "stress_y" => make_wind_ts(["w3","w1","w2"]),
+        "pressure" => make_wind_ts(["w3","w1","w2"]))
+    @test_nowarn AIHydroPoints.preprocess(m, input_shuffled)
+
+    # extra locations: silently dropped
+    input_extra = Dict(
+        "stress_x" => make_wind_ts(["w1","w2","w3","w4"]),
+        "stress_y" => make_wind_ts(["w1","w2","w3","w4"]),
+        "pressure" => make_wind_ts(["w1","w2","w3","w4"]))
+    @test_nowarn AIHydroPoints.preprocess(m, input_extra)
+
+    # missing location: readable error
+    input_missing = Dict(
+        "stress_x" => make_wind_ts(["w1","w2"]),
+        "stress_y" => make_wind_ts(["w1","w2"]),
+        "pressure" => make_wind_ts(["w1","w2"]))
+    err = @test_throws ErrorException AIHydroPoints.preprocess(m, input_missing)
+    @test occursin("missing", err.value.msg)
+    @test occursin("w3", err.value.msg)
+end

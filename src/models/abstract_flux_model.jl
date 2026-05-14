@@ -89,6 +89,34 @@ function predict(model::AbstractFluxModel, input::Dict{String, TimeSeries})
 end
 
 # ──────────────────────────────────────────────────────────────────────────────
+# Location alignment helper
+# ──────────────────────────────────────────────────────────────────────────────
+
+"""
+    _check_and_align_locations(ts, expected_names, label) -> TimeSeries
+
+Return `ts` with locations reordered to match `expected_names`.
+
+- Extra locations in `ts` are silently dropped.
+- If any name in `expected_names` is absent from `ts`, an informative error is thrown.
+
+`label` is included in the error message to identify the source (e.g. `"input[\\"stress_x\\"]"`).
+"""
+function _check_and_align_locations(ts::TimeSeries,
+                                    expected_names::Vector{String},
+                                    label::String)
+    available   = get_names(ts)
+    missing_loc = setdiff(expected_names, available)
+    if !isempty(missing_loc)
+        error("""$label: expected locations are missing.
+  expected : $expected_names
+  available: $available
+  missing  : $(collect(missing_loc))""")
+    end
+    return select_locations_by_names(ts, expected_names)
+end
+
+# ──────────────────────────────────────────────────────────────────────────────
 # save_params / load_params! — implemented once using get_flux_model
 # ──────────────────────────────────────────────────────────────────────────────
 

@@ -224,3 +224,22 @@ for other formats.
 
 **`model_io.input` / `model_io.target`** — determines how loaded variables are routed
 into the `input` and `target` dicts returned by `load_data`.
+
+---
+
+## Location alignment at inference time
+
+When running `predict`, the locations in the supplied data may differ from those
+seen during training.  The following rules apply automatically:
+
+| Situation | Behaviour |
+|---|---|
+| Locations in a different order than training | Reordered to match the training order |
+| Data contains extra locations not used by the model | Extra locations silently dropped |
+| Data is missing a location the model requires | Error with a clear message listing the missing locations |
+
+This applies to **input** variables for surge, wave, and interaction models (which
+have a fixed input grid), and to **target** variables when computing statistics or
+plots (e.g. `write_stats`, time-series plots, scatter plots).
+
+Tide models generalise to arbitrary station locations and do not have this constraint.

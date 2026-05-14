@@ -154,6 +154,12 @@ function preprocess(model::AttentionSurgeModel, input::Dict{String, TimeSeries})
     nlags     = settings["nlags"]
     nstations = settings["nlocations_output"]
 
+    if haskey(settings, "in_names")
+        in_names = settings["in_names"]
+        input = Dict(k => _check_and_align_locations(v, in_names, "input[\"$k\"]")
+                     for (k, v) in input)
+    end
+
     stress_x, stress_y = _get_stress(input)
     press  = Float32.(2e-4 .* (get_values(input["pressure"]) .- 1e5))
 

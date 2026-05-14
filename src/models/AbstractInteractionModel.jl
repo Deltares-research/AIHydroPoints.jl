@@ -136,6 +136,12 @@ function preprocess(model::AbstractInteractionModel, input::Dict{String, TimeSer
     input_mu  = Float32(get(settings, "input_mu",  0.0))
     input_std = Float32(get(settings, "input_std", 1.0))
 
+    if haskey(settings, "out_names")
+        out_names = settings["out_names"]
+        input = Dict(k => _check_and_align_locations(v, out_names, "input[\"$k\"]")
+                     for (k, v) in input)
+    end
+
     x_station, x_ts = _build_interaction_blocks(model, input)
     x_ts_norm = (x_ts .- input_mu) ./ input_std
 

@@ -119,3 +119,42 @@ end
     save_loss_plot(path2, train_losses)
     @test isfile(path2)
 end
+
+@testset "_check_and_align_locations" begin
+    ntimes = 10
+    times  = collect(DateTime(2020,1,1) .+ Hour.(0:ntimes-1))
+    vals_ab = ones(Float32, 2, ntimes)
+    vals_abc = ones(Float32, 3, ntimes)
+
+    ts_ab  = TimeSeries(vals_ab,  times, ["A","B"],   [1.0,2.0], [51.0,52.0], "q", "test")
+    ts_ba  = TimeSeries(vals_ab,  times, ["B","A"],   [2.0,1.0], [52.0,51.0], "q", "test")
+    ts_abc = TimeSeries(vals_abc, times, ["A","B","C"],[1.0,2.0,3.0],[51.0,52.0,53.0],"q","test")
+
+    # correct order: no-op
+    aligned = AIHydroPoints._check_and_align_locations(ts_ab, ["A","B"], "test")
+    @test get_names(aligned) == ["A","B"]
+
+    # wrong order: reorders to expected
+    aligned = AIHydroPoints._check_and_align_locations(ts_ba, ["A","B"], "test")
+    @test get_names(aligned) == ["A","B"]
+
+    # extra locations: silently dropped
+    aligned = AIHydroPoints._check_and_align_locations(ts_abc, ["A","B"], "test")
+    @test get_names(aligned) == ["A","B"]
+
+    # missing location: readable error
+    err = @test_throws ErrorException AIHydroPoints._check_and_align_locations(
+        ts_ab, ["A","B","C"], "test_label")
+    @test occursin("test_label", err.value.msg)
+    @test occursin("missing", err.value.msg)
+
+    # plot helpers accept reordered target without error
+    subdir = joinpath(temp_dir, "align_series")
+    mkpath(subdir)
+    pred_vals = randn(Float32, 2, ntimes)
+    true_vals = randn(Float32, 2, ntimes)
+    ts_pred = Dict("surge" => TimeSeries(pred_vals, times, ["A","B"], [1.0,2.0], [51.0,52.0], "surge", "p"))
+    ts_true_rev = Dict("surge" => TimeSeries(true_vals, times, ["B","A"], [2.0,1.0], [52.0,51.0], "surge", "t"))
+    AIHydroPoints._plot_station_series(ts_pred, ts_true_rev, subdir)
+    @test isfile(joinpath(subdir, "A.png"))
+end

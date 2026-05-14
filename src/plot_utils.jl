@@ -32,6 +32,7 @@ function _plot_station_fft(output::Dict{String, TimeSeries},
     t_start = get_times(ts_pred)[1]
     t_end   = get_times(ts_pred)[end]
     ts_true = select_timespan(ts_true, t_start, t_end)
+    ts_true = _check_and_align_locations(ts_true, get_names(ts_pred), "target[\"$out_key\"]")
 
     if !isnothing(station_names)
         ts_pred = select_locations_by_names(ts_pred, station_names)
@@ -94,6 +95,7 @@ function _plot_station_series(output::Dict{String, TimeSeries},
     t_start = get_times(ts_pred)[1]
     t_end   = get_times(ts_pred)[end]
     ts_true = select_timespan(ts_true, t_start, t_end)
+    ts_true = _check_and_align_locations(ts_true, get_names(ts_pred), "target[\"$out_key\"]")
 
     if !isnothing(station_names)
         ts_pred = select_locations_by_names(ts_pred, station_names)
@@ -150,6 +152,7 @@ function _plot_station_scatter(output::Dict{String, TimeSeries},
     t_start = get_times(ts_pred)[1]
     t_end   = get_times(ts_pred)[end]
     ts_true = select_timespan(ts_true, t_start, t_end)
+    ts_true = _check_and_align_locations(ts_true, get_names(ts_pred), "target[\"$out_key\"]")
 
     if !isnothing(station_names)
         ts_pred = select_locations_by_names(ts_pred, station_names)
