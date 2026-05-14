@@ -13,6 +13,8 @@ It has two levels: global keys that apply to the whole run, and a
 |---|---|---|
 | `series_format` | `"netcdf"` | Format for written time-series files. One of `"netcdf"`, `"jld2"`, `"noos"`. |
 | `write_summary` | `true` | Write a `summary.toml` with overall RMSE, model parameter count, and predict time. |
+| `tidal_analysis_constituents` | `"year"` | Constituent set for tidal analysis. String preset (`"year"`, `"month"`) or explicit list. |
+| `tidal_analysis_max_constituents` | `20` | Maximum number of constituents shown in tidal analysis plots. |
 
 ---
 
@@ -32,6 +34,7 @@ the label in output file names; if omitted, the `split` label is used.
 | `scatter` | `false` | Scatter plot of predicted vs observed (one point per timestep), one PNG per station. |
 | `write_stats` | `true` if split is `"testing"`, else `false` | Write per-station statistics (RMSE, bias, correlation) to `stats_<name>.csv`. |
 | `write_series` | `false` | Write predicted time series to `series_<name>.<ext>` in `series_format`. |
+| `tidal_analysis` | `false` | *(Tide models only.)* Run harmonic analysis on obs and predicted; save per-station amplitude+phase comparison PNGs to `<name>_tidal_analysis/`. Controlled by global keys `tidal_analysis_constituents` and `tidal_analysis_max_constituents`. |
 
 If no `[[output_settings.outputs]]` entries are given, a single default entry is used
 (equivalent to `split = "testing"` with per-entry defaults applied).

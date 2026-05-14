@@ -40,7 +40,9 @@ function predict(input_toml::String)
 
     model_settings = toml_read(joinpath(model_dir, "model_settings.toml"))
     model = create_model(model_settings, Dict{String,TimeSeries}())
-    load_params!(model, joinpath(model_dir, "params.jld2"))
+    weights_file = joinpath(model_dir, get(model_settings, "model_weights", "params.jld2"))
+    isfile(weights_file) || error("Weights file not found: $weights_file")
+    load_params!(model, weights_file)
 
     # Derive a predict-specific output dir so outputs never land in training_output
     runid      = get(get(all_settings, "run_info", Dict()), "runid", "predict")

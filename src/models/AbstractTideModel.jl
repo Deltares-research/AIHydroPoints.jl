@@ -195,11 +195,14 @@ function train_model!(model::AbstractTideModel, train_settings::TrainingSettings
     opt_state  = Flux.setup(Adam(train_settings.learning_rate), flux_model)
     nbatch     = min(train_settings.nbatches, n_train)
 
-    train_losses = Float32[]
-    val_losses   = Float32[]
-    showvalues   = Pair{String,String}[]
-    progress     = Progress(train_settings.nepochs; desc="Training: ", showspeed=true)
-    log_every    = max(1, train_settings.nepochs ÷ 10)
+    checkpoint_dir = get(settings, "model_dir", nothing)
+
+    train_losses  = Float32[]
+    val_losses    = Float32[]
+    showvalues    = Pair{String,String}[]
+    progress      = Progress(train_settings.nepochs; desc="Training: ", showspeed=true)
+    log_every     = max(1, train_settings.nepochs ÷ 10)
+    best_val_rmse = Inf32
 
     for epoch in 1:train_settings.nepochs
         idx = sortperm(rand(n_train))[1:nbatch]
@@ -217,8 +220,17 @@ function train_model!(model::AbstractTideModel, train_settings::TrainingSettings
             val_rmse = sqrt(Flux.mse(flux_model(x_st_val, x_w_val), y_val))
             push!(val_losses, val_rmse)
             push!(showvalues, "val RMSE  " => @sprintf("%.4f", val_rmse))
+            if !isnothing(checkpoint_dir) && val_rmse < best_val_rmse
+                best_val_rmse = val_rmse
+                save_params(model, joinpath(checkpoint_dir, "params_best.jld2"); overwrite=true)
+            end
         end
         next!(progress; showvalues)
+
+        if !isnothing(checkpoint_dir) && !isnothing(train_settings.checkpoints) &&
+                epoch in train_settings.checkpoints
+            save_params(model, joinpath(checkpoint_dir, "params_epoch_$(epoch).jld2"); overwrite=true)
+        end
 
         if epoch % log_every == 0 || epoch == train_settings.nepochs
             msg = @sprintf("epoch %d/%d  train RMSE: %.4f", epoch, train_settings.nepochs, train_rmse)

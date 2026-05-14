@@ -78,6 +78,8 @@ function validate_and_augment_settings!(
         model_settings["model_dir"] = joinpath("training_output", "$(runid)_$(model_name)")
     end
 
+    get!(model_settings, "model_weights", "params.jld2")
+
     # ── Augment from target (all models) ─────────────────────────────────────
     first_target = first(values(train_target))
     get!(model_settings, "out_quantities",    collect(keys(train_target)))

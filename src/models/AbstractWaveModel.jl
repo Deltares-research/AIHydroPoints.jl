@@ -192,7 +192,9 @@ Returns `(train_losses, val_losses)` as `Vector{Float32}` per epoch.
 `val_losses` is empty when `validation_split == 0`.
 """
 function train_model!(model::AbstractWaveModel, train_settings::TrainingSettings,
-                      input::Dict{String, TimeSeries}, target::Dict{String, TimeSeries})
+                      input::Dict{String, TimeSeries}, target::Dict{String, TimeSeries};
+                      val_input::Union{Dict{String,TimeSeries},Nothing}  = nothing,
+                      val_target::Union{Dict{String,TimeSeries},Nothing} = nothing)
 
     settings   = get_settings(model)
     wave_scale = Float32(get(settings, "wave_scale", 3.0))
@@ -249,11 +251,14 @@ function train_model!(model::AbstractWaveModel, train_settings::TrainingSettings
     opt_state  = Flux.setup(Adam(train_settings.learning_rate), flux_model)
     nbatch     = min(train_settings.nbatches, n_train)
 
-    train_losses = Float32[]
-    val_losses   = Float32[]
-    showvalues   = Pair{String, String}[]
-    progress     = Progress(train_settings.nepochs; desc="Training: ", showspeed=true)
-    log_every    = max(1, train_settings.nepochs ÷ 10)
+    checkpoint_dir = get(get_settings(model), "model_dir", nothing)
+
+    train_losses  = Float32[]
+    val_losses    = Float32[]
+    showvalues    = Pair{String, String}[]
+    progress      = Progress(train_settings.nepochs; desc="Training: ", showspeed=true)
+    log_every     = max(1, train_settings.nepochs ÷ 10)
+    best_val_rmse = Inf32
 
     for epoch in 1:train_settings.nepochs
         idx = sortperm(rand(n_train))[1:nbatch]
@@ -271,8 +276,17 @@ function train_model!(model::AbstractWaveModel, train_settings::TrainingSettings
             val_rmse = sqrt(Flux.mse(flux_model((x_s_val, x_i_val)), y_val))
             push!(val_losses, val_rmse)
             push!(showvalues, "val RMSE  " => @sprintf("%.4f", val_rmse))
+            if !isnothing(checkpoint_dir) && val_rmse < best_val_rmse
+                best_val_rmse = val_rmse
+                save_params(model, joinpath(checkpoint_dir, "params_best.jld2"); overwrite=true)
+            end
         end
         next!(progress; showvalues)
+
+        if !isnothing(checkpoint_dir) && !isnothing(train_settings.checkpoints) &&
+                epoch in train_settings.checkpoints
+            save_params(model, joinpath(checkpoint_dir, "params_epoch_$(epoch).jld2"); overwrite=true)
+        end
 
         if epoch % log_every == 0 || epoch == train_settings.nepochs
             msg = @sprintf("epoch %d/%d  train RMSE: %.4f", epoch, train_settings.nepochs, train_rmse)

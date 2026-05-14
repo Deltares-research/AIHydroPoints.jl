@@ -39,9 +39,14 @@ The main goal of this project is to develop a machine learning model for predict
     j. [x] check with explicit validation data
     k. [x] feed all settings to create output?
     l. [ ] check locations when using a trained model.
-    m. [ ] filenames for model parameters
+    m. [x] filenames for model parameters
 10. Create leaderboard
+    a. [ ] read all summary files and filter for selected runs
+    b. [ ] sort by a configured field to get the best model at the top
+    c. [ ] present results. Nice table, csv exports, etc
+    d. [ ] think about structure for maintained leaderboeards
 11. Create a baseline for each model type
+    a. [ ] surge baselines 1yr, 5yr 20yr (determine timespans)
 12. Create script for real-time forecasts
 13. Create an environment for online demos
 

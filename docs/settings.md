@@ -79,7 +79,8 @@ Concrete models: `LinearSurgeModel`, `ConvSurgeModel`, `AttentionSurgeModel`.
 ### Auto-populated by `validate_and_augment_settings!`
 
 `"out_names"`, `"out_lons"`, `"out_lats"`, `"out_quantities"`, `"nlocations_output"`,
-`"in_names"`, `"in_lons"`, `"in_lats"`, `"in_quantities"`, `"nlocations_input"`, `"model_dir"`.
+`"in_names"`, `"in_lons"`, `"in_lats"`, `"in_quantities"`, `"nlocations_input"`,
+`"model_dir"`, `"model_weights"`.
 
 ### `model_pars` for `ConvSurgeModel`
 
@@ -125,7 +126,8 @@ Concrete models: `DeepONetTideModel`, `ProductTideModel`.
 
 ### Auto-populated by `validate_and_augment_settings!`
 
-`"out_names"`, `"out_lons"`, `"out_lats"`, `"out_quantities"`, `"nlocations_output"`, `"model_dir"`.
+`"out_names"`, `"out_lons"`, `"out_lats"`, `"out_quantities"`, `"nlocations_output"`,
+`"model_dir"`, `"model_weights"`.
 (Tide models have no loaded inputs so `in_*` keys are not set.)
 
 ### `model_pars` for `DeepONetTideModel`
@@ -172,7 +174,8 @@ Concrete models: `ConvWaveModel`, `DeepONetWaveModel`.
 ### Auto-populated by `validate_and_augment_settings!`
 
 `"out_names"`, `"out_lons"`, `"out_lats"`, `"out_quantities"`, `"nlocations_output"`,
-`"in_names"`, `"in_lons"`, `"in_lats"`, `"in_quantities"`, `"nlocations_input"`, `"model_dir"`.
+`"in_names"`, `"in_lons"`, `"in_lats"`, `"in_quantities"`, `"nlocations_input"`,
+`"model_dir"`, `"model_weights"`.
 
 ### `model_pars` for `ConvWaveModel`
 
@@ -212,7 +215,7 @@ Concrete models: `ConvInteractionModel`.
 
 `validate_and_augment_settings!`: `"out_names"`, `"out_lons"`, `"out_lats"`, `"out_quantities"`,
 `"nlocations_output"`, `"in_names"`, `"in_lons"`, `"in_lats"`, `"in_quantities"`,
-`"nlocations_input"`, `"model_dir"`.
+`"nlocations_input"`, `"model_dir"`, `"model_weights"`.
 
 `train_model!`: `"input_mu"`, `"input_std"`, `"output_mu"`, `"output_std"` (Z-score statistics).
 
@@ -250,9 +253,17 @@ nchannel   = [64, 64, 64, 1]
 activation = "swish"
 ```
 
-Saving (done automatically by `train()`):
+Files written by `train()` to `model_dir`:
 
-```julia
-toml_write(joinpath(save_dir, "model_settings.toml"), get_settings(model); overwrite=true)
-save_params(model, joinpath(save_dir, "params.jld2"); overwrite=true)
-```
+| File | Contents |
+|---|---|
+| `model_settings.toml` | Full model settings dict including `model_weights` |
+| `run_settings.toml` | Complete run config (all TOML tables) for reproducibility |
+| `params.jld2` | Weights at the final training epoch |
+| `params_best.jld2` | Weights at the best validation loss epoch (written when validation data is provided) |
+| `params_epoch_N.jld2` | Epoch snapshots, for each `N` listed in `train_settings.checkpoints` |
+| `losses.png` | Training and validation loss curves |
+
+`model_weights` in `model_settings.toml` points to `params_best.jld2` when that file exists,
+otherwise to `params.jld2`.  `predict()` loads from this file.  To use a specific checkpoint
+for inference, set `model_weights = "params_epoch_50.jld2"` in the predict TOML.

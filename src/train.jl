@@ -48,6 +48,14 @@ function train(input_toml::String)
     toml_write(joinpath(save_dir, "run_settings.toml"), all_settings; overwrite=true)
 
     model = create_model(model_settings, train_input)
+
+    # Load pre-trained weights to continue training if the weights file exists
+    pretrained = joinpath(save_dir, model_settings["model_weights"])
+    if isfile(pretrained)
+        load_params!(model, pretrained)
+        @info "Continuing training from $pretrained"
+    end
+
     t0 = time()
     val_input  = haskey(data, "validation") ? data["validation"].input  : nothing
     val_target = haskey(data, "validation") ? data["validation"].target : nothing
@@ -56,6 +64,12 @@ function train(input_toml::String)
     train_time_s = round(time() - t0; digits=1)
 
     save_params(model, joinpath(save_dir, "params.jld2"); overwrite=true)
+
+    # Point model_weights at the best-val checkpoint when one was written
+    if isfile(joinpath(save_dir, "params_best.jld2"))
+        model_settings["model_weights"] = "params_best.jld2"
+    end
+
     toml_write(joinpath(save_dir, "model_settings.toml"), get_settings(model); overwrite=true)
     save_loss_plot(joinpath(save_dir, "losses.png"), train_losses, val_losses; overwrite=true)
 
