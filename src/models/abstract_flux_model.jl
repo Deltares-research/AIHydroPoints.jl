@@ -243,15 +243,19 @@ get_settings(m::MyFluxModel)   = m.settings
 # ──────────────────────────────────────────────────────────────────────────────
 
 """
-    write_outputs(model::AbstractFluxModel, data::Dict, output_settings::Dict)
+    write_outputs(model::AbstractFluxModel, data::Dict, all_settings::Dict)
 
-Generate outputs for all entries in `output_settings["outputs"]`.  `data` is
-the dict returned by `load_data`.  Each entry selects a split (and optionally a
-`timerange` sub-window) and controls which outputs to produce.
+Generate outputs for all entries in `all_settings["output_settings"]["outputs"]`.
+`data` is the dict returned by `load_data`.  Each entry selects a split (and
+optionally a `timerange` sub-window) and controls which outputs to produce.
+
+`all_settings` is the full settings dict so that other sections (e.g.
+`model_settings`, `train_settings`) are available for summary logging.
 
 See `docs/output_settings.md` for the full schema and defaults.
 """
-function write_outputs(model::AbstractFluxModel, data::Dict, output_settings::Dict)
+function write_outputs(model::AbstractFluxModel, data::Dict, all_settings::Dict)
+    output_settings = get(all_settings, "output_settings", Dict{String,Any}())
     save_dir = get_settings(model)["model_dir"]
     outputs  = get(output_settings, "outputs",
                    [Dict{String,Any}("split" => "test")])
@@ -324,9 +328,12 @@ function write_outputs(model::AbstractFluxModel, data::Dict, output_settings::Di
     if get(output_settings, "write_summary", true)
         settings = get_settings(model)
         summary  = Dict{String,Any}()
-        summary["model_name"]    = settings["model_name"]
+        run_info = get(all_settings, "run_info", Dict{String,Any}())
+        summary["runid"]          = get(run_info, "runid", "")
+        summary["description"]    = get(run_info, "description", "")
+        summary["model_name"]     = settings["model_name"]
         summary["out_quantities"] = settings["out_quantities"]
-        summary["n_params"]      = sum(length, Flux.trainables(get_flux_model(model)))
+        summary["n_params"]       = sum(length, Flux.trainables(get_flux_model(model)))
         if haskey(output_settings, "train_time_s")
             summary["train_time_s"] = output_settings["train_time_s"]
         end
@@ -334,7 +341,8 @@ function write_outputs(model::AbstractFluxModel, data::Dict, output_settings::Di
         for entry in outputs
             split = entry["split"]
             haskey(data, split) || continue
-            name = get(entry, "name", split)
+            name      = get(entry, "name", split)
+            timerange = get(entry, "timerange", nothing)
 
             t0  = time()
             out = predict(model, data[split].input)
@@ -346,6 +354,10 @@ function write_outputs(model::AbstractFluxModel, data::Dict, output_settings::Di
             t_start  = get_times(ts_pred)[1]
             t_end    = get_times(ts_pred)[end]
             ts_true  = select_timespan(ts_true, t_start, t_end)
+            if !isnothing(timerange)
+                ts_pred = select_timespan(ts_pred, timerange[1], timerange[2])
+                ts_true = select_timespan(ts_true, timerange[1], timerange[2])
+            end
             errors   = get_values(ts_true) .- get_values(ts_pred)
             summary["rmse_$(name)"] = round(sqrt(mean(abs2, errors)); digits=6)
         end

@@ -47,13 +47,8 @@ Shared across all model types.
 
 ## output_settings
 
-Optional table.  All keys default to the values shown.
-
-| Key | Default | Description |
-|---|---|---|
-| `plot_train` | `false` | Plot predictions vs observations for the training split. |
-| `plot_test` | `true` | Plot predictions vs observations for the testing split. |
-| `plot_fft` | `false` | Add FFT spectral panels to each station plot. |
+Optional table.  Controls plots, statistics, series output, and the run summary.
+See [`docs/output_settings.md`](output_settings.md) for the full schema.
 
 ---
 

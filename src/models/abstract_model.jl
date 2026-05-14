@@ -133,19 +133,23 @@ function train_model!(model::AbstractModel, train_settings::TrainingSettings,
 end
 
 """
-    write_outputs(model::AbstractModel, data::Dict, output_settings::Dict)
+    write_outputs(model::AbstractModel, data::Dict, all_settings::Dict)
 
 Generate outputs (plots, statistics, saved predictions, etc.) for all enabled
-splits according to `output_settings`.
+splits.
 
 `data` is the dict returned by `load_data`, mapping split labels (e.g.
 `"training"`, `"testing"`) to `(input=..., target=...)` namedtuples.
 
-`output_settings` is a plain dict controlling which outputs to produce.
+`all_settings` is the full settings dict (as read from the TOML file).
+Output behaviour is controlled by `all_settings["output_settings"]`; all other
+top-level sections (`model_settings`, `train_settings`, etc.) are also available
+for richer output (e.g. logging hyperparameters in the summary).
+
 `AbstractFluxModel` provides a default implementation covering all current models.
 
 Must be implemented (or inherited) by every concrete subtype of `AbstractModel`.
 """
-function write_outputs(model::AbstractModel, data::Dict, output_settings::Dict)
+function write_outputs(model::AbstractModel, data::Dict, all_settings::Dict)
     error("write_outputs not implemented for $(typeof(model))")
 end

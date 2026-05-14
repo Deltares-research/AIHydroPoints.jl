@@ -51,7 +51,7 @@ function predict(input_toml::String)
 
     data = load_data(all_settings["data_settings"])
 
-    write_outputs(model, data, get(all_settings, "output_settings", Dict{String,Any}()))
+    write_outputs(model, data, all_settings)
 
     return nothing
 end

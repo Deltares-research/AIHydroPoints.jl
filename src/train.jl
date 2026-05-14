@@ -59,9 +59,9 @@ function train(input_toml::String)
     toml_write(joinpath(save_dir, "model_settings.toml"), get_settings(model); overwrite=true)
     save_loss_plot(joinpath(save_dir, "losses.png"), train_losses, val_losses; overwrite=true)
 
-    output_settings = get(all_settings, "output_settings", Dict{String,Any}())
+    output_settings = get!(all_settings, "output_settings", Dict{String,Any}())
     output_settings["train_time_s"] = train_time_s
-    write_outputs(model, data, output_settings)
+    write_outputs(model, data, all_settings)
 
     return nothing
 end

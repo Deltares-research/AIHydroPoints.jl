@@ -112,11 +112,5 @@ The `[[output_settings.outputs]]` design is implemented in
 | Scatter plot | `scatter` | `_plot_station_scatter`; uses `MultiTimeSeries.scatter` |
 | Per-station stats | `write_stats` | `_write_station_stats`; uses `MultiTimeSeries.compute_statistics`; writes CSV |
 | Series output | `write_series` | `_write_station_series`; supports `"netcdf"`, `"jld2"`, `"noos"` |
-| Run summary | `write_summary` | writes `summary.toml` with `model_name`, `out_quantities`, `n_params`, `train_time_s`, `rmse_<name>`, `predict_time_<name>_s` |
-| `timerange` per entry | `timerange` | ISO-8601 strings; restricts all outputs to the specified window |
-
-### Not yet implemented
-
-| Feature | Key | Tracked in |
-|---|---|---|
-| Tides / waves / interaction | — | plan.md 9h–9i |
+| Run summary | `write_summary` | writes `summary.toml` with `runid`, `description`, `model_name`, `out_quantities`, `n_params`, `train_time_s`, `rmse_<name>` (respects `timerange`), `predict_time_<name>_s` |
+| `timerange` per entry | `timerange` | ISO-8601 strings; restricts all outputs (plots, stats, and summary RMSE) to the specified window |

@@ -37,7 +37,9 @@ The main goal of this project is to develop a machine learning model for predict
     h. [x] similar for tides, waves and interaction
     i. [x] extend for tides: added `tidal_analysis = true` output option for tide models; runs hatyan_core `analysis` on obs and pred, saves per-station amplitude+phase comparison PNG to `<name>_tidal_analysis/`; `tidal_analysis_constituents` and `tidal_analysis_max_constituents` are configurable.
     j. [x] check with explicit validation data
-    k. [ ] feed all settings to create output?
+    k. [x] feed all settings to create output?
+    l. [ ] check locations when using a trained model.
+    m. [ ] filenames for model parameters
 10. Create leaderboard
 11. Create a baseline for each model type
 12. Create script for real-time forecasts
@@ -75,9 +77,11 @@ Steps 7 and 8 are complete. `validate_and_augment_settings!`, model registry, `c
 `train.jl`, `predict.jl`, 8 example TOMLs in `examples/`. All smoke-test clean (11 PASS).
 501 tests pass.
 
-Step 9 in progress. 9a–9h complete: all output types (timeseries, scatter, fft, stats,
+Step 9 in progress. 9a–9k complete: all output types (timeseries, scatter, fft, stats,
 series, summary) work generically for all model types via `AbstractFluxModel.write_outputs`.
-Predict writes to `predict_output/` separately from `training_output/`. `plot_fft`/`plot_fft!`
-removed (replaced by `hatyan_core.fft_series`). 530 tests, 11 smoke tests pass.
+`write_outputs` now receives full `all_settings` so `runid`, `description`, and other
+sections are available for summary logging. Explicit validation data (2010/2011/2012 splits)
+tested for ConvSurgeModel and ProductTideModel. RMSE in summary correctly respects
+per-entry `timerange`. 530 tests, 11 smoke tests pass.
 
 
