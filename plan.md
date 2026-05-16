@@ -27,15 +27,16 @@ The main goal of this project is to develop a machine learning model for predict
     i. [x] Improve documentation of settings in `docs/settings.md` and `docs/data_input_settings.md`: clarified train vs predict required tables, moved `model_name` to required keys, fixed stale code examples, resolved TBD on path resolution.
 8. [x] Write a separate script for inference: `predict.jl` mirrors `train.jl` — reads a TOML with `[model_settings]` (model_dir), `[data_settings]`, and `[output_settings]`; loads trained weights and runs `write_outputs`. Example TOML at `examples/predict_ConvSurgeModel.toml`. Smoke-tested via `check_training_scripts.sh`.
 9. [x] Improve output during training — all output types (timeseries, scatter, fft, stats, series, tidal analysis, summary) work generically for all model types via `write_outputs`; explicit validation splits; location alignment at inference; explicit `model_weights` key; `params_best.jld2` and epoch checkpoints. See `docs/output_settings.md`.
-10. Create leaderboard
-    a. [x] read all summary files and filter for selected runs
-    b. [x] sort by a configured field to get the best model at the top
-    c. [x] present results. Nice table, csv exports, etc — `experiments/leaderboard.ipynb`
-    d. [ ] think about structure for maintained leaderboards
+10. [x] Create leaderboard — `src/leaderboard.jl` (find_run_dirs, load_leaderboard, sort_leaderboard); `experiments/leaderboard.ipynb` (ranked table, CSV, PNG); `experiments/leaderboard.qmd` + `render_leaderboard.sh` (Quarto HTML via engine: julia). Per-station stats CSV excluded due to inconsistent schemas across model families.
 11. Create a baseline for each model type
     a. [ ] surge baselines 1yr, 5yr 20yr (determine timespans)
+    b. [ ] interaction datasets, first testing
+    c. [ ] interaction baselines 1yr, 5yr 20yr (determine timespans)
+    d. [ ] tide baselines
 12. Create script for real-time forecasts
 13. Create an environment for online demos
+14. Add experiments for waves
+15. Scale surge model to a large number of stations
 
 ## Checklist for each step:
 - all source should eventually be in src/ and all tests should be in test/ and test data should be in test_data/

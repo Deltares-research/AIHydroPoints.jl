@@ -7,7 +7,7 @@
 
 [run_info]
 runid       = "2010_base"
-description = "Convolutional surge model trained on 2011 ERA5 wind stress and Schureman surge."
+description = "Convolutional surge model trained on 2010 ERA5 wind stress and Schureman surge."
 
 [model_settings]
 model_name = "ConvSurgeModel"
@@ -31,15 +31,28 @@ input  = ["stress_x", "stress_y", "pressure"]
 target = ["surge"]
 
 [[data_settings.files]]
-path      = "../test_data/surge_schureman_2011.nc"
+path      = "../test_data/surge_schureman_2010.nc"
 format    = "netcdf"
 split     = "training"
 variables = ["surge"]
 
 [[data_settings.files]]
-path      = "../test_data/era5_wind_stress_2011_testing.jld2"
+path      = "../test_data/era5_wind_stress_2008_training.jld2"
 format    = "jld2"
 split     = "training"
+timerange = ["2010-01-01", "2011-01-01"]
+variables = ["stress_x", "stress_y", "pressure"]
+
+[[data_settings.files]]
+path      = "../test_data/surge_schureman_2011.nc"
+format    = "netcdf"
+split     = "validation"
+variables = ["surge"]
+
+[[data_settings.files]]
+path      = "../test_data/era5_wind_stress_2011_testing.jld2"
+format    = "jld2"
+split     = "validation"
 variables = ["stress_x", "stress_y", "pressure"]
 
 [[data_settings.files]]
@@ -57,6 +70,22 @@ variables = ["stress_x", "stress_y", "pressure"]
 [output_settings]
 write_summary = true
 series_format = "netcdf"
+
+    [[output_settings.outputs]]
+    write_stats = true
+    fft = true
+    scatter = true
+    write_series = true
+    timeseries = true
+    split = "training"
+
+    [[output_settings.outputs]]
+    write_stats = true
+    fft = false
+    scatter = true
+    write_series = true
+    timeseries = false
+    split = "validation"
 
     [[output_settings.outputs]]
     write_stats = true

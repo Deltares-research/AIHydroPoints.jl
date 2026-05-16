@@ -1,0 +1,108 @@
+# AttentionSurgeModel — transformer branch + dense trunk + graph adjacency
+#
+# Usage:
+#   pixi run julia --project train.jl experiments/2010_base_AttentionSurgeModel.toml
+
+[run_info]
+runid       = "2010_base"
+description = "Attention surge model trained on 2010 ERA5 wind stress and Schureman surge."
+
+[model_settings]
+model_name = "AttentionSurgeModel"
+nlags      = 16
+
+[model_settings.model_pars]
+nembed         = 32
+theta          = 1000.0
+nheads         = 4
+nlayers_branch = 2
+nlayers_trunk  = 2
+nhidden_trunk  = 32
+
+[train_settings]
+nepochs          = 400
+nbatches         = 64
+learning_rate    = 1.0e-3
+lr_decay_factor  = 0.1
+lr_decay_rate    = 400
+patience         = 5
+validation_split = 0.2
+
+[data_settings.model_io]
+input  = ["stress_x", "stress_y", "pressure"]
+target = ["surge"]
+
+[[data_settings.files]]
+path      = "../test_data/surge_schureman_2010.nc"
+format    = "netcdf"
+split     = "training"
+variables = ["surge"]
+
+[[data_settings.files]]
+path      = "../test_data/era5_wind_stress_2008_training.jld2"
+format    = "jld2"
+split     = "training"
+timerange = ["2010-01-01", "2011-01-01"]
+variables = ["stress_x", "stress_y", "pressure"]
+
+[[data_settings.files]]
+path      = "../test_data/surge_schureman_2011.nc"
+format    = "netcdf"
+split     = "validation"
+variables = ["surge"]
+
+[[data_settings.files]]
+path      = "../test_data/era5_wind_stress_2011_testing.jld2"
+format    = "jld2"
+split     = "validation"
+variables = ["stress_x", "stress_y", "pressure"]
+
+[[data_settings.files]]
+path      = "../test_data/surge_schureman_2012.nc"
+format    = "netcdf"
+split     = "testing"
+variables = ["surge"]
+
+[[data_settings.files]]
+path      = "../test_data/era5_wind_stress_2012_validation.jld2"
+format    = "jld2"
+split     = "testing"
+variables = ["stress_x", "stress_y", "pressure"]
+
+[output_settings]
+write_summary = true
+series_format = "netcdf"
+
+    [[output_settings.outputs]]
+    write_stats = true
+    fft = true
+    scatter = true
+    write_series = true
+    timeseries = true
+    split = "training"
+
+    [[output_settings.outputs]]
+    write_stats = true
+    fft = false
+    scatter = true
+    write_series = true
+    timeseries = false
+    split = "validation"
+
+    [[output_settings.outputs]]
+    write_stats = true
+    fft = true
+    scatter = true
+    write_series = true
+    timeseries = true
+    split = "testing"
+
+    [[output_settings.outputs]]
+    split        = "testing"
+    name         = "storm_andrea_2012"
+    timerange    = ["2012-01-02", "2012-01-08"]
+    timeseries   = true
+    fft          = false
+    scatter      = true
+    write_stats  = true
+    write_series = false
