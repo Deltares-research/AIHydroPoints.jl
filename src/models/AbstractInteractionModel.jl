@@ -273,7 +273,7 @@ function train_model!(model::AbstractInteractionModel, train_settings::TrainingS
 
     flux_model = get_flux_model(model)
     opt_state  = Flux.setup(Adam(train_settings.learning_rate), flux_model)
-    nbatch     = min(train_settings.nbatches, n_train)
+    loader = Flux.DataLoader((x_s, x_i, y); batchsize=train_settings.nbatches, shuffle=true)
 
     checkpoint_dir = get(settings, "model_dir", nothing)
 
@@ -285,11 +285,12 @@ function train_model!(model::AbstractInteractionModel, train_settings::TrainingS
     best_val_rmse = Inf32
 
     for epoch in 1:train_settings.nepochs
-        idx = sortperm(rand(n_train))[1:nbatch]
-        _, grads = Flux.withgradient(flux_model) do m
-            Flux.mse(m((x_s[:, idx], x_i[:, :, idx])), y[:, idx])
+        for (x_s_b, x_i_b, yb) in loader
+            _, grads = Flux.withgradient(flux_model) do m
+                Flux.mse(m((x_s_b, x_i_b)), yb)
+            end
+            Flux.update!(opt_state, flux_model, grads[1])
         end
-        Flux.update!(opt_state, flux_model, grads[1])
 
         train_rmse = sqrt(Flux.mse(flux_model((x_s, x_i)), y))
         push!(train_losses, train_rmse)

@@ -17,7 +17,8 @@ All fields are shared across every model type.
 
 - `nepochs`: Number of training epochs.
     (**Default**: `100`)
-- `nbatches`: Batch size passed to `Flux.DataLoader`.
+- `nbatches`: Minibatch size for `Flux.DataLoader`. Each epoch iterates through
+    all training data in shuffled batches of this size.
     (**Default**: `1024`)
 - `learning_rate`: Initial learning rate for the Adam optimiser.
     (**Default**: `1.0e-3`)

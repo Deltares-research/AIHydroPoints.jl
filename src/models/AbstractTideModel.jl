@@ -193,7 +193,7 @@ function train_model!(model::AbstractTideModel, train_settings::TrainingSettings
 
     flux_model = get_flux_model(model)
     opt_state  = Flux.setup(Adam(train_settings.learning_rate), flux_model)
-    nbatch     = min(train_settings.nbatches, n_train)
+    loader = Flux.DataLoader((x_st, x_w, y); batchsize=train_settings.nbatches, shuffle=true)
 
     checkpoint_dir = get(settings, "model_dir", nothing)
 
@@ -205,11 +205,12 @@ function train_model!(model::AbstractTideModel, train_settings::TrainingSettings
     best_val_rmse = Inf32
 
     for epoch in 1:train_settings.nepochs
-        idx = sortperm(rand(n_train))[1:nbatch]
-        _, grads = Flux.withgradient(flux_model) do m
-            Flux.mse(m(x_st[:, :, idx], x_w[:, idx]), y[:, idx])
+        for (x_st_b, x_w_b, yb) in loader
+            _, grads = Flux.withgradient(flux_model) do m
+                Flux.mse(m(x_st_b, x_w_b), yb)
+            end
+            Flux.update!(opt_state, flux_model, grads[1])
         end
-        Flux.update!(opt_state, flux_model, grads[1])
 
         train_rmse = sqrt(Flux.mse(flux_model(x_st, x_w), y))
         push!(train_losses, train_rmse)
