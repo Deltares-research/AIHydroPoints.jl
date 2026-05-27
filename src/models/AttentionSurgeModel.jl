@@ -260,14 +260,20 @@ function train_model!(model::AttentionSurgeModel, train_settings::TrainingSettin
     ts_target = first(values(target))
     y_all = Float32.(get_values(ts_target))[:, nlags:end]   # (nstations, nvalid)
 
-    # Temporal train/validation split
-    n_val   = round(Int, train_settings.validation_split * nvalid)
-    has_val = n_val > 0
-    n_train = nvalid - n_val
-
-    x_st  = x_station[:, :, 1:n_train];  x_st_val  = has_val ? x_station[:, :, n_train+1:end] : nothing
-    x_w   = x_wind[:, :, 1:n_train];     x_w_val   = has_val ? x_wind[:, :, n_train+1:end]    : nothing
-    y     = y_all[:, 1:n_train];          y_val     = has_val ? y_all[:, n_train+1:end]         : nothing
+    # Explicit val split takes priority over validation_split fraction
+    if !isnothing(val_input)
+        (x_st_val, x_w_val), _ = preprocess(model, val_input)
+        y_val   = Float32.(get_values(first(values(val_target))))[:, nlags:end]
+        has_val = true
+        x_st = x_station;  x_w = x_wind;  y = y_all
+    else
+        n_val   = round(Int, train_settings.validation_split * nvalid)
+        has_val = n_val > 0
+        n_train = nvalid - n_val
+        x_st    = x_station[:, :, 1:n_train];  x_st_val = has_val ? x_station[:, :, n_train+1:end] : nothing
+        x_w     = x_wind[:, :, 1:n_train];     x_w_val  = has_val ? x_wind[:, :, n_train+1:end]    : nothing
+        y       = y_all[:, 1:n_train];          y_val    = has_val ? y_all[:, n_train+1:end]         : nothing
+    end
 
     flux_model = get_flux_model(model)
     opt_state  = Flux.setup(Adam(train_settings.learning_rate), flux_model)

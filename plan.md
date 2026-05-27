@@ -29,14 +29,17 @@ The main goal of this project is to develop a machine learning model for predict
 9. [x] Improve output during training — all output types (timeseries, scatter, fft, stats, series, tidal analysis, summary) work generically for all model types via `write_outputs`; explicit validation splits; location alignment at inference; explicit `model_weights` key; `params_best.jld2` and epoch checkpoints. See `docs/output_settings.md`.
 10. [x] Create leaderboard — `src/leaderboard.jl` (find_run_dirs, load_leaderboard, sort_leaderboard); `experiments/leaderboard.ipynb` (ranked table, CSV, PNG); `experiments/leaderboard.qmd` + `render_leaderboard.sh` (Quarto HTML via engine: julia). Per-station stats CSV excluded due to inconsistent schemas across model families.
 11. Create a baseline for each model type
-    a. [ ] surge baselines 1yr, 5yr 20yr (determine timespans)
-    b. [ ] interaction datasets, first testing
-    c. [ ] interaction baselines 1yr, 5yr 20yr (determine timespans)
-    d. [ ] tide baselines
+    a. [x] Check difference between old and new JLD2 formats before generating data
+    b. [x] surge baselines 1yr, 5yr 20yr (determine timespans)
+    c. [ ] interaction datasets, first testing
+    d. [ ] interaction baselines 1yr, 5yr 20yr (determine timespans)
+    e. [x] tide baselines
+    f. [ ] improve scatter plot
 12. Create script for real-time forecasts
 13. Create an environment for online demos
 14. Add experiments for waves
 15. Scale surge model to a large number of stations
+16. Try to remove separate training loop for the AttentionSurgeModel
 
 ## Checklist for each step:
 - all source should eventually be in src/ and all tests should be in test/ and test data should be in test_data/
@@ -74,5 +77,13 @@ Steps 7–9 are complete. `validate_and_augment_settings!`, model registry, `cre
 generic `train`/`predict` pipelines, 8 example TOMLs, full output suite, location alignment
 at inference, explicit model weights with best-val and epoch checkpoints.
 543 tests, 11 smoke tests pass.
+
+Steps 11a, 11b, 11e are complete. JLD2 format differences documented. Surge and tide
+baselines created: 3 training spans (1yr/5yr/20yr) × 3 surge models (Linear, Conv,
+Attention) + 3 tide models (ProductTideModel, with nodal cycle `"N"` added for 20yr).
+Data downloaded from Deltares S3, tidal analysis via `analyse_tides_schureman.jl`.
+Training loop switched to `Flux.DataLoader` (proper full-epoch shuffling) across all
+model families. `AttentionSurgeModel` val_input bug fixed. Leaderboard extended with
+tide table; `leaderboard.ipynb` removed in favour of `leaderboard.qmd`.
 
 

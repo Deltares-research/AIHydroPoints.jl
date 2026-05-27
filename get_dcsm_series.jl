@@ -21,15 +21,15 @@ using AIHydroPoints
 # - "local_folder/file.zarr"
 # The profile parameter in the URL is used to specify which AWS credentials profile to use when accessing the S3 bucket. This allows you to manage multiple sets of credentials for different S3 buckets or services.
 url_or_filename = "s3://s3.deltares.nl/ai-hydro/dcsm_1980_2023/DCSM-FM_0_5nm_1980-2023_his.zarr?profile=aihydro_partner"
-quantity="waterlevel"
-source="DCSM-FM_0_5nm_1980-2023"
+quantity = "waterlevel"
+source   = "DCSM-FM_0_5nm_1980-2023"
 
 # open the Zarr time series
 his_data=ZarrTimeSeries(url_or_filename, quantity, source)
 
 # Select time range
-start_date = DateTime(2010,1,1)
-end_date = DateTime(2011,1,1)
+start_date = DateTime(2000,1,1)
+end_date   = DateTime(2023,1,1)
 println("Selecting time range from $(start_date) to $(end_date) and downloading data. Please wait...")
 his_data_timesel = select_timespan(his_data, start_date, end_date)
 println("Time range selected.")
@@ -42,10 +42,10 @@ his_data_selected = select_locations_by_ids(his_data_timesel, station_ids)
 
 # Coarsen to hourly values (if needed)
 # Use function select_timerange_with_fill(ts::AbstractTimeSeries, time_range::StepRange{DateTime, <:TimePeriod}; fill_value=nothing)
-his_data_selected = select_timerange_with_fill(his_data_selected, DateTime(2010,1,1):Hour(1):DateTime(2011,1,1); fill_value=0.0)
+his_data_selected = select_timerange_with_fill(his_data_selected, DateTime(2000,1,1):Hour(1):DateTime(2023,1,1); fill_value=0.0)
 
 # Save to local file
-output_file = joinpath("data","DCSM-FM_0_5nm_2010_5stations_his.jld2")
+output_file = joinpath("data","DCSM-FM_0_5nm_2000_2022_5stations_his.jld2")
 if isfile(output_file)
     rm(output_file)
     # error("Output file $(output_file) already exists. Please remove it before running this script.")

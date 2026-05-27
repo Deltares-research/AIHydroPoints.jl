@@ -44,3 +44,30 @@ available = [c for c in display_cols if c in propertynames(lb)]
 pretty_table(lb[!, available]; backend=:html, stand_alone=false, column_labels=string.(available))
 ```
 
+## Tide Leaderboard
+
+```{julia}
+#| echo: false
+settings_tide = Dict(
+    "root_dirs"  => joinpath(@__DIR__, "training_output"),
+    "quantities" => ["waterlevel"],
+    "sort_by"    => "rmse_testing",
+    "ascending"  => true,
+)
+
+lb_tide = load_leaderboard(settings_tide["root_dirs"]; quantities=settings_tide["quantities"])
+
+if isempty(lb_tide)
+    @warn "No tide runs found."
+else
+    lb_tide = sort_leaderboard(lb_tide, settings_tide["sort_by"]; ascending=settings_tide["ascending"])
+    lb_tide[!, :rank] = 1:nrow(lb_tide)
+    select!(lb_tide, :rank, :)
+end
+
+display_cols = [:rank, :runid, :model_name, :out_quantities, :rmse_testing,
+                :n_params, :train_time_s]
+available = [c for c in display_cols if c in propertynames(lb_tide)]
+pretty_table(lb_tide[!, available]; backend=:html, stand_alone=false, column_labels=string.(available))
+```
+

@@ -48,13 +48,13 @@ zarr_data = RasterStack(zarr_url; lazy=true)
 # Selection parameters
 #
 # time range
-tstart=DateTime(2010,1,1)
-tend=DateTime(2011,1,1)
+tstart=DateTime(2000,1,1)
+tend=DateTime(2023,1,1)
 # points coordinates
 x_points = [ 3.0, 3.75, 4.25, 5.25, 6.5, 0.0,  5.0, 0.0, 0.0]
 y_points = [51.5,52.0 ,53.0 ,53.25,53.75,56.0,56.0,60.0,50.25]
 # filenames for output
-output_files = ["era5_2010_9points_$(quantity).jld2" for quantity in ["wind_stress_x","wind_stress_y","mean_sea_level_pressure"]]
+output_files = [joinpath("data","era5_2000_2022_9points_$(quantity).jld2") for quantity in ["wind_stress_x","wind_stress_y","mean_sea_level_pressure"]]
 
 function download_points_from_maps(dataset,variable_name,start_time::DateTime,end_time::DateTime,x_points,y_points,source,time_chunksize=240)
     println("Downloading variable $(variable_name) for points and time range...")
@@ -95,8 +95,8 @@ function download_points_from_maps(dataset,variable_name,start_time::DateTime,en
             values[ipoint,(itime-itime_first+1):(itime_end-itime_first+1)] = point_in_buffer[:]
         end
     end
-    # create names based on point coordinates
-    names = ["$(variable_name)_$(x_points[i])_$(y_points[i])" for i in 1:length(x_points)]
+    # create names based on coordinates only (not variable name) so all outputs share identical station names
+    names = ["$(x_points[i])_$(y_points[i])" for i in 1:length(x_points)]
     # create metadata for the time series
     longitues = x_points
     latitudes = y_points
@@ -117,9 +117,10 @@ wind_y = get_values(v10_series)
 stress = uv_to_stress_xy.(wind_x, wind_y) # apply the conversion to each element of the arrays
 stress_x=first.(stress) # extract the x component of the stress
 stress_y=last.(stress) # extract the y component of the stress
-# create new time series for the stress
-stress_x_series = TimeSeries(stress_x, get_times(u10_series), get_names(u10_series), get_longitudes(u10_series), get_latitudes(u10_series), "wind_stress_x", source)
-stress_y_series = TimeSeries(stress_y, get_times(v10_series), get_names(v10_series), get_longitudes(v10_series), get_latitudes(v10_series), "wind_stress_y", source)
+# create new time series for the stress (reuse coordinates and names from u10; both share the same grid)
+stress_names = ["$(x_points[i])_$(y_points[i])" for i in 1:length(x_points)]
+stress_x_series = TimeSeries(stress_x, get_times(u10_series), stress_names, get_longitudes(u10_series), get_latitudes(u10_series), "wind_stress_x", source)
+stress_y_series = TimeSeries(stress_y, get_times(v10_series), stress_names, get_longitudes(v10_series), get_latitudes(v10_series), "wind_stress_y", source)
 
 # Save to local file
 write_to_jld2(stress_x_series, output_files[1])
