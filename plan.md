@@ -32,7 +32,7 @@ The main goal of this project is to develop a machine learning model for predict
     a. [x] Check difference between old and new JLD2 formats before generating data
     b. [x] surge baselines 1yr, 5yr 20yr (determine timespans)
     c. [ ] interaction datasets, first testing
-        - Issue: ConvInteractionModel (simplified Conv1D, no station gate) does not learn. Likely nlags=16 (2.7h at 10min) is too short to capture tidal phase (12h period). Needs investigation — either increase nlags or rethink architecture.
+        - Issue: ConvInteractionModel (simplified Conv1D, no station gate) does not learn. Data is hourly so nlags=16 = 16h covers a full tidal cycle — nlags is not the problem. Root cause unknown; needs further investigation.
     d. [ ] interaction baselines 1yr, 5yr 20yr (determine timespans)
     e. [x] tide baselines
     f. [ ] improve scatter plot
@@ -42,8 +42,10 @@ The main goal of this project is to develop a machine learning model for predict
 15. Scale surge model to a large number of stations
 16. Try to remove separate training loop for the AttentionSurgeModel
 17. Create a presentation
+    a. [x] create first draft
+    b. [ ] update methods, results and refine
 18. Improve documentation
-    a. [ ] start quarto tempplate
+    a. [ ] start quarto template
     b. [ ] test publication on github
 19. Add dvc for data storage
 
