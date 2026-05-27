@@ -1,0 +1,61 @@
+# ConvSurgeModel (20yr) — full-period residual prediction
+#
+# Runs the trained 20yr ConvSurgeModel on the full 2000–2022 period and writes
+# the residual (surge_target − surge_prediction) as a JLD2 file.  The residual
+# is used as the interaction-model target.
+#
+# Prerequisites:
+#   pixi run julia --project train.jl experiments/surge_20yr_ConvSurgeModel.toml
+#
+# Usage:
+#   pixi run julia --project predict.jl experiments/predict_surge_residual_20yr.toml
+
+[run_info]
+runid       = "surge_residual_20yr"
+description = "ConvSurgeModel (20yr) residual on full 2000–2022 period for interaction-model target."
+
+[model_settings]
+model_dir = "training_output/surge_20yr_ConvSurgeModel"
+
+[data_settings.model_io]
+input  = ["stress_x", "stress_y", "pressure"]
+target = ["surge"]
+
+# ── Full period: 2000–2022 ─────────────────────────────────────────────────────
+[[data_settings.files]]
+path      = "../data/dscm_2000_2022_5points/surge_schureman_2000_2022_5stations.jld2"
+format    = "jld2"
+split     = "testing"
+timerange = ["2000-01-01", "2023-01-01"]
+variables = [{name="values", as="surge"}]
+
+[[data_settings.files]]
+path      = "../data/era_2000_2022_9points/era5_2000_2022_9points_wind_stress_x.jld2"
+format    = "jld2"
+split     = "testing"
+timerange = ["2000-01-01", "2023-01-01"]
+variables = [{name="values", as="stress_x"}]
+
+[[data_settings.files]]
+path      = "../data/era_2000_2022_9points/era5_2000_2022_9points_wind_stress_y.jld2"
+format    = "jld2"
+split     = "testing"
+timerange = ["2000-01-01", "2023-01-01"]
+variables = [{name="values", as="stress_y"}]
+
+[[data_settings.files]]
+path      = "../data/era_2000_2022_9points/era5_2000_2022_9points_mean_sea_level_pressure.jld2"
+format    = "jld2"
+split     = "testing"
+timerange = ["2000-01-01", "2023-01-01"]
+variables = [{name="values", as="pressure"}]
+
+# ── Output ────────────────────────────────────────────────────────────────────
+[output_settings]
+write_summary = false
+
+[[output_settings.outputs]]
+split         = "testing"
+name          = "full_period"
+residuals     = true
+residual_path = "../data/dscm_2000_2022_5points/surge_residual_20yr_ConvSurgeModel_2000_2022_5stations.jld2"

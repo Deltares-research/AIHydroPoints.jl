@@ -11,7 +11,8 @@ const MODEL_REGISTRY = Dict{String,Type}(
     "ProductTideModel"     => ProductTideModel,
     "ConvWaveModel"        => ConvWaveModel,
     "DeepONetWaveModel"    => DeepONetWaveModel,
-    "ConvInteractionModel" => ConvInteractionModel,
+    "ConvInteractionModel"    => ConvInteractionModel,
+    "ProductInteractionModel" => ProductInteractionModel,
 )
 
 """
@@ -55,7 +56,8 @@ create_model(::Type{DeepONetTideModel},   ms, _) = DeepONetTideModel(ms)
 create_model(::Type{ProductTideModel},    ms, _) = ProductTideModel(ms)
 create_model(::Type{ConvWaveModel},       ms, _) = ConvWaveModel(ms)
 create_model(::Type{DeepONetWaveModel},   ms, _) = DeepONetWaveModel(ms)
-create_model(::Type{ConvInteractionModel},ms, _) = ConvInteractionModel(ms)
+create_model(::Type{ConvInteractionModel},   ms, _) = ConvInteractionModel(ms)
+create_model(::Type{ProductInteractionModel},ms, _) = ProductInteractionModel(ms)
 
 function create_model(::Type{AttentionSurgeModel}, ms, _)
     in_points  = collect(zip(ms["in_lats"],  ms["in_lons"]))

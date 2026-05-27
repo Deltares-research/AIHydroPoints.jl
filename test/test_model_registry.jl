@@ -38,7 +38,8 @@ end
     @test get_model_type(Dict("model_name" => "ProductTideModel"))    === ProductTideModel
     @test get_model_type(Dict("model_name" => "ConvWaveModel"))       === ConvWaveModel
     @test get_model_type(Dict("model_name" => "DeepONetWaveModel"))   === DeepONetWaveModel
-    @test get_model_type(Dict("model_name" => "ConvInteractionModel"))=== ConvInteractionModel
+    @test get_model_type(Dict("model_name" => "ConvInteractionModel"))    === ConvInteractionModel
+    @test get_model_type(Dict("model_name" => "ProductInteractionModel")) === ProductInteractionModel
 end
 
 @testset "get_model_type errors" begin

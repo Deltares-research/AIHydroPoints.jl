@@ -1,10 +1,8 @@
 # ConvInteractionModel — convolutional tide-surge interaction model
 #
-# The interaction model captures non-linear tide-surge interaction: the part of
-# the waterlevel signal that cannot be explained by adding a linear tide model
-# and a linear surge model.  The proper target is the residual:
-#
-#   target = observed_waterlevel - tide_prediction - linear_surge_prediction
+# Treats tide and surge as two input channels and applies strided Conv1D layers
+# over the lag dimension.  Simpler than ProductInteractionModel (no per-station
+# gate).
 #
 # PLACEHOLDER TARGET
 # This example uses surge as a stand-in for the interaction target (loaded

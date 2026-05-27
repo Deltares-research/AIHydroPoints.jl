@@ -104,7 +104,7 @@ function _build_interaction_blocks(model::AbstractInteractionModel,
 
     # One-hot station encoding: (nstations, nstations * ntimes_valid)
     station_arr = collect(1:nstations) * ones(Int, ntimes_valid)'
-    x_station   = Flux.onehotbatch(station_arr[:], 1:nstations)
+    x_station   = Float32.(Flux.onehotbatch(station_arr[:], 1:nstations))
 
     return x_station, x_ts
 end
@@ -226,7 +226,7 @@ function train_model!(model::AbstractInteractionModel, train_settings::TrainingS
 
     nstations = settings["nlocations_output"]
 
-    # Build raw (unnormalized) input blocks
+    # Build raw (unnormalized) input blocks from training data
     x_station, x_ts = _build_interaction_blocks(model, input)
     ntimes_valid = size(x_ts, 3) ÷ nstations
 
@@ -234,41 +234,58 @@ function train_model!(model::AbstractInteractionModel, train_settings::TrainingS
     wl_vals = Float32.(get_values(first(values(target))))
     y_raw   = reshape(wl_vals[:, nlags:end], 1, :)
 
-    # Temporal train/val split
-    n_val_times   = round(Int, train_settings.validation_split * ntimes_valid)
-    has_val       = n_val_times > 0
-    n_train_times = ntimes_valid - n_val_times
-    n_tr_samps    = n_train_times * nstations
+    # Validation data: explicit split takes priority over validation_split
+    if !isnothing(val_input)
+        # Compute Z-score statistics from all training data
+        input_mu   = Float32(mean(x_ts))
+        input_std  = max(Float32(std(x_ts)),  1f-6)
+        output_mu  = Float32(mean(y_raw))
+        output_std = max(Float32(std(y_raw)), 1f-6)
 
-    # Compute Z-score statistics from the training portion only
-    x_ts_train = x_ts[:, :, 1:n_tr_samps]
-    y_train_raw = y_raw[:, 1:n_tr_samps]
+        settings["input_mu"]   = input_mu
+        settings["input_std"]  = input_std
+        settings["output_mu"]  = output_mu
+        settings["output_std"] = output_std
 
-    input_mu   = Float32(mean(x_ts_train))
-    input_std  = max(Float32(std(x_ts_train)), 1f-6)
-    output_mu  = Float32(mean(y_train_raw))
-    output_std = max(Float32(std(y_train_raw)), 1f-6)
+        x_s = x_station
+        x_i = (x_ts .- input_mu) ./ input_std
+        y   = (y_raw .- output_mu) ./ output_std
 
-    settings["input_mu"]   = input_mu
-    settings["input_std"]  = input_std
-    settings["output_mu"]  = output_mu
-    settings["output_std"] = output_std
+        x_station_val, x_ts_val = _build_interaction_blocks(model, val_input)
+        wl_val = Float32.(get_values(first(values(val_target))))
+        x_s_val = x_station_val
+        x_i_val = (x_ts_val .- input_mu) ./ input_std
+        y_val   = (reshape(wl_val[:, nlags:end], 1, :) .- output_mu) ./ output_std
+        has_val = true
+    else
+        # Temporal train/val split; compute Z-score from training portion only
+        n_val_times   = round(Int, train_settings.validation_split * ntimes_valid)
+        has_val       = n_val_times > 0
+        n_train_times = ntimes_valid - n_val_times
+        n_tr_samps    = n_train_times * nstations
 
-    # Normalize full dataset
-    x_ts_norm = (x_ts .- input_mu) ./ input_std
-    y_norm    = (y_raw .- output_mu) ./ output_std
+        input_mu   = Float32(mean(x_ts[:, :, 1:n_tr_samps]))
+        input_std  = max(Float32(std(x_ts[:, :, 1:n_tr_samps])),  1f-6)
+        output_mu  = Float32(mean(y_raw[:, 1:n_tr_samps]))
+        output_std = max(Float32(std(y_raw[:, 1:n_tr_samps])), 1f-6)
 
-    # Split into train / val
-    x_s = x_station[:, 1:n_tr_samps]
-    x_i = x_ts_norm[:, :, 1:n_tr_samps]
-    y   = y_norm[:, 1:n_tr_samps]
-    n_train = size(y, 2)
+        settings["input_mu"]   = input_mu
+        settings["input_std"]  = input_std
+        settings["output_mu"]  = output_mu
+        settings["output_std"] = output_std
 
-    x_s_val = x_i_val = y_val = nothing
-    if has_val
-        x_s_val = x_station[:, n_tr_samps+1:end]
-        x_i_val = x_ts_norm[:, :, n_tr_samps+1:end]
-        y_val   = y_norm[:, n_tr_samps+1:end]
+        x_ts_norm = (x_ts .- input_mu) ./ input_std
+        y_norm    = (y_raw .- output_mu) ./ output_std
+
+        x_s = x_station[:, 1:n_tr_samps]
+        x_i = x_ts_norm[:, :, 1:n_tr_samps]
+        y   = y_norm[:, 1:n_tr_samps]
+        x_s_val = x_i_val = y_val = nothing
+        if has_val
+            x_s_val = x_station[:, n_tr_samps+1:end]
+            x_i_val = x_ts_norm[:, :, n_tr_samps+1:end]
+            y_val   = y_norm[:, n_tr_samps+1:end]
+        end
     end
 
     flux_model = get_flux_model(model)

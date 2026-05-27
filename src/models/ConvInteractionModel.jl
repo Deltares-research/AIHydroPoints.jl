@@ -1,8 +1,8 @@
 # ConvInteractionModel.jl
 #
-# Concrete subtype of AbstractInteractionModel.  Uses an InteractionInputLayer
-# (per-station multiplicative gate on the tide+surge lags) followed by strided
-# Conv1D layers that compress the lag dimension down to a scalar output.
+# Concrete subtype of AbstractInteractionModel.  Uses tide and surge as two
+# input channels and applies strided Conv1D layers over the lag dimension.
+# No per-station gating — simpler and faster than ProductInteractionModel.
 #
 # Inherits from AbstractInteractionModel:
 #   preprocess, postprocess!, train_model!, plot_series
@@ -16,65 +16,29 @@
 using Flux
 
 # ──────────────────────────────────────────────────────────────────────────────
-# InteractionInputLayer — per-station multiplicative gate on tide+surge lags
-# ──────────────────────────────────────────────────────────────────────────────
-
-"""
-    struct InteractionInputLayer{T}
-
-Input layer for interaction models.  Applies a per-station learned gate to the
-`(nlags, 2, nsamples)` tide+surge input.  The station branch produces a
-`(nlags, 2, nsamples)` sensitivity tensor via `Dense(nstations => nlags*2)`,
-which is multiplied element-wise with the raw input.
-"""
-struct InteractionInputLayer{T}
-    station_params :: T   # Dense(nstations => nlags*2, identity; bias=false)
-end
-
-"""
-    InteractionInputLayer(nstations, nlags)
-
-Construct an `InteractionInputLayer` for the given station count and lag length.
-"""
-InteractionInputLayer(nstations::Int, nlags::Int) = InteractionInputLayer(
-    Dense(nstations => nlags * 2, identity; bias=false),
-)
-
-function (l::InteractionInputLayer)(x)
-    x_station, x_ts = x
-    nlags, npars, nbatch = size(x_ts)
-    s1 = l.station_params(x_station)      # (nlags*2, nbatch)
-    s1 = reshape(s1, nlags, npars, nbatch)
-    return s1 .* x_ts
-end
-
-Flux.@layer InteractionInputLayer
-
-# ──────────────────────────────────────────────────────────────────────────────
 # ConvInteractionFlux — Flux model struct
 # ──────────────────────────────────────────────────────────────────────────────
 
 """
-    struct ConvInteractionFlux{T1, T2}
+    struct ConvInteractionFlux{T}
 
-Flux model for `ConvInteractionModel`.  Combines an `InteractionInputLayer`
-gate with a chain of strided `Conv1D` layers that collapse the lag dimension
-to a scalar.
+Flux model for `ConvInteractionModel`.  Applies a chain of strided `Conv1D`
+layers directly to the `(nlags, 2, nsamples)` tide+surge input (no station
+gating).
 """
-struct ConvInteractionFlux{T1, T2}
-    input_layer :: T1   # InteractionInputLayer
-    conv_chain  :: T2   # Chain of Conv layers + Flux.flatten
+struct ConvInteractionFlux{T}
+    conv_chain :: T   # Chain of Conv layers + Flux.flatten
 end
 
 function (l::ConvInteractionFlux)(x)
-    z = l.input_layer(x)     # (nlags, 2, nsamples)
-    return l.conv_chain(z)   # (1, nsamples)
+    _, x_ts = x        # ignore station encoding
+    return l.conv_chain(x_ts)   # (1, nsamples)
 end
 
 Flux.@layer ConvInteractionFlux
 
 """
-    ConvInteractionFlux(nstations, nlags, channels)
+    ConvInteractionFlux(nlags, channels)
 
 Construct the Flux model.
 
@@ -82,7 +46,7 @@ Construct the Flux model.
   `nlags` must equal `2^length(channels)` so each stride-2 Conv halves the
   lag dimension until a scalar remains.
 """
-function ConvInteractionFlux(nstations::Int, nlags::Int, channels::Vector{Int})
+function ConvInteractionFlux(nlags::Int, channels::Vector{Int})
     in_ch = [2; channels[1:end-1]]
     acts  = [fill(tanh, length(channels) - 1); [identity]]
     conv_chain = Chain(
@@ -90,7 +54,7 @@ function ConvInteractionFlux(nstations::Int, nlags::Int, channels::Vector{Int})
          for (ic, oc, act) in zip(in_ch, channels, acts)]...,
         Flux.flatten,
     )
-    return ConvInteractionFlux(InteractionInputLayer(nstations, nlags), conv_chain)
+    return ConvInteractionFlux(conv_chain)
 end
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -100,8 +64,11 @@ end
 """
     ConvInteractionModel <: AbstractInteractionModel
 
-Interaction model using `InteractionInputLayer` followed by strided `Conv1D`
-layers.  `nlags` must equal `2^length(model_pars["channels"])`.
+Interaction model that treats tide and surge as two input channels and applies
+strided `Conv1D` layers over the lag dimension.  Simpler than
+`ProductInteractionModel` — no per-station multiplicative gate.
+
+`nlags` must equal `2^length(model_pars["channels"])`.
 
 ## Constructor
 
@@ -125,10 +92,10 @@ Optional key:
 ## Data flow
 
 ```
-preprocess → x_station (nstations, nstations * ntimes_valid)   [one-hot]
+preprocess → x_station (nstations, nstations * ntimes_valid)   [one-hot, ignored]
              x_ts      (nlags, 2, nstations * ntimes_valid)    [Z-scored lags]
 
-forward    → InteractionInputLayer → Conv1D(stride=2, SamePad) × N → flatten
+forward    → Conv1D(stride=2, SamePad) × N → flatten
           → (1, nstations * ntimes_valid) → reshape (nstations, 1, ntimes_valid)
 
 postprocess! → output["waterlevel"].values .= y .* output_std .+ output_mu
@@ -146,13 +113,12 @@ Construct a `ConvInteractionModel`.  Requires `"nlocations_output"` and `"nlags"
 `settings`.  `nlags` must equal `2^length(model_pars["channels"])`.
 """
 function ConvInteractionModel(settings::Dict{String, Any})
-    nstations = settings["nlocations_output"]
-    nlags     = settings["nlags"]
-    channels  = get(settings, "model_pars", Dict("channels" => [32, 16, 1]))["channels"]
+    nlags    = settings["nlags"]
+    channels = get(settings, "model_pars", Dict("channels" => [32, 16, 1]))["channels"]
 
     @assert nlags == 2^length(channels) "nlags ($nlags) must equal 2^length(channels) ($(2^length(channels)))"
 
-    flux = ConvInteractionFlux(nstations, nlags, channels)
+    flux = ConvInteractionFlux(nlags, channels)
     return ConvInteractionModel(flux, settings)
 end
 
@@ -162,8 +128,8 @@ get_settings(m::ConvInteractionModel)   = m.settings
 """
     forward(model::ConvInteractionModel, x::Tuple) -> Array{Float32, 3}
 
-Unpack `(x_station, x_ts)`, run through the Conv chain, and return
-predictions reshaped to `(nstations, 1, ntimes_valid)`.
+Unpack `(x_station, x_ts)`, run `x_ts` through the Conv chain (ignoring station
+encoding), and return predictions reshaped to `(nstations, 1, ntimes_valid)`.
 """
 function forward(model::ConvInteractionModel, x::Tuple)
     x_station, x_ts = x

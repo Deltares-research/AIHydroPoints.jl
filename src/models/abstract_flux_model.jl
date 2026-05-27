@@ -302,8 +302,11 @@ function write_outputs(model::AbstractFluxModel, data::Dict, all_settings::Dict)
         do_series         = get(entry, "write_series",    false)
         do_tidal_analysis = get(entry, "tidal_analysis",  false) &&
                             model isa AbstractTideModel
+        do_residuals      = get(entry, "residuals",       false)
+        residual_path     = get(entry, "residual_path",   nothing)
 
-        if do_timeseries || do_fft || do_scatter || do_stats || do_series || do_tidal_analysis
+        if do_timeseries || do_fft || do_scatter || do_stats || do_series ||
+                do_tidal_analysis || do_residuals
             out = predict(model, data[split].input)
 
             if do_timeseries
@@ -337,6 +340,35 @@ function write_outputs(model::AbstractFluxModel, data::Dict, all_settings::Dict)
                 fmt = get(output_settings, "series_format", "netcdf")
                 _write_station_series(out, data[split].target, save_dir, name, fmt;
                                       timerange = timerange)
+            end
+
+            if do_residuals
+                out_key  = first(keys(out))
+                ts_pred  = out[out_key]
+                ts_true  = data[split].target[out_key]
+                t_start  = get_times(ts_pred)[1]
+                t_end    = get_times(ts_pred)[end]
+                ts_true  = select_timespan(ts_true, t_start, t_end)
+                if !isnothing(timerange)
+                    ts_pred = select_timespan(ts_pred, timerange[1], timerange[2])
+                    ts_true = select_timespan(ts_true, timerange[1], timerange[2])
+                end
+                resid_vals = get_values(ts_true) .- get_values(ts_pred)
+                ts_resid   = TimeSeries(
+                    resid_vals,
+                    get_times(ts_true),
+                    get_names(ts_true),
+                    get_longitudes(ts_true),
+                    get_latitudes(ts_true),
+                    get_quantity(ts_pred) * "_residual",
+                    get_source(ts_true),
+                )
+                resid_path = isnothing(residual_path) ?
+                    joinpath(save_dir, "residual_$(name).jld2") :
+                    residual_path
+                isfile(resid_path) && rm(resid_path)
+                write_to_jld2(ts_resid, resid_path)
+                @info "Residual written to $resid_path"
             end
 
             if do_tidal_analysis

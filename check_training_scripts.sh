@@ -95,7 +95,7 @@ run_group() {
 # Jobs
 # ──────────────────────────────────────────────────────────────────────────────
 
-run "analyse_tides_schureman" $JULIA analyse_tides_schureman.jl
+#run "analyse_tides_schureman" $JULIA analyse_tides_schureman.jl
 
 run_group \
     "train LinearSurgeModel:::bin/train examples/LinearSurgeModel.toml" \
@@ -105,7 +105,8 @@ run_group \
     "train ProductTideModel:::bin/train examples/ProductTideModel.toml" \
     "train ConvWaveModel:::bin/train examples/ConvWaveModel.toml" \
     "train DeepONetWaveModel:::bin/train examples/DeepONetWaveModel.toml" \
-    "train ConvInteractionModel:::bin/train examples/ConvInteractionModel.toml"
+    "train ConvInteractionModel:::bin/train examples/ConvInteractionModel.toml" \
+    "train ProductInteractionModel:::bin/train examples/ProductInteractionModel.toml"
 
 run_group \
     "predict ConvSurgeModel:::bin/predict examples/predict_ConvSurgeModel.toml" \

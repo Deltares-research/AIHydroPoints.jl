@@ -86,8 +86,11 @@ export stats_skipnan, average_stats
 include("models/AbstractInteractionModel.jl")
 export AbstractInteractionModel
 
+include("models/ProductInteractionModel.jl")
+export ProductInteractionModel, ProductInteractionFlux, InteractionInputLayer
+
 include("models/ConvInteractionModel.jl")
-export ConvInteractionModel, InteractionInputLayer, ConvInteractionFlux
+export ConvInteractionModel, ConvInteractionFlux
 
 include("model_registry.jl")
 export MODEL_REGISTRY, get_model_type, validate_model_settings!, create_model
