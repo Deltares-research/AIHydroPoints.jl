@@ -1,4 +1,6 @@
 
+[![Docs](https://img.shields.io/badge/docs-online-blue.svg)](https://deltares-research.github.io/AIHydroPoints.jl/)
+
 # A series approach to forecasting tides and storm-surges
 
 The purpose of this time-series based AI model is to have a simple and fast benchmark model.
