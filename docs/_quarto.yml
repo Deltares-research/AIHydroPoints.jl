@@ -1,0 +1,36 @@
+project:
+  type: website
+  output-dir: _site
+
+website:
+  title: "AIHydroPoints.jl"
+  description: "ML-based water level forecasting — tides, surge, waves, and their interaction"
+  navbar:
+    left:
+      - href: index.qmd
+        text: Home
+      - href: background.md
+        text: Background
+    right:
+      - icon: github
+        href: https://github.com/Deltares-research/AIHydroPoints.jl
+
+  sidebar:
+    style: floating
+    contents:
+      - section: "Getting started"
+        contents:
+          - index.qmd
+          - installation.qmd
+          - background.md
+      - section: "Reference"
+        contents:
+          - settings.md
+          - data_input_settings.md
+          - output_settings.md
+
+format:
+  html:
+    theme: flatly
+    toc: true
+    toc-depth: 3

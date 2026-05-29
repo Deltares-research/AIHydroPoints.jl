@@ -1,0 +1,40 @@
+---
+title: "AIHydroPoints.jl"
+---
+
+A Julia package for ML-based point forecasting of water levels at coastal stations.
+Inputs come from ERA5 reanalysis; outputs are tides, storm surge, waves, and their interaction at a set of stations.
+
+## Overview
+
+Total water level is decomposed into four additive components:
+
+$$\eta_\text{total} = \eta_\text{tide} + \eta_\text{surge} + \eta_\text{wave} + \eta_\text{interaction}$$
+
+Each component is modelled by a separate neural network trained on DCSM-FM reanalysis output.
+
+## Quick start
+
+```bash
+# Install dependencies
+pixi install
+pixi run install-julia
+
+# Train a model
+bin/train examples/ConvSurgeModel.toml
+
+# Run inference
+bin/predict examples/predict_ConvSurgeModel.toml
+```
+
+## Documentation
+
+- [Background](background.md) — concepts and motivation
+- [Settings reference](settings.md) — all model and training settings
+- [Data input settings](data_input_settings.md) — how to configure data loading
+- [Output settings](output_settings.md) — how to configure model outputs
+
+## Presentation
+
+An overview of the models and current results:
+<https://deltares-research.github.io/AIHydroPoints.jl/presentations/index.html>

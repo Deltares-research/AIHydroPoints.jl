@@ -1,0 +1,108 @@
+---
+title: "Installation & getting started"
+---
+
+This page walks you through installing the dependencies and running your first training example.
+
+## 1. Install pixi
+
+AIHydroPoints uses [pixi](https://pixi.sh) to manage Julia and all other dependencies.
+
+::: {.panel-tabset}
+
+### Linux / macOS
+
+```bash
+curl -fsSL https://pixi.sh/install.sh | sh
+```
+
+Restart your shell (or `source ~/.bashrc`) so that `pixi` is on your PATH.
+
+### Windows
+
+```powershell
+winget install prefix-dev.pixi
+```
+
+Or with PowerShell:
+
+```powershell
+powershell -ExecutionPolicy Bypass -c "irm -useb https://pixi.sh/install.ps1 | iex"
+```
+
+:::
+
+## 2. Clone the repository
+
+```bash
+git clone https://github.com/Deltares-research/AIHydroPoints.jl.git
+cd AIHydroPoints.jl
+```
+
+::: {.callout-tip}
+If `git` is not available on your system, you can install it via pixi:
+```bash
+pixi global install git
+```
+:::
+
+
+## 3. Install the environment
+
+```bash
+pixi install
+```
+
+This downloads Julia (via juliaup) and all conda dependencies declared in `pixi.toml`.
+
+## 4. Install Julia
+
+```bash
+pixi run install-julia
+```
+
+This installs the pinned Julia version (1.12.5) through juliaup.
+
+## 5. Instantiate the Julia project
+
+```bash
+pixi run julia --project -e "using Pkg; Pkg.instantiate()"
+```
+
+This downloads all Julia package dependencies listed in `Project.toml`.
+
+## 6. Run the tests (optional)
+
+```bash
+pixi run julia --project -e "using Pkg; Pkg.test()"
+```
+
+All tests should pass. This also confirms that the test data is in place.
+
+## 7. Train a model
+
+The simplest model to start with is `LinearSurgeModel` — a single dense layer that predicts storm surge from wind stress and pressure. Training takes a few seconds.
+
+```bash
+bin/train examples/LinearSurgeModel.toml
+```
+
+Output (weights, loss plot, statistics) is written to `examples/training_output/example_LinearSurgeModel/`.
+
+::: {.callout-note}
+The example config uses `nepochs = 5` for a fast smoke-test. For a meaningful run increase this to 100 or more in the TOML file.
+:::
+
+## 8. Run inference
+
+```bash
+bin/predict examples/predict_LinearSurgeModel.toml
+```
+
+This loads the trained weights and runs prediction on the test period. Output is written to `examples/predict_output/example_predict_LinearSurgeModel/`.
+
+## Next steps
+
+- Explore the other example configs in `examples/` (ConvSurgeModel, ProductTideModel, …)
+- Read the [settings reference](settings.md) to understand all available options
+- Read the [data input settings](data_input_settings.md) to connect your own data

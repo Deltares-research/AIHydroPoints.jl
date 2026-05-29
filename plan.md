@@ -43,7 +43,7 @@ The main goal of this project is to develop a machine learning model for predict
 16. Try to remove separate training loop for the AttentionSurgeModel
 17. Create a presentation
     a. [x] create first draft
-    b. [ ] update methods, results and refine
+    b. [x] update methods, results and refine
 18. Improve documentation
     a. [ ] start quarto template
     b. [ ] test publication on github

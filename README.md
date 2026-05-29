@@ -16,6 +16,11 @@ Summing all four outputs gives the total water level.  The architecture captures
 
 The model has no internal state, which makes it equally suitable for hindcasts (reanalysis winds) and forecasts (NWP winds).
 
+## Documentation
+
+Full documentation is available at:
+<https://deltares-research.github.io/AIHydroPoints.jl/>
+
 ## Presentation
 
 An overview of the models and results is available at:
