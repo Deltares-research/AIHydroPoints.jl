@@ -1,4 +1,6 @@
 
+[![Docs](https://img.shields.io/badge/docs-online-blue.svg)](https://deltares-research.github.io/AIHydroPoints.jl/)
+
 # A series approach to forecasting tides and storm-surges
 
 The purpose of this time-series based AI model is to have a simple and fast benchmark model.
@@ -15,6 +17,11 @@ The AI model contains four modules:
 Summing all four outputs gives the total water level.  The architecture captures both local and generic dynamics: a one-hot station vector selects station-specific parameters while shared layers encode the common physics.
 
 The model has no internal state, which makes it equally suitable for hindcasts (reanalysis winds) and forecasts (NWP winds).
+
+## Documentation
+
+Full documentation is available at:
+<https://deltares-research.github.io/AIHydroPoints.jl/>
 
 ## Presentation
 
