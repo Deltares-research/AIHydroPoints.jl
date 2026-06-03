@@ -1,106 +1,118 @@
-# ConvInteractionModel — 1-year training baseline (2019)
-#
-# The interaction target is the surge residual:
-#   target = surge_observed - surge_prediction (20yr ConvSurgeModel)
-#
-# Generate the residual file first:
-#   pixi run julia --project predict.jl experiments/predict_surge_residual_20yr.toml
+# LinearSurgeModel — 20-year training baseline (2000–2019)
 #
 # Training : 2019
 # Validation: 2020
 # Testing  : 2021–2022
 #
 # Usage:
-#   pixi run julia --project train.jl experiments/interaction_1yr_ConvInteractionModel.toml
+#   ../../bin/train surge_20yr_LinearSurgeModel.toml
 
 [run_info]
-runid       = "interaction_1yr"
-description = "ConvInteractionModel baseline: 1-year training (2019), val 2020, test 2021–2022."
+runid       = "surge_20yr"
+description = "LinearSurgeModel baseline: 20-year training (2000–2019), val 2020, test 2021–2022.. 317 stations."
 
 [model_settings]
-model_name = "ConvInteractionModel"
+model_name = "LinearSurgeModel"
 nlags      = 16
 
-[model_settings.model_pars]
-channels = [64, 32, 16, 1]
-
 [train_settings]
-nepochs         = 250
-nbatches        = 256 #64
-learning_rate   = 5.0e-2
+nepochs         = 20
+nbatches        = 64
+learning_rate   = 1.0e-3
 lr_decay_factor = 0.1
 lr_decay_rate   = 400
 patience        = 10
 
 [data_settings.model_io]
-input  = ["tide", "surge"]
-target = ["interaction"]
+input  = ["stress_x", "stress_y", "pressure"]
+target = ["surge"]
 
 # ── Training: 2019 ────────────────────────────────────────────────────────────
 [[data_settings.files]]
-path      = "../data/dscm_2000_2022_5points/tides_schureman_2000_2022_5stations.jld2"
+path      = "../../data/dscm_2000_2022_317points/surge_schureman_2000_2022_317stations_his.jld2"
 format    = "jld2"
 split     = "training"
-timerange = ["2019-01-01", "2020-01-01"]
-variables = [{name="values", as="tide"}]
-
-[[data_settings.files]]
-path      = "../data/dscm_2000_2022_5points/surge_schureman_2000_2022_5stations.jld2"
-format    = "jld2"
-split     = "training"
-timerange = ["2019-01-01", "2020-01-01"]
+timerange = ["2000-01-01", "2020-01-01"]
 variables = [{name="values", as="surge"}]
 
 [[data_settings.files]]
-path      = "../data/dscm_2000_2022_5points/surge_residual_20yr_ConvSurgeModel_2000_2022_5stations.jld2"
+path      = "../../data/era_2000_2022_317points/era5_2000_2022_317points_wind_stress_x.jld2"
 format    = "jld2"
 split     = "training"
-timerange = ["2019-01-01", "2020-01-01"]
-variables = [{name="values", as="interaction"}]
+timerange = ["2000-01-01", "2020-01-01"]
+variables = [{name="values", as="stress_x"}]
+
+[[data_settings.files]]
+path      = "../../data/era_2000_2022_317points/era5_2000_2022_317points_wind_stress_y.jld2"
+format    = "jld2"
+split     = "training"
+timerange = ["2000-01-01", "2020-01-01"]
+variables = [{name="values", as="stress_y"}]
+
+[[data_settings.files]]
+path      = "../../data/era_2000_2022_317points/era5_2000_2022_317points_mean_sea_level_pressure.jld2"
+format    = "jld2"
+split     = "training"
+timerange = ["2000-01-01", "2020-01-01"]
+variables = [{name="values", as="pressure"}]
 
 # ── Validation: 2020 ──────────────────────────────────────────────────────────
 [[data_settings.files]]
-path      = "../data/dscm_2000_2022_5points/tides_schureman_2000_2022_5stations.jld2"
-format    = "jld2"
-split     = "validation"
-timerange = ["2020-01-01", "2021-01-01"]
-variables = [{name="values", as="tide"}]
-
-[[data_settings.files]]
-path      = "../data/dscm_2000_2022_5points/surge_schureman_2000_2022_5stations.jld2"
+path      = "../../data/dscm_2000_2022_317points/surge_schureman_2000_2022_317stations_his.jld2"
 format    = "jld2"
 split     = "validation"
 timerange = ["2020-01-01", "2021-01-01"]
 variables = [{name="values", as="surge"}]
 
 [[data_settings.files]]
-path      = "../data/dscm_2000_2022_5points/surge_residual_20yr_ConvSurgeModel_2000_2022_5stations.jld2"
+path      = "../../data/era_2000_2022_317points/era5_2000_2022_317points_wind_stress_x.jld2"
 format    = "jld2"
 split     = "validation"
 timerange = ["2020-01-01", "2021-01-01"]
-variables = [{name="values", as="interaction"}]
+variables = [{name="values", as="stress_x"}]
+
+[[data_settings.files]]
+path      = "../../data/era_2000_2022_317points/era5_2000_2022_317points_wind_stress_y.jld2"
+format    = "jld2"
+split     = "validation"
+timerange = ["2020-01-01", "2021-01-01"]
+variables = [{name="values", as="stress_y"}]
+
+[[data_settings.files]]
+path      = "../../data/era_2000_2022_317points/era5_2000_2022_317points_mean_sea_level_pressure.jld2"
+format    = "jld2"
+split     = "validation"
+timerange = ["2020-01-01", "2021-01-01"]
+variables = [{name="values", as="pressure"}]
 
 # ── Testing: 2021–2022 ────────────────────────────────────────────────────────
 [[data_settings.files]]
-path      = "../data/dscm_2000_2022_5points/tides_schureman_2000_2022_5stations.jld2"
-format    = "jld2"
-split     = "testing"
-timerange = ["2021-01-01", "2023-01-01"]
-variables = [{name="values", as="tide"}]
-
-[[data_settings.files]]
-path      = "../data/dscm_2000_2022_5points/surge_schureman_2000_2022_5stations.jld2"
+path      = "../../data/dscm_2000_2022_317points/surge_schureman_2000_2022_317stations_his.jld2"
 format    = "jld2"
 split     = "testing"
 timerange = ["2021-01-01", "2023-01-01"]
 variables = [{name="values", as="surge"}]
 
 [[data_settings.files]]
-path      = "../data/dscm_2000_2022_5points/surge_residual_20yr_ConvSurgeModel_2000_2022_5stations.jld2"
+path      = "../../data/era_2000_2022_317points/era5_2000_2022_317points_wind_stress_x.jld2"
 format    = "jld2"
 split     = "testing"
 timerange = ["2021-01-01", "2023-01-01"]
-variables = [{name="values", as="interaction"}]
+variables = [{name="values", as="stress_x"}]
+
+[[data_settings.files]]
+path      = "../../data/era_2000_2022_317points/era5_2000_2022_317points_wind_stress_y.jld2"
+format    = "jld2"
+split     = "testing"
+timerange = ["2021-01-01", "2023-01-01"]
+variables = [{name="values", as="stress_y"}]
+
+[[data_settings.files]]
+path      = "../../data/era_2000_2022_317points/era5_2000_2022_317points_mean_sea_level_pressure.jld2"
+format    = "jld2"
+split     = "testing"
+timerange = ["2021-01-01", "2023-01-01"]
+variables = [{name="values", as="pressure"}]
 
 # ── Output ────────────────────────────────────────────────────────────────────
 [output_settings]

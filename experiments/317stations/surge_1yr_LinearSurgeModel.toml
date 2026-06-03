@@ -1,34 +1,26 @@
-# AttentionSurgeModel — 1-year training baseline (2019)
+# LinearSurgeModel — 1-year training baseline (2019)
 #
 # Training : 2019
 # Validation: 2020
 # Testing  : 2021–2022
 #
 # Usage:
-#   pixi run julia --project train.jl experiments/surge_1yr_AttentionSurgeModel.toml
+#   ../../bin/train surge_1yr_LinearSurgeModel.toml
 
 [run_info]
 runid       = "surge_1yr"
-description = "AttentionSurgeModel baseline: 1-year training (2019), val 2020, test 2021–2022."
+description = "LinearSurgeModel baseline: 1-year training (2019), val 2020, test 2021–2022.. 317 stations."
 
 [model_settings]
-model_name = "AttentionSurgeModel"
+model_name = "LinearSurgeModel"
 nlags      = 16
 
-[model_settings.model_pars]
-nembed         = 32
-theta          = 1000.0
-nheads         = 4
-nlayers_branch = 2
-nlayers_trunk  = 2
-nhidden_trunk  = 32
-
 [train_settings]
-nepochs         = 20
+nepochs         = 50 #20
 nbatches        = 64
 learning_rate   = 1.0e-3
-lr_decay_factor = 0.1
-lr_decay_rate   = 400
+lr_decay_factor = 0.5
+lr_decay_rate   = 10 #400
 patience        = 10
 
 [data_settings.model_io]
@@ -37,28 +29,28 @@ target = ["surge"]
 
 # ── Training: 2019 ────────────────────────────────────────────────────────────
 [[data_settings.files]]
-path      = "../data/dscm_2000_2022_5points/surge_schureman_2000_2022_5stations.jld2"
+path      = "../../data/dscm_2000_2022_317points/surge_schureman_2000_2022_317stations_his.jld2"
 format    = "jld2"
 split     = "training"
 timerange = ["2019-01-01", "2020-01-01"]
 variables = [{name="values", as="surge"}]
 
 [[data_settings.files]]
-path      = "../data/era_2000_2022_9points/era5_2000_2022_9points_wind_stress_x.jld2"
+path      = "../../data/era_2000_2022_317points/era5_2000_2022_317points_wind_stress_x.jld2"
 format    = "jld2"
 split     = "training"
 timerange = ["2019-01-01", "2020-01-01"]
 variables = [{name="values", as="stress_x"}]
 
 [[data_settings.files]]
-path      = "../data/era_2000_2022_9points/era5_2000_2022_9points_wind_stress_y.jld2"
+path      = "../../data/era_2000_2022_317points/era5_2000_2022_317points_wind_stress_y.jld2"
 format    = "jld2"
 split     = "training"
 timerange = ["2019-01-01", "2020-01-01"]
 variables = [{name="values", as="stress_y"}]
 
 [[data_settings.files]]
-path      = "../data/era_2000_2022_9points/era5_2000_2022_9points_mean_sea_level_pressure.jld2"
+path      = "../../data/era_2000_2022_317points/era5_2000_2022_317points_mean_sea_level_pressure.jld2"
 format    = "jld2"
 split     = "training"
 timerange = ["2019-01-01", "2020-01-01"]
@@ -66,28 +58,28 @@ variables = [{name="values", as="pressure"}]
 
 # ── Validation: 2020 ──────────────────────────────────────────────────────────
 [[data_settings.files]]
-path      = "../data/dscm_2000_2022_5points/surge_schureman_2000_2022_5stations.jld2"
+path      = "../../data/dscm_2000_2022_317points/surge_schureman_2000_2022_317stations_his.jld2"
 format    = "jld2"
 split     = "validation"
 timerange = ["2020-01-01", "2021-01-01"]
 variables = [{name="values", as="surge"}]
 
 [[data_settings.files]]
-path      = "../data/era_2000_2022_9points/era5_2000_2022_9points_wind_stress_x.jld2"
+path      = "../../data/era_2000_2022_317points/era5_2000_2022_317points_wind_stress_x.jld2"
 format    = "jld2"
 split     = "validation"
 timerange = ["2020-01-01", "2021-01-01"]
 variables = [{name="values", as="stress_x"}]
 
 [[data_settings.files]]
-path      = "../data/era_2000_2022_9points/era5_2000_2022_9points_wind_stress_y.jld2"
+path      = "../../data/era_2000_2022_317points/era5_2000_2022_317points_wind_stress_y.jld2"
 format    = "jld2"
 split     = "validation"
 timerange = ["2020-01-01", "2021-01-01"]
 variables = [{name="values", as="stress_y"}]
 
 [[data_settings.files]]
-path      = "../data/era_2000_2022_9points/era5_2000_2022_9points_mean_sea_level_pressure.jld2"
+path      = "../../data/era_2000_2022_317points/era5_2000_2022_317points_mean_sea_level_pressure.jld2"
 format    = "jld2"
 split     = "validation"
 timerange = ["2020-01-01", "2021-01-01"]
@@ -95,28 +87,28 @@ variables = [{name="values", as="pressure"}]
 
 # ── Testing: 2021–2022 ────────────────────────────────────────────────────────
 [[data_settings.files]]
-path      = "../data/dscm_2000_2022_5points/surge_schureman_2000_2022_5stations.jld2"
+path      = "../../data/dscm_2000_2022_317points/surge_schureman_2000_2022_317stations_his.jld2"
 format    = "jld2"
 split     = "testing"
 timerange = ["2021-01-01", "2023-01-01"]
 variables = [{name="values", as="surge"}]
 
 [[data_settings.files]]
-path      = "../data/era_2000_2022_9points/era5_2000_2022_9points_wind_stress_x.jld2"
+path      = "../../data/era_2000_2022_317points/era5_2000_2022_317points_wind_stress_x.jld2"
 format    = "jld2"
 split     = "testing"
 timerange = ["2021-01-01", "2023-01-01"]
 variables = [{name="values", as="stress_x"}]
 
 [[data_settings.files]]
-path      = "../data/era_2000_2022_9points/era5_2000_2022_9points_wind_stress_y.jld2"
+path      = "../../data/era_2000_2022_317points/era5_2000_2022_317points_wind_stress_y.jld2"
 format    = "jld2"
 split     = "testing"
 timerange = ["2021-01-01", "2023-01-01"]
 variables = [{name="values", as="stress_y"}]
 
 [[data_settings.files]]
-path      = "../data/era_2000_2022_9points/era5_2000_2022_9points_mean_sea_level_pressure.jld2"
+path      = "../../data/era_2000_2022_317points/era5_2000_2022_317points_mean_sea_level_pressure.jld2"
 format    = "jld2"
 split     = "testing"
 timerange = ["2021-01-01", "2023-01-01"]

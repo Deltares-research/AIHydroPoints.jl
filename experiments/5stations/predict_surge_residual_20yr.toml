@@ -23,28 +23,28 @@ target = ["surge"]
 
 # ── Full period: 2000–2022 ─────────────────────────────────────────────────────
 [[data_settings.files]]
-path      = "../data/dscm_2000_2022_5points/surge_schureman_2000_2022_5stations.jld2"
+path      = "../../data/dscm_2000_2022_5points/surge_schureman_2000_2022_5stations.jld2"
 format    = "jld2"
 split     = "testing"
 timerange = ["2000-01-01", "2023-01-01"]
 variables = [{name="values", as="surge"}]
 
 [[data_settings.files]]
-path      = "../data/era_2000_2022_9points/era5_2000_2022_9points_wind_stress_x.jld2"
+path      = "../../data/era_2000_2022_9points/era5_2000_2022_9points_wind_stress_x.jld2"
 format    = "jld2"
 split     = "testing"
 timerange = ["2000-01-01", "2023-01-01"]
 variables = [{name="values", as="stress_x"}]
 
 [[data_settings.files]]
-path      = "../data/era_2000_2022_9points/era5_2000_2022_9points_wind_stress_y.jld2"
+path      = "../../data/era_2000_2022_9points/era5_2000_2022_9points_wind_stress_y.jld2"
 format    = "jld2"
 split     = "testing"
 timerange = ["2000-01-01", "2023-01-01"]
 variables = [{name="values", as="stress_y"}]
 
 [[data_settings.files]]
-path      = "../data/era_2000_2022_9points/era5_2000_2022_9points_mean_sea_level_pressure.jld2"
+path      = "../../data/era_2000_2022_9points/era5_2000_2022_9points_mean_sea_level_pressure.jld2"
 format    = "jld2"
 split     = "testing"
 timerange = ["2000-01-01", "2023-01-01"]
@@ -58,4 +58,4 @@ write_summary = false
 split         = "testing"
 name          = "full_period"
 residuals     = true
-residual_path = "../data/dscm_2000_2022_5points/surge_residual_20yr_ConvSurgeModel_2000_2022_5stations.jld2"
+residual_path = "../../data/dscm_2000_2022_5points/surge_residual_20yr_ConvSurgeModel_2000_2022_5stations.jld2"
