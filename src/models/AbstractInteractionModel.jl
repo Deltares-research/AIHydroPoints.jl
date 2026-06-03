@@ -290,6 +290,7 @@ function train_model!(model::AbstractInteractionModel, train_settings::TrainingS
 
     flux_model = get_flux_model(model)
     opt_state  = Flux.setup(Adam(train_settings.learning_rate), flux_model)
+    current_lr = Float64(train_settings.learning_rate)
     loader = Flux.DataLoader((x_s, x_i, y); batchsize=train_settings.nbatches, shuffle=true)
 
     checkpoint_dir = get(settings, "model_dir", nothing)
@@ -334,6 +335,13 @@ function train_model!(model::AbstractInteractionModel, train_settings::TrainingS
             msg = @sprintf("epoch %d/%d  train RMSE: %.4f", epoch, train_settings.nepochs, train_rmse)
             has_val && (msg *= @sprintf("  val RMSE: %.4f", val_losses[end]))
             @info msg
+        end
+
+        if !isnothing(train_settings.lr_decay_factor) &&
+                !isnothing(train_settings.lr_decay_rate) &&
+                epoch % train_settings.lr_decay_rate == 0
+            current_lr *= train_settings.lr_decay_factor
+            Flux.Optimisers.adjust!(opt_state, current_lr)
         end
     end
 

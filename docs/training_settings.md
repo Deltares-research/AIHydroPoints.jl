@@ -8,8 +8,8 @@ not saved with the model — they are only needed during training.
 | `nepochs` | `Int` | `100` | Number of training epochs. |
 | `nbatches` | `Int` | `1024` | Minibatch size. |
 | `learning_rate` | `Float64` | `1.0e-3` | Initial learning rate for the Adam optimiser. |
-| `lr_decay_factor` | `Float64` or `nothing` | `nothing` | Multiplicative LR decay factor; `nothing` disables decay. |
-| `lr_decay_rate` | `Int` or `nothing` | `nothing` | Epoch interval between LR decay steps; `nothing` disables decay. |
+| `lr_decay_factor` | `Float64` | *(omit to disable)* | Multiply the learning rate by this value every `lr_decay_rate` epochs (e.g. `0.1` reduces LR 10×). Both keys must be present to activate decay. |
+| `lr_decay_rate` | `Int` | *(omit to disable)* | Epoch interval between LR decay steps (e.g. `10` decays at epochs 10, 20, 30, …). Both keys must be present to activate decay. |
 | `weight_reg` | `Float64` | `1.0e-4` | L2 weight-decay coefficient. |
 | `patience` | `Int` | `5` | Epochs without improvement before early stopping. |
 | `checkpoints` | `Vector{Int}` or `nothing` | `nothing` | Epoch numbers at which to save a model snapshot. |
