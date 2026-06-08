@@ -81,7 +81,7 @@ The main goal of this project is to develop a machine learning model for predict
        per-model assembly step. Update `LinearSurgeModel`, `ConvSurgeModel`,
        `AttentionSurgeModel` accordingly; verify wave and interaction
        models too.
-    g. [ ] Update `src/models/design.md` to reflect the new convention
+    g. [ ] Update `docs/design.md` to reflect the new convention
        (each model declares its own input/output tensor layout; the
        abstract pipeline only standardises the `Dict{String,TimeSeries}`
        boundary).

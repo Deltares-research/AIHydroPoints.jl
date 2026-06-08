@@ -81,6 +81,7 @@ And the predicted surge timeseries at Hoek van Holland on the test period (RMSE 
 ## Documentation
 
 - [Background](background.md) — concepts and motivation
+- [Software design](design.md) — model hierarchy, interfaces, and tensor conventions
 - [Settings reference](settings.md) — all model and training settings
 - [Data input settings](data_input_settings.md) — how to configure data loading
 - [Output settings](output_settings.md) — how to configure model outputs
