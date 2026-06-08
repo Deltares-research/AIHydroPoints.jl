@@ -1,7 +1,14 @@
 
 # Background and motivation
 
-NOTE: This doc is about the concepts and math, not the code structure or implementation details. 
+NOTE: This doc is about the concepts and math, not the code structure or implementation details.
+
+> **Draft warning.** This document is still a very rough draft and should be
+> read with care. The conceptual notation and the actual tensor layouts used
+> in the code are not yet fully consistent — see
+> [`notes_dimensions.md`](notes_dimensions.md) for an ongoing review of those
+> inconsistencies and the planned refactor. The index-notation conventions
+> used below are spelled out in the [Notation](notation.md) appendix.
 
 The AIHydroPoints.jl package is developed to explore the application of machine learning models to predict water levels, tides, waves, and more at a network of coastal stations. Although this is the intended application scope at te moment, the package is designed to be flexible and extensible, allowing for the incorporation of additional phenomena and model architectures in the future. To keep the repository organized and maintainable, the codebase is structured around a common concept for the AI models. The key assumptions and design principles are as follows:
 - each model takes a set of time-series as input, and produces a set of time-series as output. Both the input and output time-series are given as a combination of points (locations) and variables (e.g. "wind_x", "surge", etc.). 

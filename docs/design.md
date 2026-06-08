@@ -87,6 +87,19 @@ a side-effect on the model struct and keeps `TimeSeries` allocation in one place
 
 `time_lag = 1` means no lag (single time step input).
 
+> **Note — under review (see `docs/notes_dimensions.md`, plan step 20).** The
+> "unified" 4-D input / 3-D output layout above is aspirational rather than
+> implemented: concrete models already use different shapes (e.g.
+> `ConvSurgeModel` wants `(nlags, channels, time)` for Flux's Conv1D;
+> `AttentionSurgeModel` produces a tuple `(x_station, x_wind)`; the trailing
+> singleton in the output is a placeholder). The current direction is to drop
+> the single unified layout, let each model declare its own input/output
+> shape, and have `preprocess` / `postprocess!` convert between the
+> standardised `Dict{String, TimeSeries}` boundary and the model-specific
+> tensors. The shared call signature will be `flux_model(x)` for both tensor
+> and tuple inputs via a `(m::ModelFlux)(x::Tuple) = m(x...)` wrapper. This
+> file will be updated once that refactor lands.
+
 ### Required customisation points
 
 | Method | Signature | Purpose |

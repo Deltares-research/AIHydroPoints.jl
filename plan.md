@@ -45,9 +45,46 @@ The main goal of this project is to develop a machine learning model for predict
     a. [x] create first draft
     b. [x] update methods, results and refine
 18. Improve documentation
-    a. [ ] start quarto template
-    b. [ ] test publication on github
+    a. [x] start quarto template
+    b. [x] test publication on github
+    c. [x] Expand `docs/notation.md` to support `docs/background.md`: dense + ReLU
+       walkthrough with Flux & PyTorch side-by-side; column-major vs row-major
+       intermezzo; index convention table (capital = output, lowercase = input);
+       generic convolution notation with kernel offset `Δi` and per-direction size
+       `N_i, K_i → N_{Δi}`; summary table of three conv variants with parameter
+       counts; `$\star$` reduced to "apply weights" (subscripts moved into the
+       index pattern of `W`).
+    d. [ ] Extend `notation.md` to cover the *realistic* 4-axis input/output
+       (point, quantity, time-lag, batch-time) once the per-model layout
+       refactor (step 20) lands — see `docs/notes_dimensions.md`.
 19. Add dvc for data storage
+20. Tensor-layout review and refactor (working notes in `docs/notes_dimensions.md`)
+    a. [x] Survey actual tensor shapes used in each model (preprocess vs.
+       layer-ready) — Notes 1–4.
+    b. [x] Identify the design issue: a "unified" abstract input tensor
+       layout is an illusion; only data extraction is genuinely shared,
+       the tensor arrangement is layer-specific — Note 5.
+    c. [x] Decide call-signature convention: every Flux model gets a
+       `(m::ModelFlux)(x::Tuple) = m(x...)` wrapper so `forward` can call
+       `flux_model(x)` uniformly — Note 6.
+    d. [x] Decide output convention: drop the trailing
+       `reshape(y, size(y, 1), 1, ntimes)` placeholder; each `forward`
+       returns its natural 2D `(nstations, ntimes)` shape; `postprocess!`
+       consumes 2D directly — Note 7.
+    e. [ ] Fix the `ConvSurgeModel.jl:70` reshape bug: `reshape(x, nlags,
+       n_in, size(x,2))` doesn't permute memory and silently scrambles
+       channel/lag positions whenever `nlags ≠ 3·nwind`. Verify with a
+       synthetic test, then fix via per-model `preprocess` (Note 5
+       recommendation) — not via `permutedims` in `forward`.
+    f. [ ] Refactor `preprocess` along the principle in the conclusion of
+       `notes_dimensions.md`: shared data-extraction helper +
+       per-model assembly step. Update `LinearSurgeModel`, `ConvSurgeModel`,
+       `AttentionSurgeModel` accordingly; verify wave and interaction
+       models too.
+    g. [ ] Update `src/models/design.md` to reflect the new convention
+       (each model declares its own input/output tensor layout; the
+       abstract pipeline only standardises the `Dict{String,TimeSeries}`
+       boundary).
 
 ## Checklist for each step:
 - all source should eventually be in src/ and all tests should be in test/ and test data should be in test_data/

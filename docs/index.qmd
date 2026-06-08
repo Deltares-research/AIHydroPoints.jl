@@ -85,6 +85,10 @@ And the predicted surge timeseries at Hoek van Holland on the test period (RMSE 
 - [Data input settings](data_input_settings.md) — how to configure data loading
 - [Output settings](output_settings.md) — how to configure model outputs
 
+## Appendix
+
+- [Notation](notation.md) — index-notation conventions used in [Background](background.md)
+
 ## Presentation
 
 An overview of the models and current results:
