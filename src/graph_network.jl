@@ -4,7 +4,7 @@ function distance(point1, point2)
     lat1, lon1 = point1
     lat2, lon2 = point2
     delta_lon = abs(lon1-lon2)
-    delta_sig = acos(sin(lat1)*sin(lat2) + cos(lat1)*cos(lat2)*cos(delta_lon))
+    delta_sig = acos(clamp(sin(lat1)*sin(lat2) + cos(lat1)*cos(lat2)*cos(delta_lon), -1.0, 1.0))
     return R*delta_sig
 end
 
