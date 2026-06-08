@@ -30,6 +30,10 @@ website:
           - data_input_settings.md
           - output_settings.md
       - background.md
+      - design.md
+      - section: "Appendix"
+        contents:
+          - notation.md
 
 format:
   html:
