@@ -171,12 +171,17 @@ whether they also rely on the q·p-first ordering for a flatten-into-
 Dense pattern, in which case the right answer is for *each* model's
 `forward` to choose its own layout via an honest `permutedims`).
 
-### Status
+### Status — RESOLVED (step 20e/f)
 
-- [ ] Verify by running a small synthetic test (e.g. set
-  `stress_x[c, l, i] = 100*c + l` and check what the Conv input
-  actually sees).
-- [ ] Decide on fix 1 vs. fix 2.
+- [x] Verified by a synthetic test (`stress_x[p,t] = 100*p + t`): the old
+  `reshape` made the Conv spatial axis read `[101, 201, 301, 401]` (a feature
+  ramp) instead of `[101, 102, 103, 104]` (a lag ramp). Now a permanent
+  regression test, "ConvSurgeModel conv-ready layout (no scramble)".
+- [x] Decided: **neither fix 1 (`permutedims` in `forward`) nor a global fix 2**,
+  but the Note-5 design — `ConvSurgeModel.preprocess` builds the conv-ready
+  `(nlags, 3·nwind, nvalid)` layout directly (transposing each lag window with
+  `permutedims` at preprocess time, not per forward pass), and the `Chain[1]`
+  reshape is gone.
 - [x] Check that `LinearSurgeModel` is not silently affected by either
   fix — see Note 3.
 - [x] Check `AttentionSurgeModel` — see Note 4.

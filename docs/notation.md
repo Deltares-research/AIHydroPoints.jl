@@ -40,7 +40,7 @@ We'll add a few more details to this notation to arrive at:
 
 $$\mathbf{y}_I = \sigma(\mathbf{W}_{Ii} \star \mathbf{x}_i + \mathbf{b}_I) $$
 
-where $\sigma$ is the activation function, and $\star$ denotes "apply the weights": the exact operation (dense contraction, convolution, pass-through, …) is determined per direction by the index pattern of $\mathbf{W}$ — see the rules in the convolutional-layer section. We also use capital letters for the output indices and lowercase letters for the input indices, and we drop the brackets around the indices for brevity. We'll use brackets when we want to make the order of the indices explicit, but otherwise we'll use the names of the indices instead of their positions in the tensor. So, eg $\mathbf{W}_{Ii}$ is the same as $\mathbf{W}_{iI}$, but $[\mathbf{W}]_{Ii}$ is the transpose of $[\mathbf{W}]_{iI}$.
+where $\sigma$ is the activation function (not necessarilly a sigmoid), and $\star$ denotes "apply the weights": the exact operation (dense contraction, convolution, pass-through, …) is determined per direction by the index pattern of $\mathbf{W}$ — see the rules in the convolutional-layer section. We also use capital letters for the output indices and lowercase letters for the input indices, and we drop the brackets around the indices for brevity. We'll use brackets when we want to make the order of the indices explicit, but otherwise we'll use the names of the indices instead of their positions in the tensor. So, eg $\mathbf{W}_{Ii}$ is the same as $\mathbf{W}_{iI}$, but $[\mathbf{W}]_{Ii}$ is the transpose of $[\mathbf{W}]_{iI}$.
 
 ## Multi-dimensional data
 
@@ -154,7 +154,7 @@ $$\mathbf{y}_I = \sigma(\mathbf{W}_{\Delta i} \star \mathbf{x}_{i} + b)$$
 
 The kernel $\mathbf{W}_{\Delta i}$ is indexed by the **kernel offset** $\Delta i$ (range $1, \ldots, N_{\Delta i}$), not by the full input position $i$ (range $1, \ldots, N_i$). The $\Delta i$ on $\mathbf{W}$ tells us that $\star$ is a convolution along $i$: for each output position $I$, we sum over the kernel offset $\Delta i$ against the shifted input values $\mathbf{x}_{I+\Delta i - 1}$.
 
-The key observation is that the weight tensor $\mathbf{W}$ has **fewer or different indices than the corresponding dense layer would have**: a dense layer would have $\mathbf{W}_{Ii}$ (both output index $I$ and input index $i$), but the convolutional version drops $I$ (weights are shared across output positions) and replaces $i$ with the kernel offset $\Delta i$.
+The key observation is that the weight tensor $\mathbf{W}$ **typically has much fewer indices than the corresponding dense layer would have**: a dense layer would have $\mathbf{W}_{Ii}$ (both output index $I$ and input index $i$), but the convolutional version drops $I$ (weights are shared across output positions) and replaces $N_I N_i$ weights with $N_{\Delta i}$ weights for a single input and single output channel, that is if we ignore the bias weights. 
 
 ### Notation for missing and convolved indices
 
@@ -192,14 +192,42 @@ These are three different layers, distinguishable at a glance from the index pat
 | 2D conv (3×3 kernel) over $i$ and $j$ | $\mathbf{y}_{IJ} = \sigma(\mathbf{W}_{\Delta i\,\Delta j} \star \mathbf{x}_{ij} + b)$ | $N_{\Delta i} N_{\Delta j}$ | `Conv((3, 3), 1 => 1, relu)` |
 | 1D conv (size 3) over $i$, dense over $j$ | $\mathbf{y}_{IJ} = \sigma(\mathbf{W}_{J\,\Delta i\,j} \star \mathbf{x}_{ij} + b_J)$ | $N_J N_{\Delta i} N_j$ | `Conv((3,), N_j => N_J, relu)` (treating $j$ as channel) |
 | 1D conv (size 3) over $j$, shared for each $i$ | $\mathbf{y}_{IJ} = \sigma(\mathbf{W}_{\Delta j} \star \mathbf{x}_{ij} + b)$ | $N_{\Delta j}$ | `Conv((1, 3), 1 => 1, relu)` |
+| Dense over $i$ and $j$ | $\mathbf{y}_{IJ} = \sigma(\mathbf{W}_{IJij} \star \mathbf{x}_{ij} + b_{IJ})$ | $N_I N_J N_i N_j$ | `Dense(N_i*N_j => N_I*N_J, relu)` |
 
-For reference, a fully dense layer $\mathbf{W}_{IJij}$ would have $N_I N_J N_i N_j$ weights — every conv variant above is a strict subset obtained by dropping or replacing indices, which is exactly the parameter sharing that makes convolutions efficient.
+The fully dense layer with $\mathbf{W}_{IJij}$ would require reshaping the input tensor $\mathbf{x}_{ij}$ into a vector of length $N_i N_j$ before applying the weight matrix, and then reshaping the output back into a tensor of shape $(N_I, N_J)$.
 
 In the second row, $j$ is interpreted as the channel dimension so a 1D `Conv` with $N_j$ input and $N_J$ output channels achieves the dense map along $j$. In the third row, a 2D `Conv` with a width-1 kernel along $i$ reuses the same weights at every $i$ position.
 
+It is clear from this table that the number of weights in $\mathbf{W}$ can vary dramatically depending on the index pattern, and that the index pattern is a concise way to describe the structure of the layer. For $N_i = N_j = 100$ and $N_{\Delta i} = N_{\Delta j} = 3$, the number of weights per row is 9 for the first row, 300 for the second row, 3 for the third row, and 1,000,000 for the fourth row. The number of weights in $\mathbf{W}$ is a key factor in determining the capacity of the model and its ability to generalize to new data. 
+On the other hand all models, except the fully dense layer, impose a strong inductive bias on the data, which can be beneficial for generalization, but can also be detrimental if the bias is not appropriate for the data. The choice of index pattern for $\mathbf{W}$ is therefore an important design decision when building a model.
+
 ## Towards a more realistic example
 
-In practice the input tensor is 4-dimensional with axes for point, quantity, time-lag, and batch-time — though point and quantity are merged into one dimension at the tensor level so that 1D Conv treats them as channels.
+Let's consider a surge model that uses convolution in time and dense mapping across other dimensions. At the input nodes, we have winds in x and y directions, as well as surface pressure. The output points are a different set of locations from the input points. The goal is to predict the surge at the output points, at time $t$. The model predicts the surge at each output point independently, using all the input points and all the input quantities. Thus the input $\mathbf{x}$ has indices for point $p$, quantity $q$ and time $t$, and the output $\mathbf{y}$ has an index for point $P$ and times $T$. The weights $\mathbf{W}$ have indices for output point $P$, input point $p$, input quantity $q$, and time-lag $\Delta t$. The bias $\mathbf{b}$ has an index for output point $P$. The model can be written as:
+
+$$\mathbf{y}_{P T} = \sigma(\mathbf{W}_{Ppq\Delta t} \star \mathbf{x}_{pqt} + \mathbf{b}_P)$$
+
+For implementation, we can use a 1D convolutional layer and process the combined $pq$ as channels. In a Conv layer the convolution comes before the channels, so the input tensor is reshaped to have shape $(N_t, N_p N_q)$, and the output tensor is reshaped to have shape $(N_T, N_P)$. The model can be implemented in Flux as:
+
+```julia
+model = Conv((N_Δt,), N_p*N_q => N_P, relu)
+```
+
+In practice the input will arrive as 3 separate 2D arrays for the 3 quantities, each of size $(N_p, N_t)$, which can be stacked into a single 3D array with shape $(N_p, N_q, N_t)$ before being reshaped to $(N_t, N_p N_q)$ for the Conv layer, arrives as a 2D array of size $N_T, N_P$. The output will be reshaped back to $(N_P, N_T)$ after the Conv layer. Note that the order of the indices in the input and output tensors is needs to be adjusted in the pre- and post-processing steps to match the expected order of the Conv layer. _Permuting indices cannot be performed using a reshape, but also requires changing the order of the data in memory using eg permutedims._
+
+## Lumped notation
+
+Some aspects of the models can be explained without knowing the exact details of the input and output locations, and we can use a more compact notation to describe the models. Here the inputs and outputs are assumed to be lumped together and only depend on time $t$. The input time-series is denoted as $\mathbf{X}_t \in \mathbb{R}^{N_i}$, and the output time-series is denoted as $\mathbf{Y}_t \in \mathbb{R}^{N_I}$. The model is a function $f_\theta$ with parameters $\theta$, that maps the input time-series in the input window to the output at time $t$:
+
+$$\mathbf{Y}_t = f_\theta(\mathbf{X}_{t-l:t},t)$$
+
+where $\mathbf{X}_{t-l:t}$ denotes the input time-series from time $t-l$ to time $t$, with $l$ being the length of the input window. Many models will not have an explicit dependence on time $t$, and for example tides models on the other end of the spectrum will have no other inputs than the time $t$.
+
+For training, we have a dataset of input-output pairs $\{(\mathbf{X}_{t-l:t}, \mathbf{Y}_t)\}_{t=1}^T$, where $\mathbf{Y}_t$ is the target output at time $t$. The training objective is to find the parameters $\theta$ that minimize the loss function:
+
+$$\mathbf{L}(\theta) = \frac{1}{T}\sum_{t=1}^T ||f_\theta(\mathbf{X}_{t-l:t},t) - \mathbf{Y}_t||^2$$
+
+where $||.||^2$ uses the mean squared error (MSE), but other loss functions can also be used depending on the application. The trained model can then be used for inference by applying it to new input time-series to predict the output at future times.
 
 
 

@@ -9,36 +9,40 @@ NOTE: This doc is about the concepts and math, not the code structure or impleme
 > [`notes_dimensions.md`](notes_dimensions.md) for an ongoing review of those
 > inconsistencies and the planned refactor. The index-notation conventions
 > used below are spelled out in the [Notation](notation.md) appendix.
+> Everything before the "## Old background" is the new background, which is incomplete and under development.
 
-The AIHydroPoints.jl package is developed to explore the application of machine learning models to predict water levels, tides, waves, and more at a network of coastal stations. Although this is the intended application scope at te moment, the package is designed to be flexible and extensible, allowing for the incorporation of additional phenomena and model architectures in the future. To keep the repository organized and maintainable, the codebase is structured around a common concept for the AI models. The key assumptions and design principles are as follows:
-- each model takes a set of time-series as input, and produces a set of time-series as output. Both the input and output time-series are given as a combination of points (locations) and variables (e.g. "wind_x", "surge", etc.). 
-- The models are causal, meaning that the prediction at time t can only depend on the input data up to time t (or t - lag, where lag is a hyperparameter). All previous times t-lag until t are considered as the "input window" for the prediction at time t. 
-- The models are not autoregressive. The models are trained to predict the output time-series at time t, given the input time-series in the input window. This implies that the models do not use any values of the output time-series (at any time) as input. This implies that the computation of the output time-series can be fully parallelized over time, which is a significant advantage for training and inference speed. Another consequence of this is that the acuracy of the model does not degrade over time due to error accumulation, which is a common issue with autoregressive models, but this comes at the cost of overlapping input windows. In addition, autoregressive models can often improve the accuracy at short lead-times.
-- Initially, the output at a particular location may depend on the input at all input locations, but we aim to explore also models that have a more local receptive field, where the output at a particular location only depends on the input at nearby locations. This is a natural assumption for many physical phenomena, and it can also help to reduce the number of parameters and improve the generalization of the model, and can be used to further speed up the training and inference by exploiting the sparsity of the input-output dependencies.
+## Introduction
 
-## Notation
+This describes the mathematical and conceptual background for the AIHydroPoints.jl package. The package is designed to explore the application of machine learning models to predict water levels, tides, waves, and more at a network of coastal stations. The package is designed to be flexible and extensible, allowing for the incorporation of additional phenomena and model architectures in the future.
 
-Consider a set of $N$ input stations with locations $(x_i, y_i)$ for $i = 1, \dots, N$, and a set of $\tilde{N}$ output stations with locations $(\tilde{x}_j, \tilde{y}_j)$ for $j = 1, \dots, \tilde{N}$. For each input location there are $P$ input variables (e.g. "wind_x", "wind_y", "surge", etc.), and for each output location there are $\tilde{P}$ output variables (e.g. "surge", "tide", etc.). The full input time-series thus has length $N*P$ at any time $t$, denoted as $\mathbf{x}_t \in \mathbb{R}^{N*P}$, and the full output time-series has length $\tilde{N}*\tilde{P}$ at any time $t$, denoted as $\mathbf{y}_t \in \mathbb{R}^{\tilde{N}*\tilde{P}}$. Each model is a function $f_\theta$ with parameters $\theta$, that maps the input time-series in the input window to the output at time $t$:
-$$\mathbf{y}_t = f_\theta(\mathbf{x}_{t-l:t},t)$$
-where $\mathbf{x}_{t-l:t}$ denotes the input time-series from time $t-l$ to time $t$, with $l$ being the length of the input window. Many models will not have an explicit dependence on time $t$, and for example tides models on the other end of the spectrum will have no other inputs than the time $t$.
+The notation used in this document is based on the index notation for tensors, which is a concise and expressive way to describe the structure of the data and the operations performed by the models. The notation is explained in detail in the [Notation](notation.md) appendix.
 
-For training, we have a dataset of input-output pairs $\{(\mathbf{x}_{t-l:t}, \mathbf{y}_t)\}_{t=1}^T$, where $\mathbf{y}_t$ is the target output at time $t$. The training objective is to find the parameters $\theta$ that minimize the loss function:
-$$\mathbf{L}(\theta) = \frac{1}{T}\sum_{t=1}^T ||f_\theta(\mathbf{x}_{t-l:t},t) - \mathbf{y}_t||^2$$
-where $||.||^2$ uses the mean squared error (MSE), but other loss functions can also be used depending on the application. The trained model can then be used for inference by applying it to new input time-series to predict the output at future times.
+## Time-lag models
+
+All the models in the package are time-lag models, which means that to compute the output at time $t$, the model takes as input a window of past input data from time $t-l$ to time $t$, where $l$ is the length of the input window. The models are **causal**, meaning that the prediction at time $t$ can only depend on the input data up to time $t$. The models are **not autoregressive**, which means that they do not use any values of the output time-series (at any time) as input. This allows for parallel computation of the output time-series over time, which is a significant advantage for training and inference speed. The generic form of this type of model is described at the end of the [Notation](notation.md) appendix.
+
+In this package a single call to the core model, will compute the output at a single time $t$, given the input window from $t-l$ to $t$. To compute the output time-series over a range of times, inputs can be stacked into a batch dimension, and the model can be called in parallel over the batch dimension. This implies that the inputs will probably contain overlapping time windows, but this is not a problem as long as everything fits in memory. Still, it's good to be aware that the model preprocess function will increase the memory footprint by a factor of $l$ when preparing the input data for a range of times.
 
 ## Surge models
 
-The surge models all use the same input variables (wind-stress and pressure) and the same output variable (surge), but they differ in the model architecture. 
+The surge models all use the same input variables (wind-stress and pressure) and all output one variable (surge). In more detail, the input time-series should be provided for one of:
+- Wind-stress components "stress_x" and "stress_y" and "pressure" at $N_p$ input stations and $N_t$ time steps.
+- Wind speed components "wind_x" and "wind_y" and "pressure" at $N_p$ input stations and $N_t$ time steps. The wind speed components are converted to wind-stress components internally in the model, using the Charnock drag coefficient relation. The output time-series is the surge at $\tilde{N}_p$ output stations and $N_t$ time steps.
+
+Input time-series are provided as a dictionary of MultiTimeSeries, with keys "stress_x", "stress_y", and "pressure" (or "wind_x", "wind_y", and "pressure"). The output time-series is a single MultiTimeSeries with key "surge".
 
 ### Linear surge model
 
-The linear surge model is a simple linear regression on the lagged wind-stress and pressure forcing. The linear model can be denoted as:
-$$
-\mathbf{y}_t = W\,\mathbf{x}_{t-l:t} + \mathbf{b},\qquad
-W \in \mathbb{R}^{\tilde{N}*\tilde{P} \times N*P*l},\quad \mathbf{b} \in \mathbb{R}^{\tilde{N}*\tilde{P}}
-$$
-with $\tilde{P}=1$ for surge. This corresponds to a single dense layer with identity
-activation, applied independently for each time $t$.
+
+The linear surge model is a simple linear regression on the lagged wind-stress and pressure forcing. The linear model for a single output time can be denoted as:
+
+$$\mathbf{y}_{PT} = (\mathbf{W}_{Ppql} \star \mathbf{x}_{pqlt} + \mathbf{b}_P)$$
+
+where $l$ is the time lag dimension, $p$ is the input station dimension, $q$ is the input variable dimension (wind-stress x, wind-stress y, pressure), and $P$ is the output station dimension. The model can be applied independently for each output time $t$, using the lagged input window $\mathbf{x}_{pql}$ from time $t-l$ to time $t$.  
+
+The model only imposes a linear relationship between the input and output, but there are no other constraints on the model parameters. The model could be trained using standard linear regression techniques, but here we use a neural network framework to keep the training and inference code consistent with the other models. The linear model can be implemented as a single dense layer with identity activation, using the output time as the batch dimension.
+
+## Old background
 
 ### Time convolution surge model
 
