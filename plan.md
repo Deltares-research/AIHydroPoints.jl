@@ -31,6 +31,10 @@ The main goal of this project is to develop a machine learning model for predict
 11. Create a baseline for each model type
     a. [x] Check difference between old and new JLD2 formats before generating data
     b. [x] surge baselines 1yr, 5yr 20yr (determine timespans)
+        - NOTE: the **ConvSurgeModel** baselines must be **regenerated** — they
+          were trained before the step-20e reshape fix, i.e. on scrambled
+          channel/lag data. Linear (Dense is permutation-invariant, Note 3) and
+          Attention (unaffected, Note 4) baselines remain valid.
     c. [ ] interaction datasets, first testing
         - Issue: ConvInteractionModel (simplified Conv1D, no station gate) does not learn. Data is hourly so nlags=16 = 16h covers a full tidal cycle — nlags is not the problem. Root cause unknown; needs further investigation.
     d. [ ] interaction baselines 1yr, 5yr 20yr (determine timespans)
@@ -40,7 +44,11 @@ The main goal of this project is to develop a machine learning model for predict
 13. Create an environment for online demos
 14. Add experiments for waves
 15. Scale surge model to a large number of stations
-16. Try to remove separate training loop for the AttentionSurgeModel
+16. [x] Try to remove separate training loop for the AttentionSurgeModel —
+    done as a byproduct of step 20e/f: the always-tuple `preprocess` + generic
+    `forward`/`train_model!` let the `AttentionSurgeModel` `forward` and
+    `train_model!` overrides be deleted; it now trains through the single shared
+    surge loop.
 17. Create a presentation
     a. [x] create first draft
     b. [x] update methods, results and refine
@@ -71,20 +79,36 @@ The main goal of this project is to develop a machine learning model for predict
        `reshape(y, size(y, 1), 1, ntimes)` placeholder; each `forward`
        returns its natural 2D `(nstations, ntimes)` shape; `postprocess!`
        consumes 2D directly — Note 7.
-    e. [ ] Fix the `ConvSurgeModel.jl:70` reshape bug: `reshape(x, nlags,
+    e. [x] Fix the `ConvSurgeModel.jl:70` reshape bug: `reshape(x, nlags,
        n_in, size(x,2))` doesn't permute memory and silently scrambles
-       channel/lag positions whenever `nlags ≠ 3·nwind`. Verify with a
-       synthetic test, then fix via per-model `preprocess` (Note 5
-       recommendation) — not via `permutedims` in `forward`.
-    f. [ ] Refactor `preprocess` along the principle in the conclusion of
-       `notes_dimensions.md`: shared data-extraction helper +
-       per-model assembly step. Update `LinearSurgeModel`, `ConvSurgeModel`,
-       `AttentionSurgeModel` accordingly; verify wave and interaction
-       models too.
+       channel/lag positions whenever `nlags ≠ 3·nwind`. Verified with a
+       synthetic test (throwaway demo + permanent regression test
+       "ConvSurgeModel conv-ready layout (no scramble)"), fixed via per-model
+       `preprocess` that builds the conv-ready `(nlags, 3·nwind, nvalid)` layout
+       directly (Note 5 recommendation) — not via `permutedims` in `forward`.
+    f. [x] Refactor `preprocess` along the principle in the conclusion of
+       `notes_dimensions.md`: shared data-extraction helper
+       (`_surge_lag_windows`) + per-model assembly step. Done **for the surge
+       family** together with 20e (Option 1): `preprocess` now returns a tuple
+       `(x, output)`; `forward`/`postprocess!`/`train_model!` are generic on
+       `AbstractSurgeModel` (splat `flux_model(x...)`, 2-D output, single tuple
+       DataLoader loop). Also applies the 20c/20d decisions (tuple call, drop
+       output singleton). Wave/interaction/tide were **verified unaffected**
+       (they keep their own `preprocess`/`forward`/`train_model!`), not yet
+       converted — see 20h.
     g. [ ] Update `docs/design.md` to reflect the new convention
        (each model declares its own input/output tensor layout; the
        abstract pipeline only standardises the `Dict{String,TimeSeries}`
        boundary).
+    h. [ ] **(deferred — Option 2, package-wide unification)** Extend the
+       always-tuple + 2-D convention to the **wave, interaction, and tide**
+       families and collapse **all four** `train_model!` bodies into a single
+       generic loop in `abstract_flux_model.jl`, parameterised by a per-family
+       `build_training_tensors(model, …)` hook (captures the NaN-filter for
+       waves and the Z-score stat computation for interaction) plus per-family
+       `postprocess!` (inverse transforms). Make every Flux model return its
+       natural 2-D output. Deferred until the interaction baselines (11c/d) are
+       settled, to avoid destabilising working families.
 
 ## Checklist for each step:
 - all source should eventually be in src/ and all tests should be in test/ and test data should be in test_data/
@@ -130,5 +154,19 @@ Data downloaded from Deltares S3, tidal analysis via `analyse_tides_schureman.jl
 Training loop switched to `Flux.DataLoader` (proper full-epoch shuffling) across all
 model families. `AttentionSurgeModel` val_input bug fixed. Leaderboard extended with
 tide table; `leaderboard.ipynb` removed in favour of `leaderboard.qmd`.
+
+Steps 20e, 20f, and 16 are complete (Option 1 — surge family). The
+`ConvSurgeModel` reshape scramble is fixed. Surge models now follow the
+always-tuple convention: `preprocess → (x::Tuple, output)`; a shared
+`_surge_lag_windows` extraction helper feeds per-model assembly; `forward`
+(splats `flux_model(x...)`, returns 2-D), `postprocess!` (2-D), and a single
+tuple-`DataLoader` `train_model!` are generic on `AbstractSurgeModel`. The
+`AttentionSurgeModel` `forward`/`train_model!` overrides are gone (step 16); its
+Flux model now returns the 2-D last-lag slice directly. Every tensor axis is
+commented in code for the docs step (18d). 149 surge-family unit tests pass
+(incl. the new conv-layout regression test). **Remaining verification:** full
+`Pkg.test()` + `check_training_scripts.sh` (task in progress), and `docs/design.md`
+(20g). Deferred: package-wide `train_model!` unification (20h); ConvSurgeModel
+baseline regeneration (11b note).
 
 

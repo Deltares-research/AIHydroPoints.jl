@@ -4,15 +4,14 @@
 # architecture (branch/trunk/downsample with graph adjacency).
 #
 # Inherits from AbstractSurgeModel:
-#   postprocess!, save_params, load_params!, predict
+#   forward, postprocess!, train_model!, save_params, load_params!, predict
 #
-# Overrides (different tensor structure — two inputs instead of one):
-#   preprocess, forward, train_model!
+# Overrides only preprocess (two input tensors instead of one). The generic
+# forward/train_model! handle the 2-input case because preprocess returns a
+# tuple and the Flux model is called by splatting it (m(x_station, x_wind)).
 
 using Flux
 using Dates
-using Printf: @sprintf
-using ProgressMeter: Progress, next!
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Internal Flux architecture
@@ -43,7 +42,10 @@ function (m::AttentionSurgeFlux)(x_station, x_wind)
         batched_transpose(trunk_out .* m.adjacency),
         reshape(branch_out, (nwind, :, nbatch)),
     )
-    return m.downsample(merged)
+    # downsample → (nstations, nlags, nbatch); the prediction is the final lag,
+    # so slice it here and return the 2-D (nstations, nbatch) surge output that
+    # the shared surge pipeline (forward / train_model!) expects.
+    return m.downsample(merged)[:, end, :]
 end
 
 @Flux.layer AttentionSurgeFlux
@@ -126,63 +128,49 @@ get_flux_model(m::AttentionSurgeModel) = m.flux_model
 get_settings(m::AttentionSurgeModel)   = m.settings
 
 # ──────────────────────────────────────────────────────────────────────────────
-# preprocess — overrides AbstractSurgeModel (two inputs, not one)
+# preprocess — overrides AbstractSurgeModel (two input tensors, not one)
 # ──────────────────────────────────────────────────────────────────────────────
 
 """
     preprocess(model::AttentionSurgeModel, input::Dict{String, TimeSeries})
         -> (Tuple, Dict{String, TimeSeries})
 
-Build wind/pressure lag tensor and station-encoding tensor, and pre-allocate
-the output `TimeSeries` for surge.
+Build the station-encoding tensor and the wind/pressure lag tensor, and
+pre-allocate the surge output.
 
 Returns `((x_station, x_wind), output)` where:
-- `x_station` has shape `(6, nstations, ntimes_valid)`: cos/sin of lat, lon,
-  and day-of-year for each output station at each valid time step.
-- `x_wind` has shape `(3*nwind, nlags, ntimes_valid)`: lagged wind-stress and
-  scaled pressure history.
+- `x_station :: (6, nstations, ntimes_valid)` — cos/sin of latitude, longitude,
+  and day-of-year for each output station at each valid batch-time step.
+- `x_wind :: (3*nlocations_input, nlags, ntimes_valid)` — the shared lag windows
+  stacked along the feature axis in `(stress_x, stress_y, pressure)` order, so
+  point varies fastest within quantity. The branch network's downstream
+  `reshape(·, (nwind, 3, nlags, :))` relies on exactly this ordering.
 
-Accepts either `"stress_x"`/`"stress_y"` (used directly) or `"wind_x"`/`"wind_y"`
-(converted via `uv_to_stress_xy`).
+Batch-time is the last axis of both tensors, so the shared `train_model!` can
+batch them together. `forward` and `postprocess!` are inherited from
+`AbstractSurgeModel`.
 
-Requires `"out_lats"`, `"out_lons"` to be present in `model.settings` (set
-automatically by `train_model!` on first call).
+Requires `"out_lats"`, `"out_lons"` in `model.settings` (set automatically by
+`train_model!` on first call).
 """
 function preprocess(model::AttentionSurgeModel, input::Dict{String, TimeSeries})
     settings  = get_settings(model)
-    nwind     = settings["nlocations_input"]
-    nlags     = settings["nlags"]
     nstations = settings["nlocations_output"]
 
-    if haskey(settings, "in_names")
-        in_names = settings["in_names"]
-        input = Dict(k => _check_and_align_locations(v, in_names, "input[\"$k\"]")
-                     for (k, v) in input)
-    end
+    # Shared extraction: sx, sy, pr :: (nwind, nlags, nvalid), point-fastest.
+    sx, sy, pr, times_valid = _surge_lag_windows(model, input)
+    nvalid = length(times_valid)
 
-    stress_x, stress_y = _get_stress(input)
-    press  = Float32.(2e-4 .* (get_values(input["pressure"]) .- 1e5))
+    # x_wind: (3*nwind, nlags, nvalid) — point-fastest within quantity.
+    x_wind = vcat(sx, sy, pr)
 
-    times       = get_times(input[_wind_key(input)])
-    ntimes      = length(times)
-    valid_range = nlags:ntimes
-    nvalid      = length(valid_range)
-
-    # Stress/pressure lag tensor: (3*nwind, nlags, nvalid)
-    x_wind = zeros(Float32, 3 * nwind, nlags, nvalid)
-    for (i, t) in enumerate(valid_range)
-        x_wind[1:nwind,           :, i] = stress_x[:, t-nlags+1:t]
-        x_wind[nwind+1:2*nwind,   :, i] = stress_y[:, t-nlags+1:t]
-        x_wind[2*nwind+1:3*nwind, :, i] = press[   :, t-nlags+1:t]
-    end
-
-    # Station encoding: (6, nstations, nvalid)
-    lats       = settings["out_lats"]
-    lons       = settings["out_lons"]
-    dayperiod  = 365.25
-    times_day  = Dates.dayofyear.(times[valid_range])
-    times_cos  = Float32.(cos.(2π .* times_day ./ dayperiod))'  # (1, nvalid)
-    times_sin  = Float32.(sin.(2π .* times_day ./ dayperiod))'
+    # Station encoding: (6, nstations, nvalid) — cos/sin of lat, lon, day-of-year.
+    lats      = settings["out_lats"]
+    lons      = settings["out_lons"]
+    dayperiod = 365.25
+    times_day = Dates.dayofyear.(times_valid)
+    times_cos = Float32.(cos.(2π .* times_day ./ dayperiod))'   # (1, nvalid)
+    times_sin = Float32.(sin.(2π .* times_day ./ dayperiod))'
 
     x_station = zeros(Float32, 6, nstations, nvalid)
     x_station[1, :, :] .= Float32.(cos.(deg2rad.(lats)))
@@ -192,145 +180,5 @@ function preprocess(model::AttentionSurgeModel, input::Dict{String, TimeSeries})
     x_station[5, :, :] .= times_cos
     x_station[6, :, :] .= times_sin
 
-    # Pre-allocate output TimeSeries
-    out_ts = TimeSeries(
-        zeros(Float32, nstations, nvalid),
-        times[valid_range],
-        settings["out_names"],
-        settings["out_lons"],
-        settings["out_lats"],
-        get(settings, "out_quantity", "surge"),
-        "AttentionSurgeModel",
-    )
-    output = Dict{String, TimeSeries}("surge" => out_ts)
-
-    return (x_station, x_wind), output
-end
-
-# ──────────────────────────────────────────────────────────────────────────────
-# forward — overrides AbstractSurgeModel (unpacks tuple input)
-# ──────────────────────────────────────────────────────────────────────────────
-
-"""
-    forward(model::AttentionSurgeModel, x::Tuple) -> Array{Float32, 3}
-
-Unpack `(x_station, x_wind)` from `x`, run `AttentionSurgeFlux`, and return
-the last-lag slice reshaped to `(nstations, 1, ntimes)`.
-"""
-function forward(model::AttentionSurgeModel, x::Tuple)
-    x_station, x_wind = x
-    y = model.flux_model(x_station, x_wind)   # (nstations, nlags, ntimes)
-    return reshape(y[:, end, :], size(y, 1), 1, size(y, 3))
-end
-
-# ──────────────────────────────────────────────────────────────────────────────
-# train_model! — overrides AbstractSurgeModel (batches over time axis as tuple)
-# ──────────────────────────────────────────────────────────────────────────────
-
-"""
-    train_model!(model::AttentionSurgeModel, train_settings::TrainingSettings,
-                 input::Dict{String, TimeSeries}, target::Dict{String, TimeSeries})
-        -> (Vector{Float32}, Vector{Float32})
-
-Train `AttentionSurgeModel` in-place using minibatch gradient descent (Adam).
-Batches are sampled randomly from the time axis.
-
-See `AbstractSurgeModel` docstring for argument conventions and return value.
-"""
-function train_model!(model::AttentionSurgeModel, train_settings::TrainingSettings,
-                      input::Dict{String, TimeSeries}, target::Dict{String, TimeSeries};
-                      val_input::Union{Dict{String,TimeSeries},Nothing}  = nothing,
-                      val_target::Union{Dict{String,TimeSeries},Nothing} = nothing)
-
-    settings = get_settings(model)
-
-    # Populate output metadata from target if not yet present
-    if !haskey(settings, "out_names")
-        ts_ref = first(values(target))
-        settings["out_names"]    = get_names(ts_ref)
-        settings["out_lons"]     = Float64.(get_longitudes(ts_ref))
-        settings["out_lats"]     = Float64.(get_latitudes(ts_ref))
-        settings["out_quantity"] = get_quantity(ts_ref)
-    end
-
-    (x_station, x_wind), _ = preprocess(model, input)
-    nvalid = size(x_wind, 3)
-
-    nlags     = settings["nlags"]
-    ts_target = first(values(target))
-    y_all = Float32.(get_values(ts_target))[:, nlags:end]   # (nstations, nvalid)
-
-    # Explicit val split takes priority over validation_split fraction
-    if !isnothing(val_input)
-        (x_st_val, x_w_val), _ = preprocess(model, val_input)
-        y_val   = Float32.(get_values(first(values(val_target))))[:, nlags:end]
-        has_val = true
-        x_st = x_station;  x_w = x_wind;  y = y_all
-    else
-        n_val   = round(Int, train_settings.validation_split * nvalid)
-        has_val = n_val > 0
-        n_train = nvalid - n_val
-        x_st    = x_station[:, :, 1:n_train];  x_st_val = has_val ? x_station[:, :, n_train+1:end] : nothing
-        x_w     = x_wind[:, :, 1:n_train];     x_w_val  = has_val ? x_wind[:, :, n_train+1:end]    : nothing
-        y       = y_all[:, 1:n_train];          y_val    = has_val ? y_all[:, n_train+1:end]         : nothing
-    end
-
-    flux_model = get_flux_model(model)
-    opt_state  = Flux.setup(Adam(train_settings.learning_rate), flux_model)
-    current_lr = Float64(train_settings.learning_rate)
-    loader = Flux.DataLoader((x_st, x_w, y); batchsize=train_settings.nbatches, shuffle=true)
-
-    checkpoint_dir = get(settings, "model_dir", nothing)
-
-    train_losses  = Float32[]
-    val_losses    = Float32[]
-    showvalues    = Pair{String,String}[]
-    progress      = Progress(train_settings.nepochs; desc="Training: ", showspeed=true)
-    log_every     = max(1, train_settings.nepochs ÷ 10)
-    best_val_rmse = Inf32
-
-    for epoch in 1:train_settings.nepochs
-        for (x_st_b, x_w_b, yb) in loader
-            _, grads = Flux.withgradient(flux_model) do m
-                Flux.mse(m(x_st_b, x_w_b)[:, end, :], yb)
-            end
-            Flux.update!(opt_state, flux_model, grads[1])
-        end
-
-        train_rmse = sqrt(Flux.mse(flux_model(x_st, x_w)[:, end, :], y))
-        push!(train_losses, train_rmse)
-
-        empty!(showvalues)
-        push!(showvalues, "train RMSE" => @sprintf("%.4f", train_rmse))
-        if has_val
-            val_rmse = sqrt(Flux.mse(flux_model(x_st_val, x_w_val)[:, end, :], y_val))
-            push!(val_losses, val_rmse)
-            push!(showvalues, "val RMSE  " => @sprintf("%.4f", val_rmse))
-            if !isnothing(checkpoint_dir) && val_rmse < best_val_rmse
-                best_val_rmse = val_rmse
-                save_params(model, joinpath(checkpoint_dir, "params_best.jld2"); overwrite=true)
-            end
-        end
-        next!(progress; showvalues)
-
-        if !isnothing(checkpoint_dir) && !isnothing(train_settings.checkpoints) &&
-                epoch in train_settings.checkpoints
-            save_params(model, joinpath(checkpoint_dir, "params_epoch_$(epoch).jld2"); overwrite=true)
-        end
-
-        if epoch % log_every == 0 || epoch == train_settings.nepochs
-            msg = @sprintf("epoch %d/%d  train RMSE: %.4f", epoch, train_settings.nepochs, train_rmse)
-            has_val && (msg *= @sprintf("  val RMSE: %.4f", val_losses[end]))
-            @info msg
-        end
-
-        if !isnothing(train_settings.lr_decay_factor) &&
-                !isnothing(train_settings.lr_decay_rate) &&
-                epoch % train_settings.lr_decay_rate == 0
-            current_lr *= train_settings.lr_decay_factor
-            Flux.Optimisers.adjust!(opt_state, current_lr)
-        end
-    end
-
-    return train_losses, val_losses
+    return (x_station, x_wind), _alloc_surge_output(model, times_valid)
 end

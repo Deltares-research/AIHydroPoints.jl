@@ -67,46 +67,64 @@ The following are populated automatically by `train_model!` on first call:
 
 ## Tensor layout
 
-`preprocess` produces a tensor of shape `(1, 3*nlocations_input, nlags, ntimes_valid)`,
-where the three feature blocks are `wind_x`, `wind_y`, and scaled pressure.
-`forward` must accept this 4-D tensor and return `(nlocations_output, 1, ntimes_valid)`.
+All surge models share the same *data extraction*: `wind_x`, `wind_y`, and
+scaled pressure sliced into lag windows of shape
+`(nlocations_input, nlags, ntimes_valid)` via [`_surge_lag_windows`](@ref).
+Each concrete model then assembles those windows into whatever tensor layout its
+layers need and returns them from `preprocess` as a **tuple** (a 1-tuple for the
+single-input Dense/Conv models, a 2-tuple `(x_station, x_wind)` for the
+attention model — see the per-model `preprocess` docstrings).
+
+`forward` and `postprocess!` are provided generically at this level: `forward`
+splats the tuple into the Flux model (`get_flux_model(m)(x...)`), which must
+return a 2-D `(nlocations_output, ntimes_valid)` array. `train_model!` is a
+single loop that works for both single- and multi-input models because
+`Flux.DataLoader((x, y))` batches every tensor in the tuple along its shared
+last (batch-time) axis.
 
 ## Concrete subtypes must implement
 
-- `get_flux_model(m)` — return the underlying Flux chain
+- `get_flux_model(m)` — return the underlying Flux model
 - `get_settings(m)` — return `Dict{String, Any}`
-- `forward(m, x::Array{Float32,4}) -> Array{Float32,3}`
+- `preprocess(m, input) -> (Tuple, Dict{String,TimeSeries})` — per-model tensor assembly
+
+The Flux model must return a 2-D `(nlocations_output, ntimes_valid)` array.
 """
 abstract type AbstractSurgeModel <: AbstractFluxModel end
 
 # ──────────────────────────────────────────────────────────────────────────────
-# preprocess — shared across all surge models
+# Shared data extraction — lag windows + output allocation
 # ──────────────────────────────────────────────────────────────────────────────
 
 """
-    preprocess(model::AbstractSurgeModel, input::Dict{String, TimeSeries})
-        -> (Array{Float32, 4}, Dict{String, TimeSeries})
+    _surge_lag_windows(model::AbstractSurgeModel, input::Dict{String, TimeSeries})
+        -> (sx, sy, pr, times_valid)
 
-Assemble a lag-window tensor from wind-stress and pressure forcing, and
-pre-allocate the output `TimeSeries` for surge.
+Extract wind-stress and scaled-pressure forcing from `input` and slice it into
+lag windows.  This is the part of preprocessing that is genuinely shared across
+every surge model; each model then arranges these windows into its own tensor
+layout.
 
-Returns `(tensor, output)` where:
-- `tensor` has shape `(1, 3*nwind, nlags, ntimes_valid)`,
-  with `ntimes_valid = length(times) - nlags + 1`.
-- `output` is `Dict("surge" => ts)` with `ts.values` initialised to zeros.
-  Station metadata is read from `model.settings`.
+Returns `(sx, sy, pr, times_valid)` where each of `sx`, `sy`, `pr` is a
+`Float32` array of shape `(nlocations_input, nlags, ntimes_valid)`:
 
-Accepts either `"stress_x"`/`"stress_y"` (used directly) or `"wind_x"`/`"wind_y"`
-(converted via `uv_to_stress_xy`). Pressure is scaled by `2e-4*(p - 1e5)`.
+```
+axis 1 → point (input location p),  varies fastest in memory
+axis 2 → lag   (Δt, history step)
+axis 3 → batch-time (valid step i)
+```
 
-Requires `"out_names"`, `"out_lons"`, `"out_lats"` to be present in
-`model.settings`.  These are set automatically by `train_model!` on first use.
+For each valid batch-time step `i`, `sx[:, :, i]` holds the `nlags`-step history
+ending at that step.  `times_valid` is the `Vector{DateTime}` of valid steps.
+
+`ntimes_valid = ntimes - nlags + 1`.  Accepts either `"stress_x"`/`"stress_y"`
+(used directly) or `"wind_x"`/`"wind_y"` (converted via `uv_to_stress_xy`);
+pressure is scaled by `2e-4*(p - 1e5)`.
 """
-function preprocess(model::AbstractSurgeModel, input::Dict{String, TimeSeries})
-    settings  = get_settings(model)
-    nwind     = settings["nlocations_input"]
-    nlags     = settings["nlags"]
-    nstations = settings["nlocations_output"]
+function _surge_lag_windows(model::AbstractSurgeModel, input::Dict{String, TimeSeries})
+    settings = get_settings(model)
+    nwind    = settings["nlocations_input"]
+    nlags    = settings["nlags"]
 
     # Align input locations to training-time order (errors on missing, drops extras)
     if haskey(settings, "in_names")
@@ -115,55 +133,92 @@ function preprocess(model::AbstractSurgeModel, input::Dict{String, TimeSeries})
                      for (k, v) in input)
     end
 
-    stress_x, stress_y = _get_stress(input)
-    press  = Float32.(2e-4 .* (get_values(input["pressure"]) .- 1e5))
+    stress_x, stress_y = _get_stress(input)                          # (nwind, ntimes)
+    press = Float32.(2e-4 .* (get_values(input["pressure"]) .- 1e5)) # (nwind, ntimes)
 
     times       = get_times(input[_wind_key(input)])
     ntimes      = length(times)
     valid_range = nlags:ntimes
     nvalid      = length(valid_range)
 
-    x = zeros(Float32, 3 * nwind, nlags, nvalid)
+    # Slice each forcing field into (point, lag, batch-time) = (nwind, nlags, nvalid).
+    sx = zeros(Float32, nwind, nlags, nvalid)
+    sy = zeros(Float32, nwind, nlags, nvalid)
+    pr = zeros(Float32, nwind, nlags, nvalid)
     for (i, t) in enumerate(valid_range)
-        x[1:nwind,           :, i] = stress_x[:, t-nlags+1:t]
-        x[nwind+1:2*nwind,   :, i] = stress_y[:, t-nlags+1:t]
-        x[2*nwind+1:3*nwind, :, i] = press[   :, t-nlags+1:t]
+        sx[:, :, i] = stress_x[:, t-nlags+1:t]
+        sy[:, :, i] = stress_y[:, t-nlags+1:t]
+        pr[:, :, i] = press[   :, t-nlags+1:t]
     end
+    return sx, sy, pr, times[valid_range]
+end
 
+"""
+    _alloc_surge_output(model::AbstractSurgeModel, times_valid)
+        -> Dict{String, TimeSeries}
+
+Allocate the zero-initialised `Dict("surge" => ts)` output container for the
+valid batch-time steps `times_valid`, reading station metadata (`out_names`,
+`out_lons`, `out_lats`, `out_quantity`) from the model settings.
+
+Requires `"out_names"`, `"out_lons"`, `"out_lats"` to be present in
+`model.settings` — set automatically by `train_model!` on first use.
+"""
+function _alloc_surge_output(model::AbstractSurgeModel, times_valid)
+    settings  = get_settings(model)
+    nstations = settings["nlocations_output"]
     out_ts = TimeSeries(
-        zeros(Float32, nstations, nvalid),
-        times[valid_range],
+        zeros(Float32, nstations, length(times_valid)),
+        times_valid,
         settings["out_names"],
         settings["out_lons"],
         settings["out_lats"],
         get(settings, "out_quantity", "surge"),
         string(typeof(model)),
     )
-    output = Dict{String, TimeSeries}("surge" => out_ts)
-
-    tensor = reshape(x, 1, 3 * nwind, nlags, nvalid)
-    return tensor, output
+    return Dict{String, TimeSeries}("surge" => out_ts)
 end
 
 # ──────────────────────────────────────────────────────────────────────────────
-# postprocess! — shared across all surge models
+# forward / postprocess! — shared across all surge models
 # ──────────────────────────────────────────────────────────────────────────────
 
 """
-    postprocess!(output::Dict{String, TimeSeries}, model::AbstractSurgeModel,
-                 y::Array{Float32, 3})
+    forward(model::AbstractSurgeModel, x::Tuple) -> Array{Float32, 2}
 
-Write surge predictions from `y` into `output["surge"]` in-place.
-`y` has shape `(nstations, 1, ntimes)`; the singleton feature dimension is dropped.
+Run the model's Flux network on the tuple `x` from `preprocess` and return a
+2-D `(nlocations_output, ntimes)` array of surge predictions.
+
+The tuple is splatted into the Flux model, so a 1-tuple `(x1,)` calls
+`flux_model(x1)` and an N-tuple calls `flux_model(x1, …, xN)`.  Every surge Flux
+model returns the 2-D `(nlocations_output, time)` shape directly.
+"""
+forward(model::AbstractSurgeModel, x::Tuple) = get_flux_model(model)(x...)
+
+"""
+    postprocess!(output::Dict{String, TimeSeries}, model::AbstractSurgeModel,
+                 y::AbstractMatrix)
+
+Write the 2-D surge predictions `y` of shape `(nlocations_output, ntimes)` into
+`output["surge"]` in-place.
 """
 function postprocess!(output::Dict{String, TimeSeries}, model::AbstractSurgeModel,
-                      y::Array{Float32, 3})
-    output["surge"].values .= y[:, 1, :]
+                      y::AbstractMatrix)
+    output["surge"].values .= y
 end
 
 # ──────────────────────────────────────────────────────────────────────────────
 # train_model! — shared across all surge models
 # ──────────────────────────────────────────────────────────────────────────────
+
+"""
+    _take_last_dim(x::Tuple, idx) -> Tuple
+
+Slice every tensor in `x` along its last (batch-time) axis at indices `idx`,
+returning a new tuple of materialised arrays.  Used to split a preprocessed
+input tuple into train/validation portions.
+"""
+_take_last_dim(x::Tuple, idx) = map(a -> copy(selectdim(a, ndims(a), idx)), x)
 
 """
     train_model!(model::AbstractSurgeModel, train_settings::TrainingSettings,
@@ -172,21 +227,23 @@ end
 
 Train the model in-place using minibatch gradient descent (Adam).
 
-`input` must contain `"wind_x"`, `"wind_y"`, and `"pressure"`.
-`target` must contain one variable (the surge ground truth).
+This single loop serves every surge model — single-input (`LinearSurgeModel`,
+`ConvSurgeModel`) and multi-input (`AttentionSurgeModel`) — because `preprocess`
+always returns the input as a tuple `x`, `Flux.DataLoader((x, y))` batches every
+tensor in that tuple along its shared last (batch-time) axis, and the Flux model
+is called by splatting the batched tuple (`m(xb...)`).
+
+`input` must contain `"wind_x"`, `"wind_y"`, and `"pressure"` (or the
+`"stress_*"` equivalents). `target` must contain one variable (the surge ground
+truth); its columns `nlags:end` correspond to the valid batch-time steps.
 
 On first call, `"out_names"`, `"out_lons"`, `"out_lats"`, and `"out_quantity"`
 are added to the model settings from the first `TimeSeries` in `target`.
 
-If `train_settings.validation_split > 0`, the last fraction of the time series
-is held out as a validation set and its RMSE is shown in the progress bar.
-
-Returns `(train_losses, val_losses)` as `Vector{Float32}` per epoch.
-`val_losses` is empty when `validation_split == 0` and no explicit validation
-data is provided.
-
 If `val_input` / `val_target` are supplied they are used directly and
-`validation_split` is ignored.
+`validation_split` is ignored; otherwise the last `validation_split` fraction of
+the time axis is held out. Returns `(train_losses, val_losses)` per epoch;
+`val_losses` is empty when there is no validation data.
 """
 function train_model!(model::AbstractSurgeModel, train_settings::TrainingSettings,
                       input::Dict{String, TimeSeries}, target::Dict{String, TimeSeries};
@@ -204,39 +261,40 @@ function train_model!(model::AbstractSurgeModel, train_settings::TrainingSetting
         settings["out_quantity"] = get_quantity(ts_ref)
     end
 
-    # Build full input tensor and target matrix
-    tensor, _ = preprocess(model, input)
-    _, nfeatures, nlags_dim, nfull = size(tensor)
-    x_all = reshape(tensor, nfeatures * nlags_dim, nfull)
+    nlags = settings["nlags"]
 
-    nlags     = settings["nlags"]
-    ts_target = first(values(target))
-    y_all = Float32.(get_values(ts_target))[:, nlags:end]
+    # Build input tuple + target matrix (batch-time is the last axis of each).
+    x_full, _ = preprocess(model, input)                              # Tuple
+    y_full = Float32.(get_values(first(values(target))))[:, nlags:end]  # (nstations, nvalid)
 
     # Validation data: explicit split takes priority over validation_split
     if !isnothing(val_input)
-        val_tensor, _ = preprocess(model, val_input)
-        _, nf_v, nl_v, nv = size(val_tensor)
-        x_val   = reshape(val_tensor, nf_v * nl_v, nv)
-        y_val   = Float32.(get_values(first(values(val_target))))[:, nlags:end]
-        has_val = true
-        n_train = nfull
-        x       = x_all
-        y       = y_all
+        x_val, _ = preprocess(model, val_input)
+        y_val    = Float32.(get_values(first(values(val_target))))[:, nlags:end]
+        x, y     = x_full, y_full
+        has_val  = true
     else
+        nfull   = size(y_full, 2)
         n_val   = round(Int, train_settings.validation_split * nfull)
         has_val = n_val > 0
-        n_train = nfull - n_val
-        x       = x_all[:, 1:n_train]
-        y       = y_all[:, 1:n_train]
-        x_val   = has_val ? x_all[:, n_train+1:end] : nothing
-        y_val   = has_val ? y_all[:, n_train+1:end] : nothing
+        if has_val
+            n_train = nfull - n_val
+            x       = _take_last_dim(x_full, 1:n_train)
+            y       = y_full[:, 1:n_train]
+            x_val   = _take_last_dim(x_full, n_train+1:nfull)
+            y_val   = y_full[:, n_train+1:end]
+        else
+            x, y  = x_full, y_full
+            x_val = y_val = nothing
+        end
     end
 
     # Training loop
     flux_model = get_flux_model(model)
     opt_state  = Flux.setup(Adam(train_settings.learning_rate), flux_model)
     current_lr = Float64(train_settings.learning_rate)
+    # DataLoader batches the nested tuple ((x1,…,xN), y) element-wise along the
+    # last axis, yielding (xb::Tuple, yb) each iteration.
     loader = Flux.DataLoader((x, y); batchsize=train_settings.nbatches, shuffle=true)
 
     checkpoint_dir = get(settings, "model_dir", nothing)
@@ -251,18 +309,18 @@ function train_model!(model::AbstractSurgeModel, train_settings::TrainingSetting
     for epoch in 1:train_settings.nepochs
         for (xb, yb) in loader
             _, grads = Flux.withgradient(flux_model) do m
-                Flux.mse(m(xb), yb)
+                Flux.mse(m(xb...), yb)
             end
             Flux.update!(opt_state, flux_model, grads[1])
         end
 
-        train_rmse = sqrt(Flux.mse(flux_model(x), y))
+        train_rmse = sqrt(Flux.mse(flux_model(x...), y))
         push!(train_losses, train_rmse)
 
         empty!(showvalues)
         push!(showvalues, "train RMSE" => @sprintf("%.4f", train_rmse))
         if has_val
-            val_rmse = sqrt(Flux.mse(flux_model(x_val), y_val))
+            val_rmse = sqrt(Flux.mse(flux_model(x_val...), y_val))
             push!(val_losses, val_rmse)
             push!(showvalues, "val RMSE  " => @sprintf("%.4f", val_rmse))
             if !isnothing(checkpoint_dir) && val_rmse < best_val_rmse

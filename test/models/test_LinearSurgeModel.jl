@@ -77,10 +77,10 @@ end
 
     for use_wind_keys in (false, true)
         input = make_surge_input(nwind=nwind, ntimes=ntimes, use_wind_keys=use_wind_keys)
-        tensor, output = preprocess(m, input)
+        (x_flat,), output = preprocess(m, input)
 
-        @test size(tensor) == (1, 3*nwind, nlags, nvalid)
-        @test eltype(tensor) == Float32
+        @test size(x_flat) == (3*nwind*nlags, nvalid)
+        @test eltype(x_flat) == Float32
         @test haskey(output, "surge")
         @test size(output["surge"].values) == (nstations, nvalid)
         @test all(output["surge"].values .== 0f0)
@@ -97,10 +97,10 @@ end
     nwind = 3; nstations = 2; nlags = 4; ntimes = 20
     m = LinearSurgeModel(make_lsm_settings(nstations=nstations, nwind=nwind, nlags=nlags))
 
-    x = zeros(Float32, 1, 3*nwind, nlags, ntimes)
-    y = forward(m, x)
+    x = zeros(Float32, 3*nwind*nlags, ntimes)   # flat Dense input, 1-tuple
+    y = forward(m, (x,))
 
-    @test size(y) == (nstations, 1, ntimes)
+    @test size(y) == (nstations, ntimes)
     @test eltype(y) == Float32
 end
 

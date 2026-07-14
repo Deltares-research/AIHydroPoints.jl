@@ -23,9 +23,12 @@ Required keys in `settings`: `"nlocations_output"`, `"nlocations_input"`, `"nlag
 
 ## Tensor layout
 
-`forward` flattens the `(1, 3*nlocations_input, nlags, ntimes_valid)` tensor from
-`preprocess` to `(3*nlocations_input*nlags, ntimes_valid)`, applies `Dense`, and reshapes
-to `(nlocations_output, 1, ntimes_valid)`.
+`preprocess` returns a 1-tuple `(x_flat,)` with
+`x_flat :: (3*nlocations_input*nlags, ntimes_valid)` — a flat feature vector per
+batch-time step. `Dense` maps that directly to `(nlocations_output, ntimes_valid)`.
+`Dense` is permutation-invariant on its input vector, so the exact interleaving of
+point/quantity/lag inside the flat vector is irrelevant as long as it is the same
+at train and predict time (it is — both go through this `preprocess`).
 """
 mutable struct LinearSurgeModel <: AbstractSurgeModel
     flux_model
@@ -51,14 +54,23 @@ get_flux_model(m::LinearSurgeModel) = m.flux_model
 get_settings(m::LinearSurgeModel)   = m.settings
 
 """
-    forward(model::LinearSurgeModel, x::Array{Float32, 4}) -> Array{Float32, 3}
+    preprocess(model::LinearSurgeModel, input::Dict{String, TimeSeries})
+        -> (Tuple, Dict{String, TimeSeries})
 
-Flatten `x` to `(3*nwind*nlags, ntimes)`, apply the `Dense` layer, and reshape
-to `(nstations, 1, ntimes)`.
+Assemble the flat Dense-input tuple from the shared lag windows.
+
+Returns `((x_flat,), output)` where `x_flat` has shape
+`(3*nlocations_input*nlags, ntimes_valid)`: the `(point, lag, batch-time)` stress
+and pressure windows stacked along features and flattened to one vector per
+batch-time step (batch-time is the last axis).
+
+`forward` and `postprocess!` are inherited from `AbstractSurgeModel`.
 """
-function forward(model::LinearSurgeModel, x::Array{Float32, 4})
-    _, nfeatures, nlags_dim, ntimes = size(x)
-    x_flat = reshape(x, nfeatures * nlags_dim, ntimes)
-    y      = model.flux_model(x_flat)
-    return reshape(y, size(y, 1), 1, ntimes)
+function preprocess(model::LinearSurgeModel, input::Dict{String, TimeSeries})
+    # sx, sy, pr :: (nwind, nlags, nvalid)   — shared extraction
+    sx, sy, pr, times_valid = _surge_lag_windows(model, input)
+    nvalid    = size(sx, 3)
+    x_stacked = vcat(sx, sy, pr)                 # (3*nwind, nlags, nvalid)
+    x_flat    = reshape(x_stacked, :, nvalid)    # (3*nwind*nlags, nvalid)
+    return (x_flat,), _alloc_surge_output(model, times_valid)
 end

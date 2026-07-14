@@ -76,13 +76,49 @@ end
     nvalid = ntimes - nlags + 1
 
     input = conv_make_surge_input(nwind=nwind, ntimes=ntimes)
-    tensor, output = preprocess(m, input)
+    (x,), output = preprocess(m, input)
 
-    @test size(tensor) == (1, 3*nwind, nlags, nvalid)
-    @test eltype(tensor) == Float32
+    @test size(x) == (nlags, 3*nwind, nvalid)   # conv-ready (lag, channel, batch-time)
+    @test eltype(x) == Float32
     @test haskey(output, "surge")
     @test size(output["surge"].values) == (nstations, nvalid)
     @test all(output["surge"].values .== 0f0)
+end
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Conv-ready layout regression test (docs/notes_dimensions.md, Note 2)
+#
+# The old Chain[1] `reshape(x, nlags, n_in, ·)` reinterpreted a
+# (point·quantity)-fastest buffer as lag-fastest, scrambling the lag and channel
+# axes whenever nlags ≠ 3·nwind. Here nlags=4, 3·nwind=9 (≠), so the old code
+# would have failed these assertions.
+# ──────────────────────────────────────────────────────────────────────────────
+
+@testset "ConvSurgeModel conv-ready layout (no scramble)" begin
+    nwind = 3; nstations = 2; ntimes = 12; nlags = 4   # 3*nwind = 9 ≠ nlags = 4
+    @assert 3*nwind != nlags
+    m = ConvSurgeModel(conv_make_settings(nstations=nstations, nwind=nwind, nlags=nlags))
+
+    # Encode each forcing value as 100*point + time so (point, lag) is recoverable.
+    enc(base) = Float32[base + 100f0*p + t for p in 1:nwind, t in 1:ntimes]
+    input = Dict{String, TimeSeries}(
+        "stress_x" => conv_make_ts(enc(0f0),      "stress_x"),
+        "stress_y" => conv_make_ts(enc(10_000f0), "stress_y"),
+        "pressure" => conv_make_ts(fill(1f5, nwind, ntimes), "pressure"),
+    )
+
+    (x,), _ = preprocess(m, input)   # x :: (nlags, 3*nwind, nvalid)
+    nvalid = ntimes - nlags + 1
+    @test size(x) == (nlags, 3*nwind, nvalid)
+
+    # For the last batch-time step i=nvalid, the lag window covers times
+    # (ntimes-nlags+1 .. ntimes). Channel `p` (stress_x, point p) must expose a
+    # COHERENT lag ramp along axis 1 — not a scrambled feature mixture.
+    for p in 1:nwind
+        expected = Float32[100f0*p + t for t in (ntimes-nlags+1):ntimes]
+        @test x[:, p, end] == expected                      # stress_x block
+        @test x[:, nwind+p, end] == 10_000f0 .+ expected    # stress_y block
+    end
 end
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -93,10 +129,10 @@ end
     nwind = 3; nstations = 2; nlags = 4; ntimes = 20
     m = ConvSurgeModel(conv_make_settings(nstations=nstations, nwind=nwind, nlags=nlags))
 
-    x = randn(Float32, 1, 3*nwind, nlags, ntimes)
-    y = forward(m, x)
+    x = randn(Float32, nlags, 3*nwind, ntimes)   # conv-ready, 1-tuple
+    y = forward(m, (x,))
 
-    @test size(y) == (nstations, 1, ntimes)
+    @test size(y) == (nstations, ntimes)
     @test eltype(y) == Float32
 end
 
@@ -175,6 +211,6 @@ end
     load_params!(m, fn)
 
     # After reload, forward pass should give non-zero output (original weights restored)
-    x = randn(Float32, 1, 3*3, 4, 5)   # 1, 3*nwind, nlags, ntimes
-    @test !all(forward(m, x) .== 0f0)
+    x = randn(Float32, 4, 3*3, 5)   # nlags, 3*nwind, ntimes
+    @test !all(forward(m, (x,)) .== 0f0)
 end

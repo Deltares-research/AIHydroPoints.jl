@@ -29,8 +29,7 @@ Optional key `"model_pars"` (Dict):
 ## Architecture
 
 ```
-(3*nlocations_input*nlags, ntimes)          ← flattened lag tensor from preprocess
-    reshape → (nlags, 3*nlocations_input, ntimes)
+(nlags, 3*nlocations_input, ntimes)         ← conv-ready tensor from preprocess
     Conv1D(filtersize, 3*nlocations_input  → channels[1], relu, SamePad)
     Conv1D(filtersize, channels[1] → channels[2], relu, SamePad)
     ...
@@ -38,6 +37,12 @@ Optional key `"model_pars"` (Dict):
     Dense(nlags * channels[end] → nlocations_output)
 (nlocations_output, ntimes)
 ```
+
+The 1-D convolution slides over the **lag** axis (axis 1); the
+`3*nlocations_input` stress/pressure fields are the **channels** (axis 2); batch-
+time is the batch axis (axis 3). `preprocess` builds this `(lag, channel, batch)`
+layout directly, so — unlike the previous `reshape`-based version — memory order
+and axis interpretation always agree (see `docs/notes_dimensions.md`, Note 2).
 
 Each Conv1D layer uses `pad=SamePad()` (stride 1) so the lag dimension is
 preserved throughout, giving `Dense` a predictable input size of
@@ -66,8 +71,9 @@ function ConvSurgeModel(settings::Dict{String, Any})
     n_in    = 3 * nwind
     ch_seq  = [n_in; channels]
 
+    # The chain consumes the conv-ready (lag, channel, batch) tensor from
+    # preprocess directly — no internal reshape (that was the Note-2 bug).
     chain = Chain(
-        x -> reshape(x, nlags, n_in, size(x, 2)),
         [Conv((filtersize,), ch_seq[i] => ch_seq[i+1], relu; pad=SamePad())
          for i in 1:length(ch_seq)-1]...,
         Flux.flatten,
@@ -80,14 +86,41 @@ get_flux_model(m::ConvSurgeModel) = m.flux_model
 get_settings(m::ConvSurgeModel)   = m.settings
 
 """
-    forward(model::ConvSurgeModel, x::Array{Float32, 4}) -> Array{Float32, 3}
+    preprocess(model::ConvSurgeModel, input::Dict{String, TimeSeries})
+        -> (Tuple, Dict{String, TimeSeries})
 
-Flatten `x` to `(3*nwind*nlags, ntimes)`, run the Conv1D chain (which reshapes
-internally), and return `(nstations, 1, ntimes)`.
+Assemble the conv-ready input tuple from the shared lag windows.
+
+Returns `((x,), output)` where `x` has shape `(nlags, 3*nlocations_input,
+ntimes_valid)`:
+
+```
+axis 1 → lag         (Δt) — the spatial axis the 1-D Conv slides over
+axis 2 → channel     (stress_x block, stress_y block, pressure block)
+axis 3 → batch-time  (valid step)
+```
+
+The tensor is built **directly** in this order by transposing each
+`(point, lag, batch-time)` forcing window into `(lag, point, batch-time)` and
+stacking along the channel axis. This is the honest replacement for the previous
+`reshape(x, nlags, n_in, …)`, which reinterpreted a `(point·quantity)`-fastest
+buffer as `lag`-fastest and silently scrambled the two axes whenever
+`nlags ≠ 3*nlocations_input` (see `docs/notes_dimensions.md`, Note 2).
+
+`forward` and `postprocess!` are inherited from `AbstractSurgeModel`.
 """
-function forward(model::ConvSurgeModel, x::Array{Float32, 4})
-    _, nfeatures, nlags_dim, ntimes = size(x)
-    x_flat = reshape(x, nfeatures * nlags_dim, ntimes)
-    y      = model.flux_model(x_flat)
-    return reshape(y, size(y, 1), 1, ntimes)
+function preprocess(model::ConvSurgeModel, input::Dict{String, TimeSeries})
+    # sx, sy, pr :: (nwind, nlags, nvalid)   — shared extraction
+    sx, sy, pr, times_valid = _surge_lag_windows(model, input)
+    nwind  = size(sx, 1)
+    nlags  = size(sx, 2)
+    nvalid = size(sx, 3)
+
+    # Conv-ready layout (lag, channel, batch-time). permutedims materialises the
+    # (point, lag, …) → (lag, point, …) transpose so memory matches the axes.
+    x = zeros(Float32, nlags, 3 * nwind, nvalid)
+    x[:, 1:nwind,           :] = permutedims(sx, (2, 1, 3))   # channels 1..nwind        = stress_x
+    x[:, nwind+1:2*nwind,   :] = permutedims(sy, (2, 1, 3))   # channels nwind+1..2*nwind = stress_y
+    x[:, 2*nwind+1:3*nwind, :] = permutedims(pr, (2, 1, 3))   # channels 2*nwind+1..3*nwind = pressure
+    return (x,), _alloc_surge_output(model, times_valid)
 end

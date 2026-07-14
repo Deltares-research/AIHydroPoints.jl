@@ -39,14 +39,22 @@ AbstractModel
 
 ## Tensor layout
 
-Tensors passed between `preprocess`, `forward`, and `postprocess` use the
-canonical column-major layout:
+Each model owns its own tensor layout. The only contract enforced at this
+level is the *shape of the containers* exchanged between the customisation
+points, not the internal axis arrangement:
 
-- **Input tensor** (output of `preprocess`):  `(locations, features, time_lag, time)`
-- **Output tensor** (output of `forward`):    `(locations, features, time)`
+- `preprocess` returns `(x, output)` where `x` is a **tuple of tensors** — a
+  1-tuple for single-input models (`LinearSurgeModel`, `ConvSurgeModel`), an
+  N-tuple for multi-input models (`AttentionSurgeModel`, wave, interaction).
+  Each model arranges its tensor(s) in the layout its Flux layers actually
+  need; there is no shared "canonical" input layout.
+- `forward` returns a 2-D array `(locations, time)` — predictions per location
+  per batch-time step.
 
-`time` serves as the batch dimension so that the whole time-series is processed
-in a single forward pass.
+`time` (batch-time) is always the **last** axis of every tensor in `x` and of
+the `forward` output, so it acts as the batch dimension: the whole time series
+is processed in a single pass, and `Flux.DataLoader((x, y))` batches every
+tensor along that axis consistently (nested tuples are batched element-wise).
 
 ## Interface implemented at this level
 
@@ -57,9 +65,9 @@ by all subtypes without modification.
 
 | Method | Signature | Purpose |
 |---|---|---|
-| `preprocess`    | `(m::M, input::Dict{String,TimeSeries}) -> (Array{Float32,4}, Dict{String,TimeSeries})` | Build input tensor and pre-allocate output |
-| `forward`       | `(m::M, x::Array{Float32,4}) -> Array{Float32,3}` | Run Flux forward pass |
-| `postprocess!`  | `(output::Dict{String,TimeSeries}, m::M, y::Array{Float32,3})` | Fill pre-allocated output in-place |
+| `preprocess`    | `(m::M, input::Dict{String,TimeSeries}) -> (Tuple, Dict{String,TimeSeries})` | Build input tensor(s) as a tuple and pre-allocate output |
+| `forward`       | `(m::M, x::Tuple) -> Array{Float32,2}` | Run Flux forward pass; return `(locations, time)` |
+| `postprocess!`  | `(output::Dict{String,TimeSeries}, m::M, y::AbstractMatrix)` | Fill pre-allocated output in-place from 2-D `y` |
 | `get_flux_model`| `(m::M) -> <Flux model>` | Return the underlying Flux model |
 | `get_settings`  | `(m::M) -> Dict{String,Any}` | Return model settings |
 """
@@ -75,15 +83,15 @@ abstract type AbstractFluxModel <: AbstractModel end
 
 Run inference by chaining `preprocess → forward → postprocess!`.
 
-`preprocess` returns both the input tensor `(locations, features, time_lag, time)`
-and a pre-allocated output `Dict{String, TimeSeries}` with the correct metadata
-(times, station names, coordinates) and zero-initialised values.
-`forward` runs the Flux model and returns `(locations, features, time)`.
+`preprocess` returns both the input `x` (a tuple of tensors, each with batch-time
+as its last axis) and a pre-allocated output `Dict{String, TimeSeries}` with the
+correct metadata (times, station names, coordinates) and zero-initialised values.
+`forward` runs the Flux model and returns a 2-D `(locations, time)` array.
 `postprocess!` fills the pre-allocated output values in-place.
 """
 function predict(model::AbstractFluxModel, input::Dict{String, TimeSeries})
-    tensor, output = preprocess(model, input)
-    y = forward(model, tensor)
+    x, output = preprocess(model, input)
+    y = forward(model, x)
     postprocess!(output, model, y)
     return output
 end
@@ -155,13 +163,14 @@ end
 
 """
     preprocess(model::AbstractFluxModel, input::Dict{String, TimeSeries})
-        -> (Array{Float32, 4}, Dict{String, TimeSeries})
+        -> (Tuple, Dict{String, TimeSeries})
 
-Map `input` to an input tensor and a pre-allocated output container.
+Map `input` to model-specific input tensor(s) and a pre-allocated output container.
 
-Returns a tuple `(tensor, output)` where:
-- `tensor` has shape `(locations, features, time_lag, time)` and contains the
-  scaled, lagged input data ready for the Flux forward pass.
+Returns a tuple `(x, output)` where:
+- `x` is a **tuple of tensors** in the layout this model's Flux layers need
+  (a 1-tuple for single-input models). Batch-time is the last axis of every
+  tensor so `Flux.DataLoader` can batch them consistently.
 - `output` is a `Dict{String, TimeSeries}` with the correct output metadata
   (variable names, station names, coordinates, time axis) and zero-initialised
   `values` matrices.  `postprocess!` will fill these in-place.
@@ -170,6 +179,7 @@ Responsibilities:
 - Select and order input variables and locations.
 - Apply input scaling or normalisation.
 - Assemble the lagged input window (`time_lag = 1` means no lag).
+- Arrange the data into the model's preferred tensor layout(s).
 - Allocate the output `TimeSeries` objects with `zeros(Float32, ...)` values.
 
 Must be implemented for each concrete model type.
@@ -179,33 +189,27 @@ function preprocess(model::AbstractFluxModel, input::Dict{String, TimeSeries})
 end
 
 """
-    forward(model::AbstractFluxModel, x::Array{Float32, 4})
-        -> Array{Float32, 3}
+    forward(model::AbstractFluxModel, x::Tuple) -> Array{Float32, 2}
 
-Reshape `x` as required and run the Flux forward pass.
-Returns `(locations, features, time)`.
+Run the Flux forward pass on the tuple `x` produced by `preprocess` and return
+a 2-D array `(locations, time)`.
 
-Typical reshapes before calling the chain:
-```julia
-# Dense model
-x_flat = reshape(x, locations * features * time_lag, time)
-
-# 1-D temporal convolution
-x_flat = reshape(x, locations * features, time_lag, time)
-```
+Single-input models receive a 1-tuple and typically splat it into their Flux
+chain (`get_flux_model(model)(x...)`); multi-input models unpack the tuple
+explicitly. Any internal reshaping is the model's responsibility.
 
 Must be implemented for each concrete model type.
 """
-function forward(model::AbstractFluxModel, x::Array{Float32, 4})
+function forward(model::AbstractFluxModel, x)
     error("forward not implemented for $(typeof(model))")
 end
 
 """
     postprocess!(output::Dict{String, TimeSeries}, model::AbstractFluxModel,
-                 y::Array{Float32, 3})
+                 y::AbstractMatrix)
 
-Fill the pre-allocated `output` with values from the Flux output tensor `y` of
-shape `(locations, features, time)`.
+Fill the pre-allocated `output` with values from the 2-D Flux output `y` of
+shape `(locations, time)`.
 
 `output` is the dict returned by `preprocess`; its `TimeSeries` values matrices
 already have the right shape and can be written to with `.=`.  Apply any inverse
@@ -214,7 +218,7 @@ scaling here before writing.
 Must be implemented for each concrete model type.
 """
 function postprocess!(output::Dict{String, TimeSeries}, model::AbstractFluxModel,
-                      y::Array{Float32, 3})
+                      y)
     error("postprocess! not implemented for $(typeof(model))")
 end
 
