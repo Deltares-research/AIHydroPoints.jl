@@ -157,9 +157,9 @@ predict storm surge from wind-stress and pressure history.
 
 ```julia
 settings = Dict{String, Any}(
-    "nstations" => 5,   # number of output (waterlevel) stations
-    "nwind"     => 9,   # number of input (forcing) stations
-    "nlags"     => 16,  # number of previous time steps used as input
+    "nlocations_output" => 5,   # number of output (surge) stations
+    "nlocations_input"  => 9,   # number of input (forcing) locations
+    "nlags"             => 16,  # number of previous time steps used as input
 )
 model = LinearSurgeModel(settings)
 ```
@@ -175,10 +175,10 @@ model = LinearSurgeModel(settings)
 ### Data flow
 
 ```
-preprocess → tensor (1, 3*nwind, nlags, ntimes_valid)
+preprocess → x = (x_flat,)  with x_flat (3*nwind*nlags, ntimes_valid)
                 + output Dict("surge" => zeros TimeSeries)
-forward    → flatten → Dense(3*nwind*nlags => nstations) → (nstations, 1, ntimes_valid)
-postprocess! → output["surge"].values .= y[:, 1, :]
+forward    → Dense(3*nwind*nlags => nstations) → (nstations, ntimes_valid)   [generic, splats (x_flat,)]
+postprocess! → output["surge"].values .= y   [generic, 2-D]
 ```
 
 ### train_model!
@@ -204,35 +204,38 @@ dimension of the wind-stress and pressure history.
 model = ConvSurgeModel(settings::Dict{String, Any})
 ```
 
-Required keys: `"nstations"`, `"nwind"`, `"nlags"`.  Optional `"model_pars"`:
+Required keys: `"nlocations_output"`, `"nlocations_input"`, `"nlags"`.  Optional `"model_pars"`:
 
 | Key | Default | Description |
 |---|---|---|
 | `"channels"` | `[32, 16]` | Output channels per Conv1D layer |
-| `"filtersize"` | `3` | Conv1D kernel width |
+| `"filtersize"` | `3` | Conv1D kernel width **and stride** (`stride = filtersize`): non-overlapping windows that shrink the lag length by `cld(·, filtersize)` per layer |
+| `"activation"` | `"swish"` | Conv1D activation (`"swish"` or `"relu"`) |
 
 ### Data flow
 
+`preprocess` builds the conv-ready `(lag, channel, batch-time)` tensor directly,
+so `forward` (generic) runs the chain with no internal reshape:
+
 ```
-preprocess → tensor (1, 3*nwind, nlags, ntimes_valid)
-forward    → flatten → reshape (nlags, 3*nwind, ntimes)
-             → Conv1D × N (SamePad, stride=1)
-             → flatten → Dense(nlags*channels[end] → nstations)
-             → (nstations, 1, ntimes_valid)
-postprocess! → output["surge"].values .= y[:, 1, :]
+preprocess → x = (xc,)  with xc (nlags, 3*nwind, ntimes_valid)   [lag, channel, batch]
+forward    → Conv1D × N (act, stride=filtersize, SamePad)         [generic, splats (xc,)]
+             → flatten → Dense(nlags_out*channels[end] → nstations)
+             → (nstations, ntimes_valid)
+postprocess! → output["surge"].values .= y   [generic, 2-D]
 ```
 
-Inherits `preprocess`, `postprocess!`, `train_model!`, `plot_series`,
-`save_params`, and `load_params!` from `AbstractSurgeModel` /
-`AbstractFluxModel` without override.
+Overrides `preprocess` (conv-ready assembly); inherits `forward`,
+`postprocess!`, `train_model!`, `save_params`, and `load_params!` from
+`AbstractSurgeModel` / `AbstractFluxModel`.
 
 ```
 AbstractModel
     └── AbstractFluxModel   — predict, save_params, load_params!
-            └── AbstractSurgeModel  — preprocess, postprocess!, train_model!
-                    ├── LinearSurgeModel
-                    ├── ConvSurgeModel
-                    └── AttentionSurgeModel
+            └── AbstractSurgeModel  — _surge_lag_windows, forward, postprocess!, train_model!
+                    ├── LinearSurgeModel     — preprocess
+                    ├── ConvSurgeModel       — preprocess
+                    └── AttentionSurgeModel  — preprocess
 ```
 
 ## AttentionSurgeModel (`AttentionSurgeModel.jl`)
@@ -247,7 +250,7 @@ via graph-adjacency weights.
 model = AttentionSurgeModel(settings::Dict{String, Any}, gn::GraphNetwork)
 ```
 
-Required keys in `settings`: `"nstations"`, `"nwind"`, `"nlags"`, `"model_pars"`.
+Required keys in `settings`: `"nlocations_output"`, `"nlocations_input"`, `"nlags"`, `"model_pars"`.
 
 Required keys in `"model_pars"`:
 
@@ -262,23 +265,28 @@ Required keys in `"model_pars"`:
 
 ### Overridden methods
 
-`AttentionSurgeModel` overrides `preprocess`, `forward`, and `train_model!`
-(inherited defaults from `AbstractSurgeModel` do not apply because the model
-has two inputs):
+`AttentionSurgeModel` overrides only `preprocess` (it has two input tensors);
+`forward`, `postprocess!`, and `train_model!` are inherited from
+`AbstractSurgeModel` — the shared loop batches the input tuple element-wise:
 
 | Method | Notes |
 |---|---|
-| `preprocess` | Returns `((x_station, x_wind), output)` — dual input |
-| `forward` | Accepts `Tuple`, takes `[:, end, :]` of the output |
-| `train_model!` | Batches over both `x_station` and `x_wind` simultaneously |
+| `preprocess` | Returns `((x_station, x_wind), output)` — dual-input tuple |
+| `forward` | Inherited: splats the tuple → `AttentionSurgeFlux(x_station, x_wind)`, which returns the 2-D last-lag slice directly |
+| `train_model!` | Inherited shared surge loop |
 
 ### Data flow
 
+The last-lag slice now lives inside `AttentionSurgeFlux`, so the flux model
+returns the 2-D `(nstations, ntimes)` output directly:
+
 ```
-preprocess → x_wind    (3*nwind, nlags, ntimes_valid)
+preprocess → x = (x_station, x_wind)
              x_station (6, nstations, ntimes_valid)   [cos/sin lat, lon, day-of-year]
-forward    → AttentionSurgeFlux → (nstations, nlags, ntimes) → [:, end, :] → (nstations, 1, ntimes)
-postprocess! → output["surge"].values .= y[:, 1, :]
+             x_wind    (3*nwind, nlags, ntimes_valid)
+forward    → AttentionSurgeFlux(x_station, x_wind) → (nstations, nlags, ntimes)
+             → last-lag slice (inside the flux model) → (nstations, ntimes_valid)   [generic]
+postprocess! → output["surge"].values .= y   [generic, 2-D]
 ```
 
 ## AbstractTideModel (`AbstractTideModel.jl`)
@@ -362,26 +370,28 @@ save_loss_plot(path::String, train_losses::Vector, val_losses::Vector=[]; overwr
 Saves a PNG plot of train (and optionally val) RMSE against epoch. Same
 directory/overwrite guards as `toml_write` and `save_params`.
 
-## plot_series (`plot_utils.jl` + model files)
+## write_outputs (`abstract_flux_model.jl` + `plot_utils.jl`)
 
-`plot_series` is part of the `AbstractModel` interface.  Each intermediate
-abstract type provides its own implementation; the shared plotting skeleton
-lives in `_plot_station_series` in `src/plot_utils.jl`.
+Output generation is handled by `write_outputs`, a single implementation shared
+by all `AbstractFluxModel` subtypes (it replaced the old per-model `plot_series`
+in step 7g).  It is driven entirely by the `[output_settings]` TOML section —
+see `docs/output_settings.md` for the full schema.
 
 ```julia
-plot_series(model, input::Dict{String,TimeSeries}, target::Dict{String,TimeSeries},
-            series_name::String; save_dir, timerange, station_names, show_fft)
+write_outputs(model::AbstractFluxModel, data::Dict, all_settings::Dict)
 ```
 
-`_plot_station_series` aligns target to prediction times (handles lag trimming
-in surge models via `select_timespan`), computes per-station RMSE, and saves
-one PNG per station.  It uses `Plots.plot(ts; location_index=i)` from
-`MultiTimeSeries.jl` for the observation panel.
+For each configured output entry it calls `predict(model, …)` on the selected
+split and dispatches to the relevant helper: `_plot_station_series`
+(timeseries), `_plot_station_fft`, `_plot_station_scatter`,
+`_write_station_stats`, `_write_station_series`, and — for tide models —
+`_plot_station_tidal_analysis`.  A `summary.toml` with per-split RMSE is written
+when `write_summary` is set.
 
-| Model type | `show_fft` | Layout |
-|---|---|---|
-| `AbstractSurgeModel` | not supported | 2-panel (series + residual) |
-| `AbstractTideModel`  | optional      | 2-panel or 4-panel (+ FFT panels) |
+The shared plotting skeleton `_plot_station_series` (in `src/plot_utils.jl`)
+aligns target to prediction times (handles lag trimming via `select_timespan`),
+computes per-station RMSE, and saves one PNG per station using
+`Plots.plot(ts; location_index=i)` from `MultiTimeSeries.jl`.
 
 ## ProductTideModel (`ProductTideModel.jl`)
 
@@ -420,9 +430,8 @@ ProductGatingLayer × nlayers:
 Dense(nfeats → 1) → (nstations, 1, ntimes)
 ```
 
-Inherits `preprocess`, `postprocess!`, `train_model!`, `plot_series`,
-`save_params`, and `load_params!` from `AbstractTideModel` /
-`AbstractFluxModel` without override.
+Inherits `preprocess`, `postprocess!`, `train_model!`, `save_params`, and
+`load_params!` from `AbstractTideModel` / `AbstractFluxModel` without override.
 
 ```
 AbstractModel

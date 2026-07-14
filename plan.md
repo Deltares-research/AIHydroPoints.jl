@@ -96,10 +96,15 @@ The main goal of this project is to develop a machine learning model for predict
        output singleton). Wave/interaction/tide were **verified unaffected**
        (they keep their own `preprocess`/`forward`/`train_model!`), not yet
        converted — see 20h.
-    g. [ ] Update `docs/design.md` to reflect the new convention
-       (each model declares its own input/output tensor layout; the
-       abstract pipeline only standardises the `Dict{String,TimeSeries}`
-       boundary).
+    g. [x] Update `docs/design.md` to reflect the new convention (each model
+       declares its own input/output tensor layout; the abstract pipeline only
+       standardises the `Dict{String,TimeSeries}` boundary). Done for the shared
+       `AbstractFluxModel` contract + all surge sections (tuple-in / 2-D-out,
+       per-model `preprocess`, generic `forward`/`postprocess!`/`train_model!`,
+       Conv stride/activation); tide/wave/interaction sections still describe
+       their own (unchanged) 3-D layouts until 20h converts them. Also refreshed
+       `docs/model_settings.md` (ConvSurgeModel stride + activation);
+       `docs/settings.md` verified still accurate.
     h. [ ] **(deferred — Option 2, package-wide unification)** Extend the
        always-tuple + 2-D convention to the **wave, interaction, and tide**
        families and collapse **all four** `train_model!` bodies into a single
