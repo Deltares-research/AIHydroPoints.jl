@@ -24,17 +24,19 @@ Required keys in `settings`: `"nlocations_output"`, `"nlocations_input"`, `"nlag
 
 Optional key `"model_pars"` (Dict):
 - `"channels"` — output channels for each Conv1D layer (default `[32, 16]`)
-- `"filtersize"` — Conv1D kernel width (default `3`)
+- `"filtersize"` — Conv1D kernel width **and stride** (default `3`); using
+  `stride = filtersize` tiles the lag axis into non-overlapping windows
+- `"activation"` — Conv1D activation, `"swish"` (default) or `"relu"`
 
 ## Architecture
 
 ```
 (nlags, 3*nlocations_input, ntimes)         ← conv-ready tensor from preprocess
-    Conv1D(filtersize, 3*nlocations_input  → channels[1], relu, SamePad)
-    Conv1D(filtersize, channels[1] → channels[2], relu, SamePad)
+    Conv1D(filtersize, 3*nlocations_input → channels[1], act, stride=filtersize, SamePad)
+    Conv1D(filtersize, channels[1] → channels[2], act, stride=filtersize, SamePad)
     ...
-    flatten → (nlags * channels[end], ntimes)
-    Dense(nlags * channels[end] → nlocations_output)
+    flatten → (nlags_out * channels[end], ntimes)
+    Dense(nlags_out * channels[end] → nlocations_output)
 (nlocations_output, ntimes)
 ```
 
@@ -44,9 +46,12 @@ time is the batch axis (axis 3). `preprocess` builds this `(lag, channel, batch)
 layout directly, so — unlike the previous `reshape`-based version — memory order
 and axis interpretation always agree (see `docs/notes_dimensions.md`, Note 2).
 
-Each Conv1D layer uses `pad=SamePad()` (stride 1) so the lag dimension is
-preserved throughout, giving `Dense` a predictable input size of
-`nlags * channels[end]`.
+Each Conv1D layer uses `stride = filtersize` with `pad=SamePad()`, so its kernel
+tiles the lag axis into **non-overlapping** windows — every lag point is visited
+exactly once — and the lag length shrinks by a factor of `filtersize` per layer
+(`cld(·, filtersize)`). This reduces the flattened `Dense` input from
+`nlags * channels[end]` to `nlags_out * channels[end]` (where `nlags_out` is the
+lag length after all conv layers), cutting the parameter count.
 """
 mutable struct ConvSurgeModel <: AbstractSurgeModel
     flux_model
@@ -67,17 +72,27 @@ function ConvSurgeModel(settings::Dict{String, Any})
     mp         = get(settings, "model_pars", Dict{String, Any}())
     channels   = get(mp, "channels",   [32, 16])
     filtersize = get(mp, "filtersize", 3)
+    act_name   = get(mp, "activation", "swish")
+    f_act      = act_name == "relu" ? relu : swish
 
     n_in    = 3 * nwind
     ch_seq  = [n_in; channels]
 
+    # stride == filtersize tiles the lag axis into non-overlapping windows
+    # (every lag visited once). With SamePad, each layer's lag length becomes
+    # cld(prev, filtersize); track it through the stack to size the final Dense.
+    nlags_out = nlags
+    for _ in 1:length(channels)
+        nlags_out = cld(nlags_out, filtersize)
+    end
+
     # The chain consumes the conv-ready (lag, channel, batch) tensor from
     # preprocess directly — no internal reshape (that was the Note-2 bug).
     chain = Chain(
-        [Conv((filtersize,), ch_seq[i] => ch_seq[i+1], relu; pad=SamePad())
+        [Conv((filtersize,), ch_seq[i] => ch_seq[i+1], f_act; stride=(filtersize,), pad=SamePad())
          for i in 1:length(ch_seq)-1]...,
         Flux.flatten,
-        Dense(nlags * channels[end] => nstations),
+        Dense(nlags_out * channels[end] => nstations, identity) #allow negative surge
     )
     return ConvSurgeModel(chain, settings)
 end

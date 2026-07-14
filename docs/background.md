@@ -36,11 +36,55 @@ Input time-series are provided as a dictionary of MultiTimeSeries, with keys "st
 
 The linear surge model is a simple linear regression on the lagged wind-stress and pressure forcing. The linear model for a single output time can be denoted as:
 
-$$\mathbf{y}_{PT} = (\mathbf{W}_{Ppql} \star \mathbf{x}_{pqlt} + \mathbf{b}_P)$$
+$$\mathbf{y}_{P} = (\mathbf{W}_{Ppqt'} \star \mathbf{x}_{pqt'} + \mathbf{b}_P)$$
 
-where $l$ is the time lag dimension, $p$ is the input station dimension, $q$ is the input variable dimension (wind-stress x, wind-stress y, pressure), and $P$ is the output station dimension. The model can be applied independently for each output time $t$, using the lagged input window $\mathbf{x}_{pql}$ from time $t-l$ to time $t$.  
+where $t'$ is the time lag dimension, $p$ is the input station dimension, $q$ is the input variable dimension (wind-stress x, wind-stress y, pressure), and $P$ is the output station dimension. The model can be applied independently for each output time $t$, using the lagged input window $\mathbf{x}_{pq t'}$ from time $t-l$ to time $t$.  
 
-The model only imposes a linear relationship between the input and output, but there are no other constraints on the model parameters. The model could be trained using standard linear regression techniques, but here we use a neural network framework to keep the training and inference code consistent with the other models. The linear model can be implemented as a single dense layer with identity activation, using the output time as the batch dimension.
+For efficiency, we'll compute the output time-series over a range of times in parallel, using the output time as a batch dimension. The model can be written as:
+
+$$\mathbf{y}_{PT} = (\mathbf{W}_{Ppq t'} \star \mathbf{x}_{pq t' t} + \mathbf{b}_P)$$
+
+The model only imposes a linear relationship between the input and output, but there are no other constraints on the model parameters. The model could be trained using standard linear regression techniques, but here we use a neural network framework to keep the training and inference code consistent with the other models. The linear model can be implemented as a single dense layer with identity activation, using the output time as the batch dimension. We use the output time as the batch dimension to allow for parallel computation of the output time-series over time, which is a significant advantage for training and inference speed.
+
+### Time convolution surge model
+
+This surge model uses convolution in time and dense mapping across other dimensions. At the input nodes, we have wind-stress in x and y directions, as well as surface pressure. The output points are a different set of locations from the input points. The goal is to predict the surge at the output points, at time $t$ for each output point $P$. The model predicts the surge at each output point independently, using all the input points and all the input quantities. 
+The model can be written as:
+
+**input layer:**
+$$\mathbf{H}_{c t'}^{0}=\mathbf{x}_{pq t'}$$
+where $c$ is the input channel dimension, which is the combination of  input points and the input quantities, $N_{c}^0 = N_p N_q$.
+
+**processing layers:**
+$$\mathbf{H}_{C T'}^{l+1} = \sigma(\mathbf{W}_{Cc\Delta t'}^l \star \mathbf{H}_{c t'}^{l} + \mathbf{b}_P)$$
+where the channel dimension $c \to C$ can be different for each layer, and $\sigma$ is a nonlinear activation function (e.g. ReLU).
+
+**output layer:**
+$$\mathbf{y}_{P} = \sigma(\mathbf{W}_{P c} \mathbf{H}_{(c T')}^{N_l} + \mathbf{b}_P)$$
+
+For implementation, we can use a 1D convolutional layer and process the combined $pq$ as channels. In a Conv layer the convolution comes before the channels, so the input tensor is reshaped to have shape $(N_t, N_p N_q)$, and the output tensor is reshaped to have shape $(N_T, N_P)$.
+
+**Strided (non-overlapping) convolutions.** We set the convolution **stride equal
+to the kernel size** $N_{\Delta t'}$ (the `filtersize`). Because the stride equals
+the kernel width, successive windows tile the lag axis with no overlap and no
+gaps — every lag position is visited exactly once. Each convolution layer
+therefore *reduces* the lag length by a factor of $N_{\Delta t'}$,
+
+$$N_{t'}^{\,l+1} = \left\lceil N_{t'}^{\,l} \big/ N_{\Delta t'} \right\rceil,$$
+
+rather than preserving it (as a stride-1 "same"-padding convolution would).
+After $N_l$ layers the lag length has shrunk from $l$ to $N_{t'}^{\,N_l}$, so the
+flattened input to the final dense output layer drops from $l\,N_C$ to
+$N_{t'}^{\,N_l} N_C$ — this is the parameter saving the stride buys.
+
+When the lag length is an exact power of $N_{\Delta t'}$ the funnel is
+padding-free. For example, with $N_{\Delta t'} = 3$, a window of $l = 9$ lags, and
+two layers, the lag dimension collapses $9 \to 3 \to 1$ with no padding at either
+step. When a stage is not evenly divisible, same-padding appends a few zeros to
+the final window so that all real lag positions are still covered — this is what
+the ceiling $\lceil\cdot\rceil$ in the formula above accounts for (e.g. $l = 16$
+with $N_{\Delta t'} = 3$ gives $16 \to 6 \to 2$, the last layer-1 window
+tail-padded).
 
 ## Old background
 

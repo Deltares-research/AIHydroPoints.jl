@@ -65,50 +65,52 @@ AbstractModel
 
 ```julia
 function predict(model::AbstractFluxModel, input::Dict{String, TimeSeries})
-    tensor, output = preprocess(model, input)   # build tensor + pre-allocate output
-    y = forward(model, tensor)                  # Flux forward pass
-    postprocess!(output, model, y)              # fill output in-place
+    x, output = preprocess(model, input)   # build model-specific input + pre-allocate output
+    y = forward(model, x)                  # Flux forward pass
+    postprocess!(output, model, y)         # fill output in-place
     return output
 end
 ```
 
-`preprocess` returns both the input tensor and a pre-allocated
+`preprocess` returns both the input `x` and a pre-allocated
 `Dict{String, TimeSeries}` whose `values` matrices are zero-initialised with
 the correct shape and metadata (times, station names, coordinates).
 `postprocess!` fills those matrices in-place — this avoids storing metadata as
 a side-effect on the model struct and keeps `TimeSeries` allocation in one place.
 
-### Tensor layout
+### Tensor layout — per-model, not unified
 
-| Tensor | Shape | Notes |
-|---|---|---|
-| Input (from `preprocess`) | `(locations, features, time_lag, time)` | column-major; `time` is the batch dim |
-| Output (from `forward`)   | `(locations, features, time)` | one output per time step |
+There is **no single imposed tensor shape** at this level (see
+`docs/notes_dimensions.md`, plan step 20). Each model declares the layout its
+Flux layers need; the only thing standardised here is the *container* exchanged
+between the customisation points:
 
-`time_lag = 1` means no lag (single time step input).
+- `preprocess` returns `(x, output)` where `x` is a **tuple of tensors** (a
+  1-tuple for single-input models, an N-tuple for multi-input models such as
+  `AttentionSurgeModel`). Batch-time is the **last** axis of every tensor, so
+  `Flux.DataLoader((x, y))` batches them consistently (nested tuples are batched
+  element-wise).
+- `forward` returns a 2-D `(locations, time)` array.
 
-> **Note — under review (see `docs/notes_dimensions.md`, plan step 20).** The
-> "unified" 4-D input / 3-D output layout above is aspirational rather than
-> implemented: concrete models already use different shapes (e.g.
-> `ConvSurgeModel` wants `(nlags, channels, time)` for Flux's Conv1D;
-> `AttentionSurgeModel` produces a tuple `(x_station, x_wind)`; the trailing
-> singleton in the output is a placeholder). The current direction is to drop
-> the single unified layout, let each model declare its own input/output
-> shape, and have `preprocess` / `postprocess!` convert between the
-> standardised `Dict{String, TimeSeries}` boundary and the model-specific
-> tensors. The shared call signature will be `flux_model(x)` for both tensor
-> and tuple inputs via a `(m::ModelFlux)(x::Tuple) = m(x...)` wrapper. This
-> file will be updated once that refactor lands.
+The **surge family** has been converted to this convention (steps 20e/f); the
+Flux model is called by splatting the tuple (`get_flux_model(m)(x...)`). The
+tide, wave, and interaction families still use their own historical shapes (a
+4-D input tensor and a 3-D `(locations, 1, time)` output); unifying them is
+deferred to step 20h. Each per-family section below documents its actual
+layout.
 
 ### Required customisation points
 
 | Method | Signature | Purpose |
 |---|---|---|
-| `preprocess`    | `(m::M, input::Dict{String,TimeSeries}) -> (Array{Float32,4}, Dict{String,TimeSeries})` | Build input tensor; pre-allocate output |
-| `forward`       | `(m::M, x::Array{Float32,4}) -> Array{Float32,3}` | Reshape + Flux forward pass |
-| `postprocess!`  | `(output::Dict{String,TimeSeries}, m::M, y::Array{Float32,3})` | Fill output values in-place |
+| `preprocess`    | `(m::M, input::Dict{String,TimeSeries}) -> (Tuple, Dict{String,TimeSeries})` | Build model-specific input tuple; pre-allocate output |
+| `forward`       | `(m::M, x::Tuple) -> AbstractMatrix` | Flux forward pass; returns `(locations, time)` |
+| `postprocess!`  | `(output::Dict{String,TimeSeries}, m::M, y)` | Fill output values in-place |
 | `get_flux_model`| `(m::M) -> <Flux model>` | Expose chain for save/load |
 | `get_settings`  | `(m::M) -> Dict{String,Any}` | Return inference-time settings |
+
+(The surge family follows the `Tuple` → 2-D signatures shown here; tide/wave/
+interaction still use the 4-D-in / 3-D-out signatures pending step 20h.)
 
 `save_params` and `load_params!` are implemented once at this level using
 `get_flux_model` together with `Flux.state` / `Flux.loadmodel!` and JLD2.
@@ -116,29 +118,33 @@ a side-effect on the model struct and keeps `TimeSeries` allocation in one place
 ## AbstractSurgeModel (`AbstractSurgeModel.jl`)
 
 `AbstractSurgeModel <: AbstractFluxModel` is an intermediate abstract type that
-captures shared logic for all surge models.  Concrete subtypes only need to
-implement `forward` and `get_flux_model` / `get_settings`.
+captures shared logic for all surge models.  Concrete subtypes only implement
+`preprocess` (their own tensor assembly) plus `get_flux_model` / `get_settings`;
+`forward`, `postprocess!`, and `train_model!` are provided generically here.
 
 ### Shared implementations
 
 | Method | What it does |
 |---|---|
-| `preprocess` | Builds `(1, 3*nwind, nlags, nvalid)` wind/pressure lag tensor and pre-allocates output |
-| `postprocess!` | Writes `y[:, 1, :]` into `output["surge"].values` |
-| `train_model!` | Adam loop with ProgressMeter, temporal train/val split, returns `(train_losses, val_losses)` |
+| `_surge_lag_windows` | Shared **data extraction**: aligns locations, converts wind→stress, scales pressure, and slices each field into `(nwind, nlags, nvalid)` lag windows. Each model's `preprocess` calls this, then assembles the windows into its own layout. |
+| `_alloc_surge_output` | Allocates the zero-initialised `Dict("surge" => ts)` output container. |
+| `forward` | Splats the input tuple into the Flux model (`get_flux_model(m)(x...)`); returns the 2-D `(nstations, ntimes)` output. |
+| `postprocess!` | Writes the 2-D `y` into `output["surge"].values`. |
+| `train_model!` | Adam loop over `Flux.DataLoader((x, y))` (batches the input tuple element-wise), ProgressMeter, temporal train/val split; returns `(train_losses, val_losses)`. One loop serves single- and multi-input surge models alike. |
 
 ### Input key handling
 
-`preprocess` accepts either `"stress_x"`/`"stress_y"` (used directly) or
+Data extraction accepts either `"stress_x"`/`"stress_y"` (used directly) or
 `"wind_x"`/`"wind_y"` (converted via `uv_to_stress_xy`).  The helper
 `_get_stress(input)` encapsulates this.
 
 ```
 AbstractModel
     └── AbstractFluxModel   — predict, save_params, load_params!
-            └── AbstractSurgeModel  — preprocess, postprocess!, train_model!
-                    ├── LinearSurgeModel
-                    └── AttentionSurgeModel
+            └── AbstractSurgeModel  — _surge_lag_windows, forward, postprocess!, train_model!
+                    ├── LinearSurgeModel     — preprocess
+                    ├── ConvSurgeModel       — preprocess
+                    └── AttentionSurgeModel  — preprocess
 ```
 
 ## LinearSurgeModel (`LinearSurgeModel.jl`)

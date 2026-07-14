@@ -56,6 +56,7 @@ To express the meaning of the indices we'll use the following convention:
 |---|---|---|
 | $p$ | $P$ | point (spatial location) |
 | $t$ | $T$ | time |
+| $t'$ | $T'$ | convolution time |
 | $q$ | $Q$ | quantity (e.g. temperature, pressure) |
 | $c$ | $C$ | channel (feature) |
 | $b$ | $B$ | batch|
@@ -63,6 +64,7 @@ To express the meaning of the indices we'll use the following convention:
 | $x$ | $X$ | x-dimension |
 | $y$ | $Y$ | y-dimension |
 | $z$ | $Z$ | z-dimension |
+| $l$ | $L$ | layer number |
 
 In addition, we will use $b$ for the batch index and $l$ index as a superscript for the layer number when we want to make it explicit. 
 
@@ -203,11 +205,15 @@ On the other hand all models, except the fully dense layer, impose a strong indu
 
 ## Towards a more realistic example
 
-Let's consider a surge model that uses convolution in time and dense mapping across other dimensions. At the input nodes, we have winds in x and y directions, as well as surface pressure. The output points are a different set of locations from the input points. The goal is to predict the surge at the output points, at time $t$. The model predicts the surge at each output point independently, using all the input points and all the input quantities. Thus the input $\mathbf{x}$ has indices for point $p$, quantity $q$ and time $t$, and the output $\mathbf{y}$ has an index for point $P$ and times $T$. The weights $\mathbf{W}$ have indices for output point $P$, input point $p$, input quantity $q$, and time-lag $\Delta t$. The bias $\mathbf{b}$ has an index for output point $P$. The model can be written as:
+Let's consider a surge model that uses convolution in time and dense mapping across other dimensions. At the input nodes, we have winds/stress in x and y directions, as well as surface pressure. The output points are a different set of locations from the input points. The goal is to predict the surge at the output points, at time $T$. The model predicts the surge at each output point independently, using all the input points and all the input quantities. Per output time, the model considers a range of input times denoted by $t'$. Thus the input $\mathbf{x}$ has indices for point $p$, quantity $q$ and time $t'$, and the output $\mathbf{y}$ has an index for point $P$. The weights $\mathbf{W}$ have indices for output point $P$, input point $p$, input quantity $q$, and time-lag/convolution time $\Delta t'$. The bias $\mathbf{b}$ has an index for output point $P$. The model can be written as:
 
-$$\mathbf{y}_{P T} = \sigma(\mathbf{W}_{Ppq\Delta t} \star \mathbf{x}_{pqt} + \mathbf{b}_P)$$
+$$\mathbf{y}_{PT'} = \sigma(\mathbf{W}_{Ppq\Delta t'} \star \mathbf{x}_{pq t'} + \mathbf{b}_P)$$
 
-For implementation, we can use a 1D convolutional layer and process the combined $pq$ as channels. In a Conv layer the convolution comes before the channels, so the input tensor is reshaped to have shape $(N_t, N_p N_q)$, and the output tensor is reshaped to have shape $(N_T, N_P)$. The model can be implemented in Flux as:
+For efficiency, we can add the output time as a batch dimension, $t\to T$, so that the model can be applied to all output times in parallel. This results in the following index pattern:
+
+$$\mathbf{y}_{P T' T} = \sigma(\mathbf{W}_{Ppq\Delta t'} \star \mathbf{x}_{pq t' t} + \mathbf{b}_P)$$
+
+For implementation, we can use a 1D convolutional layer and process the combined $pq$ as channels. In a Conv layer the convolution comes before the channels, so the input tensor is reshaped to have shape $(N_{t'}, N_p N_q)$, and the output tensor is reshaped to have shape $(N_{T'}, N_P)$. The model can be implemented in Flux as:
 
 ```julia
 model = Conv((N_Δt,), N_p*N_q => N_P, relu)

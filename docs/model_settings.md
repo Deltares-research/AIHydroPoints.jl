@@ -39,7 +39,8 @@ Concrete models: `LinearSurgeModel`, `ConvSurgeModel`, `AttentionSurgeModel`.
 | Key | Default | Description |
 |---|---|---|
 | `"channels"` | `[32, 16]` | Output channels for each Conv layer. |
-| `"filtersize"` | `3` | Convolution kernel width. |
+| `"filtersize"` | `3` | Conv kernel width **and stride** (`stride = filtersize`): windows tile the lag axis with no overlap, so the lag length shrinks by `filtersize` per layer (`cld(·, filtersize)`), reducing the flattened `Dense` input. |
+| `"activation"` | `"swish"` | Activation function (`"swish"` or `"relu"`). |
 
 ### `model_pars` for `AttentionSurgeModel`
 
