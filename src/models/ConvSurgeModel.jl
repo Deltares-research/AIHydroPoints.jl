@@ -67,7 +67,7 @@ Required keys: `"nlocations_output"` (Int), `"nlocations_input"` (Int), `"nlags"
 """
 function ConvSurgeModel(settings::Dict{String, Any})
     nstations  = settings["nlocations_output"]
-    nwind      = settings["nlocations_input"]
+    nlocs_input      = settings["nlocations_input"]
     nlags      = settings["nlags"]
     mp         = get(settings, "model_pars", Dict{String, Any}())
     channels   = get(mp, "channels",   [32, 16])
@@ -75,7 +75,7 @@ function ConvSurgeModel(settings::Dict{String, Any})
     act_name   = get(mp, "activation", "swish")
     f_act      = act_name == "relu" ? relu : swish
 
-    n_in    = 3 * nwind
+    n_in    = 3 * nlocs_input # length(["stress_x", "stress_y", "pressure"])==3
     ch_seq  = [n_in; channels]
 
     # stride == filtersize tiles the lag axis into non-overlapping windows
@@ -125,17 +125,17 @@ buffer as `lag`-fastest and silently scrambled the two axes whenever
 `forward` and `postprocess!` are inherited from `AbstractSurgeModel`.
 """
 function preprocess(model::ConvSurgeModel, input::Dict{String, TimeSeries})
-    # sx, sy, pr :: (nwind, nlags, nvalid)   — shared extraction
+    # sx, sy, pr :: (nlocs_input, nlags, nvalid)   — shared extraction
     sx, sy, pr, times_valid = _surge_lag_windows(model, input)
-    nwind  = size(sx, 1)
+    nlocs_input  = size(sx, 1)
     nlags  = size(sx, 2)
     nvalid = size(sx, 3)
 
     # Conv-ready layout (lag, channel, batch-time). permutedims materialises the
     # (point, lag, …) → (lag, point, …) transpose so memory matches the axes.
-    x = zeros(Float32, nlags, 3 * nwind, nvalid)
-    x[:, 1:nwind,           :] = permutedims(sx, (2, 1, 3))   # channels 1..nwind        = stress_x
-    x[:, nwind+1:2*nwind,   :] = permutedims(sy, (2, 1, 3))   # channels nwind+1..2*nwind = stress_y
-    x[:, 2*nwind+1:3*nwind, :] = permutedims(pr, (2, 1, 3))   # channels 2*nwind+1..3*nwind = pressure
+    x = zeros(Float32, nlags, 3 * nlocs_input, nvalid)
+    x[:, 1:nlocs_input,           :] = permutedims(sx, (2, 1, 3))   # channels 1..nlocs_input        = stress_x
+    x[:, nlocs_input+1:2*nlocs_input,   :] = permutedims(sy, (2, 1, 3))   # channels nlocs_input+1..2*nlocs_input = stress_y
+    x[:, 2*nlocs_input+1:3*nlocs_input, :] = permutedims(pr, (2, 1, 3))   # channels 2*nlocs_input+1..3*nlocs_input = pressure
     return (x,), _alloc_surge_output(model, times_valid)
 end

@@ -105,15 +105,45 @@ The main goal of this project is to develop a machine learning model for predict
        their own (unchanged) 3-D layouts until 20h converts them. Also refreshed
        `docs/model_settings.md` (ConvSurgeModel stride + activation);
        `docs/settings.md` verified still accurate.
-    h. [ ] **(deferred — Option 2, package-wide unification)** Extend the
-       always-tuple + 2-D convention to the **wave, interaction, and tide**
-       families and collapse **all four** `train_model!` bodies into a single
-       generic loop in `abstract_flux_model.jl`, parameterised by a per-family
-       `build_training_tensors(model, …)` hook (captures the NaN-filter for
-       waves and the Z-score stat computation for interaction) plus per-family
-       `postprocess!` (inverse transforms). Make every Flux model return its
-       natural 2-D output. Deferred until the interaction baselines (11c/d) are
-       settled, to avoid destabilising working families.
+    h. **(Option 2 — package-wide `train_model!` unification.)** Apply the surge
+       always-tuple + 2-D convention (from 20e/f) to the tide, wave, and
+       interaction families and collapse **all four** `train_model!` bodies into
+       one generic loop on `AbstractFluxModel`. **Strategy: convert one family at
+       a time**, copying the surge training routine into that family and adapting
+       it (verify each family in isolation; leave unconverted families untouched);
+       **deduplicate last**, once all four near-identical routines are visible,
+       by hoisting one generic loop with an `apply_flux` seam (splat vs
+       single-tuple flux call) and a per-family `build_training_tensors` hook.
+       `preprocess` already returns the nested tuple in every family; `postprocess!`
+       stays per-family (inverse transforms + the sample→station×time reshape for
+       wave/interaction). Originally deferred until the interaction baselines
+       (11c/d) settled; being picked up now. Substeps:
+       1. [ ] **Tide** — adapt `forward`→2-D (drop its reshape to 3-D) and
+          `postprocess!`→2-D-in; replace `AbstractTideModel.train_model!` with an
+          adapted copy of the surge routine (surge's `m(xb...)` splat works —
+          `TideModel` is 2-arg). Diffs to catch vs surge: no `nlags` target
+          alignment (tide is per-time; `y = target["waterlevel"]` full), key
+          `"waterlevel"`. Verify surge + tide + full `Pkg.test()` green;
+          wave/interaction untouched.
+       2. [ ] **Wave** (`ConvWaveModel`, `DeepONetWaveModel`) — adapt `forward`→2-D
+          returning `(1, nsamples)`, moving the `→(nstations, ntimes)` reshape
+          into `postprocess!` (with `wave_scale`); copy/adapt the routine
+          (single-tuple flux call `m(xb)`; add the NaN-filter). Verify.
+       3. [ ] **Interaction** (`ConvInteractionModel`, `ProductInteractionModel`)
+          — same shape as wave; the routine copy adds the Z-score statistic
+          computation (stored in settings for inference) + inverse Z-score in
+          `postprocess!`. Verify.
+       4. [ ] **Deduplicate** — the four routines now differ only in (a) the
+          flux-call form and (b) data-prep. Hoist one generic
+          `train_model!(::AbstractFluxModel, …)` with the `apply_flux` seam (splat
+          default; wave/interaction single-tuple) and the `build_training_tensors`
+          hook (per-family data-prep) plus a generic `forward`; delete the four
+          per-family `train_model!` copies and now-redundant `forward`s. Verify
+          numeric parity + smoke.
+       5. [ ] **Docs** — update `docs/design.md` (tide/wave/interaction sections
+          to tuple/2-D; drop the "pending 20h" caveats added in 20g), complete
+          18d (`notation.md` realistic 4-axis input/output), and update the
+          status. Full `Pkg.test()` + `check_training_scripts.sh` green.
 21. ConvSurgeModel architecture improvements (follow-on to step 20)
     a. [x] Reintroduce a stride on the Conv1D layers, set `stride = filtersize`
        so the kernel tiles the lag axis into non-overlapping windows (every lag
