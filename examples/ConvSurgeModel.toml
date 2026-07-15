@@ -16,6 +16,7 @@ nlags      = 16
 [model_settings.model_pars]
 channels   = [32, 16]
 filtersize = 3
+activation = "swish"
 
 [train_settings]
 nepochs         = 5
