@@ -87,7 +87,7 @@ end
     x_doodson = randn(Float32, 2 * nfreqs, ntimes)
     y = forward(m, (x_station, x_doodson))
 
-    @test size(y) == (nstations, 1, ntimes)
+    @test size(y) == (nstations, ntimes)
     @test eltype(y) == Float32
 end
 

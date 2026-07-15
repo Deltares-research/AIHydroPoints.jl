@@ -161,14 +161,4 @@ end
 get_flux_model(m::ProductTideModel) = m.flux_model
 get_settings(m::ProductTideModel)   = m.settings
 
-"""
-    forward(model::ProductTideModel, x::Tuple) -> Array{Float32, 3}
-
-Unpack `(x_station, x_doodson)` from `x`, run `ProductTideFlux`, and return
-the result reshaped to `(nstations, 1, ntimes)`.
-"""
-function forward(model::ProductTideModel, x::Tuple)
-    x_station, x_doodson = x
-    y = model.flux_model(x_station, x_doodson)   # (nstations, ntimes)
-    return reshape(y, size(y, 1), 1, size(y, 2))  # (nstations, 1, ntimes)
-end
+# forward, postprocess!, and train_model! are inherited from AbstractTideModel.

@@ -4,7 +4,8 @@
 # and concrete tide models (DeepONetTideModel, etc.) and implements shared
 # tide-specific logic: preprocess, postprocess!, and train_model!.
 #
-# Concrete subtypes must implement: get_flux_model, get_settings, forward.
+# Concrete subtypes must implement: get_flux_model, get_settings.
+# (forward, postprocess!, and train_model! are shared here.)
 #
 # Unlike surge models, tide models have no external forcing — inputs are computed
 # from station lat/lon and time (Doodson numbers).  The input dict and target dict
@@ -37,7 +38,8 @@ The following are populated automatically by `train_model!` on first call:
 - `x_station :: Float32 (4, nstations, ntimes)` — cos/sin lat and cos/sin lon per station
 - `x_doodson :: Float32 (2*nfreqs, ntimes)` — cos/sin Doodson arguments per time step
 
-`forward` must accept this tuple and return `(nstations, 1, ntimes)`.
+`forward` is provided generically here (`get_flux_model(m)(x...)`); the Flux
+model must return a 2-D `(nstations, ntimes)` array.
 
 ## Input convention
 
@@ -49,7 +51,9 @@ Both `input` and `target` dicts carry a `"waterlevel"` key.
 
 - `get_flux_model(m)` — return the underlying Flux model
 - `get_settings(m)` — return `Dict{String, Any}`
-- `forward(m, x::Tuple) -> Array{Float32, 3}`
+
+`forward`, `postprocess!`, and `train_model!` are shared; the Flux model must
+return a 2-D `(nstations, ntimes)` array.
 """
 abstract type AbstractTideModel <: AbstractFluxModel end
 
@@ -108,19 +112,28 @@ function preprocess(model::AbstractTideModel, input::Dict{String, TimeSeries})
 end
 
 # ──────────────────────────────────────────────────────────────────────────────
-# postprocess! — shared across all tide models
+# forward / postprocess! — shared across all tide models
 # ──────────────────────────────────────────────────────────────────────────────
 
 """
-    postprocess!(output::Dict{String, TimeSeries}, model::AbstractTideModel,
-                 y::Array{Float32, 3})
+    forward(model::AbstractTideModel, x::Tuple) -> Array{Float32, 2}
 
-Write tide predictions from `y` into `output["waterlevel"]` in-place.
-`y` has shape `(nstations, 1, ntimes)`; the singleton feature dimension is dropped.
+Run the model's Flux network on `(x_station, x_doodson)` from `preprocess` and
+return a 2-D `(nstations, ntimes)` array of tide predictions.  The tuple is
+splatted into the Flux model, which returns the 2-D shape directly.
+"""
+forward(model::AbstractTideModel, x::Tuple) = get_flux_model(model)(x...)
+
+"""
+    postprocess!(output::Dict{String, TimeSeries}, model::AbstractTideModel,
+                 y::AbstractMatrix)
+
+Write the 2-D tide predictions `y` of shape `(nstations, ntimes)` into
+`output["waterlevel"]` in-place.
 """
 function postprocess!(output::Dict{String, TimeSeries}, model::AbstractTideModel,
-                      y::Array{Float32, 3})
-    output["waterlevel"].values .= y[:, 1, :]
+                      y::AbstractMatrix)
+    output["waterlevel"].values .= y
 end
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -158,43 +171,50 @@ function train_model!(model::AbstractTideModel, train_settings::TrainingSettings
 
     # Populate output metadata from target if not yet present
     if !haskey(settings, "out_names")
-        ts_ref = target["waterlevel"]
+        ts_ref = first(values(target))
         settings["out_names"]    = get_names(ts_ref)
         settings["out_lons"]     = Float64.(get_longitudes(ts_ref))
         settings["out_lats"]     = Float64.(get_latitudes(ts_ref))
         settings["out_quantity"] = get_quantity(ts_ref)
     end
 
-    (x_station, x_doodson), _ = preprocess(model, input)
-    ntimes = size(x_doodson, 2)
-
-    y_all = Float32.(get_values(target["waterlevel"]))   # (nstations, ntimes)
+    # Build input tuple + target matrix (batch-time is the last axis of each).
+    # Unlike surge, tide predicts per-time for ALL times — there is no `nlags`
+    # lag window, so the target is the full series (no `[:, nlags:end]` trim).
+    # NB: this loop is otherwise identical to AbstractSurgeModel.train_model! and
+    #     both will be hoisted to one generic loop at the 20h deduplication step
+    #     (`_take_last_dim` is the shared tuple helper, currently in
+    #     AbstractSurgeModel.jl).
+    x_full, _ = preprocess(model, input)                    # Tuple (x_station, x_doodson)
+    y_full = Float32.(get_values(first(values(target))))    # (nstations, ntimes)
 
     # Validation data: explicit split takes priority over validation_split
     if !isnothing(val_input)
-        (x_st_val, x_w_val), _ = preprocess(model, val_input)
-        y_val   = Float32.(get_values(val_target["waterlevel"]))
-        has_val = true
-        n_train = ntimes
-        x_st    = x_station
-        x_w     = x_doodson
-        y       = y_all
+        x_val, _ = preprocess(model, val_input)
+        y_val    = Float32.(get_values(first(values(val_target))))
+        x, y     = x_full, y_full
+        has_val  = true
     else
-        n_val   = round(Int, train_settings.validation_split * ntimes)
+        nfull   = size(y_full, 2)
+        n_val   = round(Int, train_settings.validation_split * nfull)
         has_val = n_val > 0
-        n_train = ntimes - n_val
-        x_st      = x_station[:, :, 1:n_train]
-        x_w       = x_doodson[:, 1:n_train]
-        y         = y_all[:, 1:n_train]
-        x_st_val  = has_val ? x_station[:, :, n_train+1:end] : nothing
-        x_w_val   = has_val ? x_doodson[:, n_train+1:end]    : nothing
-        y_val     = has_val ? y_all[:, n_train+1:end]         : nothing
+        if has_val
+            n_train = nfull - n_val
+            x       = _take_last_dim(x_full, 1:n_train)
+            y       = y_full[:, 1:n_train]
+            x_val   = _take_last_dim(x_full, n_train+1:nfull)
+            y_val   = y_full[:, n_train+1:end]
+        else
+            x, y  = x_full, y_full
+            x_val = y_val = nothing
+        end
     end
 
+    # Training loop
     flux_model = get_flux_model(model)
     opt_state  = Flux.setup(Adam(train_settings.learning_rate), flux_model)
     current_lr = Float64(train_settings.learning_rate)
-    loader = Flux.DataLoader((x_st, x_w, y); batchsize=train_settings.nbatches, shuffle=true)
+    loader = Flux.DataLoader((x, y); batchsize=train_settings.nbatches, shuffle=true)
 
     checkpoint_dir = get(settings, "model_dir", nothing)
 
@@ -206,20 +226,20 @@ function train_model!(model::AbstractTideModel, train_settings::TrainingSettings
     best_val_rmse = Inf32
 
     for epoch in 1:train_settings.nepochs
-        for (x_st_b, x_w_b, yb) in loader
+        for (xb, yb) in loader
             _, grads = Flux.withgradient(flux_model) do m
-                Flux.mse(m(x_st_b, x_w_b), yb)
+                Flux.mse(m(xb...), yb)
             end
             Flux.update!(opt_state, flux_model, grads[1])
         end
 
-        train_rmse = sqrt(Flux.mse(flux_model(x_st, x_w), y))
+        train_rmse = sqrt(Flux.mse(flux_model(x...), y))
         push!(train_losses, train_rmse)
 
         empty!(showvalues)
         push!(showvalues, "train RMSE" => @sprintf("%.4f", train_rmse))
         if has_val
-            val_rmse = sqrt(Flux.mse(flux_model(x_st_val, x_w_val), y_val))
+            val_rmse = sqrt(Flux.mse(flux_model(x_val...), y_val))
             push!(val_losses, val_rmse)
             push!(showvalues, "val RMSE  " => @sprintf("%.4f", val_rmse))
             if !isnothing(checkpoint_dir) && val_rmse < best_val_rmse

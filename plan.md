@@ -118,13 +118,13 @@ The main goal of this project is to develop a machine learning model for predict
        stays per-family (inverse transforms + the sample→station×time reshape for
        wave/interaction). Originally deferred until the interaction baselines
        (11c/d) settled; being picked up now. Substeps:
-       1. [ ] **Tide** — adapt `forward`→2-D (drop its reshape to 3-D) and
-          `postprocess!`→2-D-in; replace `AbstractTideModel.train_model!` with an
-          adapted copy of the surge routine (surge's `m(xb...)` splat works —
-          `TideModel` is 2-arg). Diffs to catch vs surge: no `nlags` target
-          alignment (tide is per-time; `y = target["waterlevel"]` full), key
-          `"waterlevel"`. Verify surge + tide + full `Pkg.test()` green;
-          wave/interaction untouched.
+       1. [x] **Tide** — generic 2-D `forward` on `AbstractTideModel`
+          (`get_flux_model(m)(x...)`); deleted the two concrete reshaping
+          `forward`s; `postprocess!`→2-D-in; `train_model!` replaced with the
+          surge routine (identical loop; only diff = no `nlags` target
+          alignment, full `y`). Confirmed tide has **no** feature surge lacks —
+          it is strictly simpler (no `nlags`, no `in_names` alignment). 590/590
+          tests pass; tide train scripts pass fresh; wave/interaction untouched.
        2. [ ] **Wave** (`ConvWaveModel`, `DeepONetWaveModel`) — adapt `forward`→2-D
           returning `(1, nsamples)`, moving the `→(nstations, ntimes)` reshape
           into `postprocess!` (with `wave_scale`); copy/adapt the routine
