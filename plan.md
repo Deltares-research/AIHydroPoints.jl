@@ -125,10 +125,19 @@ The main goal of this project is to develop a machine learning model for predict
           alignment, full `y`). Confirmed tide has **no** feature surge lacks —
           it is strictly simpler (no `nlags`, no `in_names` alignment). 590/590
           tests pass; tide train scripts pass fresh; wave/interaction untouched.
-       2. [ ] **Wave** (`ConvWaveModel`, `DeepONetWaveModel`) — adapt `forward`→2-D
-          returning `(1, nsamples)`, moving the `→(nstations, ntimes)` reshape
-          into `postprocess!` (with `wave_scale`); copy/adapt the routine
-          (single-tuple flux call `m(xb)`; add the NaN-filter). Verify.
+       2. [x] **Wave** (`ConvWaveModel`, `DeepONetWaveModel`) — generic
+          `forward(::AbstractWaveModel, x)` = `get_flux_model(m)(x)` returning
+          2-D `(1, nsamples)`; deleted the two concrete reshaping `forward`s;
+          `postprocess!` now reshapes `(1, nsamples)→(nstations, ntimes)` +
+          `wave_scale`; `train_model!` adapted (nested-tuple DataLoader,
+          single-tuple flux call `m(xb)`, NaN-filter preserved). 590/590 tests
+          pass; wave train scripts pass fresh; behaviour preserved.
+          **FINDING (needs a decision):** the wave `train_model!` accepts
+          `val_input`/`val_target` but **ignores them** — it validates only via
+          the `validation_split` fraction. Surge/tide/interaction honour explicit
+          validation data. Left as-is (behaviour-preserving) and flagged; decide
+          whether to add explicit-val support to wave (here, at the 20h dedup, or
+          as a separate fix).
        3. [ ] **Interaction** (`ConvInteractionModel`, `ProductInteractionModel`)
           — same shape as wave; the routine copy adds the Z-score statistic
           computation (stored in settings for inference) + inverse Z-score in

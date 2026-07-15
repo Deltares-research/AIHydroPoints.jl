@@ -145,16 +145,4 @@ end
 get_flux_model(m::ConvWaveModel) = m.flux_model
 get_settings(m::ConvWaveModel)   = m.settings
 
-"""
-    forward(model::ConvWaveModel, x::Tuple) -> Array{Float32, 3}
-
-Unpack `(x_station, x_input)`, run through the Conv chain, and return
-predictions reshaped to `(nstations, 1, ntimes_valid)`.
-"""
-function forward(model::ConvWaveModel, x::Tuple)
-    x_station, x_input = x
-    nstations = size(x_station, 1)
-    y = model.flux_model((x_station, x_input))   # (1, nstations * ntimes_valid)
-    ntimes = size(y, 2) ÷ nstations
-    return reshape(y, nstations, 1, ntimes)
-end
+# forward, postprocess!, and train_model! are inherited from AbstractWaveModel.

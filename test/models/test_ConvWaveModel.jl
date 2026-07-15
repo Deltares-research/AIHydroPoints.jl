@@ -109,7 +109,7 @@ end
     x_input   = randn(Float32, WAVE_NLAGS, 2 * WAVE_NWIND, nsamples)
     y = forward(m, (x_station, x_input))
 
-    @test size(y) == (nstations, 1, ntimes_valid)
+    @test size(y) == (1, nsamples)   # (1, nstations*ntimes_valid) — reshaped in postprocess!
     @test eltype(y) == Float32
 end
 

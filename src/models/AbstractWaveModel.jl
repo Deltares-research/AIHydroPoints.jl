@@ -1,4 +1,4 @@
-# AbstractWaveModel.jl
+    # AbstractWaveModel.jl
 #
 # Intermediate abstract type for all wave models.  Sits between AbstractFluxModel
 # and concrete wave models (ConvWaveModel, etc.) and implements shared wave-specific
@@ -11,7 +11,8 @@
 #
 # where x_station is one-hot and x_input is a lagged wind-stress block.
 #
-# Concrete subtypes must implement: get_flux_model, get_settings, forward.
+# Concrete subtypes must implement: get_flux_model, get_settings.
+# (forward, postprocess!, and train_model! are shared here.)
 
 using Flux
 using Printf: @sprintf
@@ -66,7 +67,9 @@ The following are populated automatically by `train_model!` on first call:
 - `x_input  :: Float32 (nlags, 2*nlocations_input, nlocations_output * ntimes_valid)` — lagged wind-stress blocks
 
 Samples are ordered: for each valid time step (outer), then for each station (inner).
-`forward` must accept this tuple and return `(nlocations_output, 1, ntimes_valid)`.
+`forward` is provided generically (`get_flux_model(m)(x)`) and returns a 2-D
+`(1, nlocations_output*ntimes_valid)` array — one value per `(station, time)`
+sample; `postprocess!` reshapes it to `(nlocations_output, ntimes_valid)`.
 
 ## Input convention
 
@@ -79,7 +82,10 @@ Samples are ordered: for each valid time step (outer), then for each station (in
 
 - `get_flux_model(m)` — return the underlying Flux model
 - `get_settings(m)` — return `Dict{String, Any}`
-- `forward(m, x::Tuple) -> Array{Float32, 3}`
+
+`forward`, `postprocess!`, and `train_model!` are shared; the Flux model must
+accept the `(x_station, x_input)` tuple as a single argument and return a 2-D
+`(1, nlocations_output*ntimes_valid)` array.
 """
 abstract type AbstractWaveModel <: AbstractFluxModel end
 
@@ -155,21 +161,36 @@ function preprocess(model::AbstractWaveModel, input::Dict{String, TimeSeries})
 end
 
 # ──────────────────────────────────────────────────────────────────────────────
-# postprocess! — shared across all wave models
+# forward / postprocess! — shared across all wave models
 # ──────────────────────────────────────────────────────────────────────────────
 
 """
-    postprocess!(output::Dict{String, TimeSeries}, model::AbstractWaveModel,
-                 y::Array{Float32, 3})
+    forward(model::AbstractWaveModel, x::Tuple) -> Array{Float32, 2}
 
-Write wave-height predictions from `y` into `output["wave_height"]` in-place,
-applying the inverse of the training scale factor (`wave_scale`).
-`y` has shape `(nstations, 1, ntimes_valid)`.
+Run the model's Flux network on `(x_station, x_input)` from `preprocess`.  The
+tuple is passed as a **single argument** (`get_flux_model(m)(x)`, not splatted —
+the wave flux models unpack the tuple in their first layer).  Returns a 2-D
+`(1, nstations*ntimes_valid)` array: one scaled wave-height value per
+`(station, time)` sample.  `postprocess!` reshapes and unscales it.
+"""
+forward(model::AbstractWaveModel, x::Tuple) = get_flux_model(model)(x)
+
+"""
+    postprocess!(output::Dict{String, TimeSeries}, model::AbstractWaveModel,
+                 y::AbstractMatrix)
+
+Write wave-height predictions from the 2-D `y` of shape
+`(1, nstations*ntimes_valid)` into `output["wave_height"]` in-place: reshape the
+`(station × time)` samples back to `(nstations, ntimes_valid)` (station-fastest
+within time, matching `preprocess`) and apply the inverse training scale
+(`wave_scale`).
 """
 function postprocess!(output::Dict{String, TimeSeries}, model::AbstractWaveModel,
-                      y::Array{Float32, 3})
-    wave_scale = Float32(get(get_settings(model), "wave_scale", 3.0))
-    output["wave_height"].values .= y[:, 1, :] .* wave_scale
+                      y::AbstractMatrix)
+    wave_scale        = Float32(get(get_settings(model), "wave_scale", 3.0))
+    vals              = output["wave_height"].values        # (nstations, ntimes_valid)
+    nstations, ntimes = size(vals)
+    vals .= reshape(y, nstations, ntimes) .* wave_scale
 end
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -241,7 +262,6 @@ function train_model!(model::AbstractWaveModel, train_settings::TrainingSettings
     end
 
     x_s, x_i, y = _nanfilter(x_station, x_input, y_flat, n_tr_samps)
-    n_train = size(y, 2)
 
     x_s_val = x_i_val = y_val = nothing
     if has_val
@@ -253,10 +273,20 @@ function train_model!(model::AbstractWaveModel, train_settings::TrainingSettings
         )
     end
 
+    # Bundle the two input tensors into a tuple so the loop matches the shared
+    # surge/tide form: DataLoader((x, y)) yields (xb::Tuple, yb). Wave flux models
+    # take the tuple as a SINGLE argument (`m(xb)`), unlike surge/tide (`m(xb...)`)
+    # — that call-form difference is unified by `apply_flux` at the 20h dedup step.
+    # NB: unlike surge/tide, `val_input`/`val_target` are ignored — wave validates
+    #     only via the `validation_split` fraction (with the NaN-filter). Loop is
+    #     otherwise identical to AbstractSurgeModel.train_model!.
+    x     = (x_s, x_i)
+    x_val = has_val ? (x_s_val, x_i_val) : nothing
+
     flux_model = get_flux_model(model)
     opt_state  = Flux.setup(Adam(train_settings.learning_rate), flux_model)
     current_lr = Float64(train_settings.learning_rate)
-    loader = Flux.DataLoader((x_s, x_i, y); batchsize=train_settings.nbatches, shuffle=true)
+    loader = Flux.DataLoader((x, y); batchsize=train_settings.nbatches, shuffle=true)
 
     checkpoint_dir = get(get_settings(model), "model_dir", nothing)
 
@@ -268,20 +298,20 @@ function train_model!(model::AbstractWaveModel, train_settings::TrainingSettings
     best_val_rmse = Inf32
 
     for epoch in 1:train_settings.nepochs
-        for (x_s_b, x_i_b, yb) in loader
+        for (xb, yb) in loader
             _, grads = Flux.withgradient(flux_model) do m
-                Flux.mse(m((x_s_b, x_i_b)), yb)
+                Flux.mse(m(xb), yb)
             end
             Flux.update!(opt_state, flux_model, grads[1])
         end
 
-        train_rmse = sqrt(Flux.mse(flux_model((x_s, x_i)), y))
+        train_rmse = sqrt(Flux.mse(flux_model(x), y))
         push!(train_losses, train_rmse)
 
         empty!(showvalues)
         push!(showvalues, "train RMSE" => @sprintf("%.4f", train_rmse))
         if has_val
-            val_rmse = sqrt(Flux.mse(flux_model((x_s_val, x_i_val)), y_val))
+            val_rmse = sqrt(Flux.mse(flux_model(x_val), y_val))
             push!(val_losses, val_rmse)
             push!(showvalues, "val RMSE  " => @sprintf("%.4f", val_rmse))
             if !isnothing(checkpoint_dir) && val_rmse < best_val_rmse
