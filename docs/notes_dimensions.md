@@ -171,7 +171,7 @@ whether they also rely on the q·p-first ordering for a flatten-into-
 Dense pattern, in which case the right answer is for *each* model's
 `forward` to choose its own layout via an honest `permutedims`).
 
-### Status — RESOLVED (step 20e/f)
+### Status — RESOLVED (ConvSurgeModel reshape fix + surge-family `preprocess` refactor)
 
 - [x] Verified by a synthetic test (`stress_x[p,t] = 100*p + t`): the old
   `reshape` made the Conv spatial axis read `[101, 201, 301, 401]` (a feature

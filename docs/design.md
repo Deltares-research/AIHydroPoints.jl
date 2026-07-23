@@ -81,7 +81,7 @@ a side-effect on the model struct and keeps `TimeSeries` allocation in one place
 ### Tensor layout — per-model, not unified
 
 There is **no single imposed tensor shape** at this level (see
-`docs/notes_dimensions.md`, plan step 20). Each model declares the layout its
+`docs/notes_dimensions.md`, the tensor-layout refactor). Each model declares the layout its
 Flux layers need; the only thing standardised here is the *container* exchanged
 between the customisation points:
 
@@ -93,7 +93,8 @@ between the customisation points:
 - `forward` returns a **2-D** array (`(locations, time)` for surge/tide, or
   `(1, nsamples)` for the station×time wave/interaction models).
 
-**All four families** now follow this convention (step 20h). The Flux model is
+**All four families** now follow this convention (since the package-wide
+`train_model!` unification). The Flux model is
 called uniformly as `get_flux_model(m)(x)` — every flux model is callable on its
 input tuple (single-input Dense/Conv chains prepend `only` to unwrap the 1-tuple;
 multi-arg models carry a `(m)(x::Tuple) = m(x...)` method). As a result `forward`
@@ -392,7 +393,8 @@ directory/overwrite guards as `toml_write` and `save_params`.
 
 Output generation is handled by `write_outputs`, a single implementation shared
 by all `AbstractFluxModel` subtypes (it replaced the old per-model `plot_series`
-in step 7g).  It is driven entirely by the `[output_settings]` TOML section —
+when the pipeline became TOML-driven).  It is driven entirely by the
+`[output_settings]` TOML section —
 see `docs/output_settings.md` for the full schema.
 
 ```julia
