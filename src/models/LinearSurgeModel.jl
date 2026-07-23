@@ -25,7 +25,8 @@ Required keys in `settings`: `"nlocations_output"`, `"nlocations_input"`, `"nlag
 
 `preprocess` returns a 1-tuple `(x_flat,)` with
 `x_flat :: (3*nlocations_input*nlags, ntimes_valid)` — a flat feature vector per
-batch-time step. `Dense` maps that directly to `(nlocations_output, ntimes_valid)`.
+batch-time step. The flux model is `Chain(only, Dense(...))`: `only` unwraps the
+1-tuple and `Dense` maps `x_flat` to `(nlocations_output, ntimes_valid)`.
 `Dense` is permutation-invariant on its input vector, so the exact interleaving of
 point/quantity/lag inside the flat vector is irrelevant as long as it is the same
 at train and predict time (it is — both go through this `preprocess`).
@@ -46,7 +47,9 @@ function LinearSurgeModel(settings::Dict{String, Any})
     nstations = settings["nlocations_output"]
     nwind     = settings["nlocations_input"]
     nlags     = settings["nlags"]
-    chain     = Dense(3 * nwind * nlags => nstations)
+    # `only` unwraps the 1-tuple `(x_flat,)` from preprocess so the flux model is
+    # callable uniformly as `chain(x)` (matching the multi-input models).
+    chain     = Chain(only, Dense(3 * nwind * nlags => nstations))
     return LinearSurgeModel(chain, settings)
 end
 

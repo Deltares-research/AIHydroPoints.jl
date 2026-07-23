@@ -3,13 +3,10 @@
 
 NOTE: This doc is about the concepts and math, not the code structure or implementation details.
 
-> **Draft warning.** This document is still a very rough draft and should be
-> read with care. The conceptual notation and the actual tensor layouts used
-> in the code are not yet fully consistent — see
-> [`notes_dimensions.md`](notes_dimensions.md) for an ongoing review of those
-> inconsistencies and the planned refactor. The index-notation conventions
-> used below are spelled out in the [Notation](notation.md) appendix.
-> Everything before the "## Old background" is the new background, which is incomplete and under development.
+> **Draft warning.** This document is still a rough draft and under
+> development — some model families are not yet written up (see the
+> outstanding items in `plan.md`). The index-notation conventions used below
+> are spelled out in the [Notation](notation.md) appendix.
 
 ## Introduction
 
@@ -56,11 +53,11 @@ $$\mathbf{H}_{c t'}^{0}=\mathbf{x}_{pq t'}$$
 where $c$ is the input channel dimension, which is the combination of  input points and the input quantities, $N_{c}^0 = N_p N_q$.
 
 **processing layers:**
-$$\mathbf{H}_{C T'}^{l+1} = \sigma(\mathbf{W}_{Cc\Delta t'}^l \star \mathbf{H}_{c t'}^{l} + \mathbf{b}_P)$$
+$$\mathbf{H}_{C T'}^{l+1} = \sigma(\mathbf{W}_{Cc\Delta t'}^l \star \mathbf{H}_{c t'}^{l} + \mathbf{b}_C)$$
 where the channel dimension $c \to C$ can be different for each layer, and $\sigma$ is a nonlinear activation function (e.g. ReLU).
 
 **output layer:**
-$$\mathbf{y}_{P} = \sigma(\mathbf{W}_{P c} \mathbf{H}_{(c T')}^{N_l} + \mathbf{b}_P)$$
+$$\mathbf{y}_{P} = \sigma(\mathbf{W}_{P (c T')} \mathbf{H}_{(c T')}^{N_l} + \mathbf{b}_P)$$
 
 For implementation, we can use a 1D convolutional layer and process the combined $pq$ as channels. In a Conv layer the convolution comes before the channels, so the input tensor is reshaped to have shape $(N_t, N_p N_q)$, and the output tensor is reshaped to have shape $(N_T, N_P)$.
 
@@ -86,84 +83,78 @@ the ceiling $\lceil\cdot\rceil$ in the formula above accounts for (e.g. $l = 16$
 with $N_{\Delta t'} = 3$ gives $16 \to 6 \to 2$, the last layer-1 window
 tail-padded).
 
-## Old background
-
-### Time convolution surge model
-
-The time convolution surge model applies 1-D convolutions over the lag dimension
-of the input window. Let the lagged input be reshaped to a sequence
-$X_t \in \mathbb{R}^{l \times (N*P)}$, where each lag index contains the concatenated
-wind-stress and pressure features for all input stations (with $P=3$). The model
-applies a stack of temporal convolutions with same padding:
-$$
-H^{(0)}_t = X_t,\qquad
-H^{(k)}_t = \sigma\bigl(K^{(k)} * H^{(k-1)}_t + b^{(k)}\bigr),\quad k=1,\dots,K
-$$
-where $K^{(k)}$ is a 1-D convolution kernel over the lag axis and $\sigma$ is ReLU.
-Same padding keeps the lag length $l$ fixed in every layer. The final features are
-flattened and mapped to surge at output stations with a linear layer:
-$$
-\mathbf{y}_t = W\,\mathrm{vec}(H^{(K)}_t) + \mathbf{b},
-$$
-with $\mathbf{y}_t \in \mathbb{R}^{\tilde{N}}$ (since $\tilde{P}=1$ for surge).
-
 ### Attention surge model
 
-The attention surge model combines a transformer-style branch network over the
-lagged wind/pressure history with a trunk network over station metadata, then
-merges them using a graph adjacency matrix. Let the wind/pressure input window
-at time $t$ be reshaped to $X_t \in \mathbb{R}^{l \times (3N)}$ (lag length $l$,
-three variables per wind station). Let the station encoding be
-$S_t \in \mathbb{R}^{6 \times \tilde{N}}$ (cos/sin of lat, lon, and day-of-year).
+The attention surge model uses the same lagged wind-stress and pressure inputs as
+the other surge models, but replaces the fixed temporal convolution with a learned
+transformer branch, and couples input and output points through a graph-adjacency
+structure.
 
-The branch network $g_\theta$ applies embedding, positional encoding, and
-transformer layers to produce per-wind features
+Write the lagged forcing at a single output time as $X \in \mathbb{R}^{3N_p \times l}$
+— the $3N_p$ stress/pressure features (three quantities at each of the $N_p$ input
+points) over a lag window of length $l$ — and the output-station encoding as
+$S \in \mathbb{R}^{6 \times \tilde N_p}$ (cosine and sine of latitude, of longitude,
+and of day-of-year, for each of the $\tilde N_p$ output points).
+
+A **branch network** $g_\theta$ (feature embedding, sinusoidal positional encoding
+along the lag axis, and a stack of transformer layers) processes the history into
+per-input-point features
 $$
-B_t = g_\theta(X_t) \in \mathbb{R}^{N \times (3l)}.
+B = g_\theta(X) \in \mathbb{R}^{N_p \times 3l}.
 $$
-The trunk network $h_\phi$ maps station encodings to attention weights
+A **trunk network** $h_\phi$ (a small MLP) maps each station encoding to a weight
+over the input points,
 $$
-T_t = h_\phi(S_t) \in \mathbb{R}^{\tilde{N} \times N}.
+T = h_\phi(S) \in \mathbb{R}^{N_p \times \tilde N_p}.
 $$
-With a fixed adjacency matrix $A \in \mathbb{R}^{\tilde{N} \times N}$, the
-graph-weighted merge is
+A fixed adjacency matrix $A \in \mathbb{R}^{N_p \times \tilde N_p}$, built from the
+input/output geometry by the `GraphNetwork`, restricts which input points each
+output point may attend to. The graph-gated trunk weights are contracted with the
+branch features, mixing the input points per output point:
 $$
-M_t = (A \odot T_t)\,B_t \in \mathbb{R}^{\tilde{N} \times (3l)},
+M = (A \odot T)^\top B \in \mathbb{R}^{\tilde N_p \times 3l}.
 $$
-which is then downsampled by a $1\times 1$ convolution (channel-mixing) to
-produce $\tilde{N} \times l$ outputs. The prediction at time $t$ is the last lag:
+A $1\times1$ convolution over the $3l$ channels reduces them back to $l$ lag
+positions, and the surge prediction is the value at the final lag:
 $$
-\mathbf{y}_t = \mathrm{last\_lag}\bigl(\mathrm{Conv1x1}(M_t)\bigr),\qquad
-\mathbf{y}_t \in \mathbb{R}^{\tilde{N}}.
+\mathbf{y} = \big[\mathrm{Conv}_{1\times1}(M)\big]_{:,\,l} \in \mathbb{R}^{\tilde N_p}.
 $$
-As with the other surge models, $\tilde{P}=1$ for surge.
+As with the other surge models, the output time is carried as a batch dimension, so
+one forward pass yields $\mathbf{y}_{PT}$ over the full output series — a 2-D
+$(\tilde N_p, N_T)$ array (the last-lag read-out is part of the model).
 
 ## Tide models
 
-The tide models use only the time $t$ as input, and predict the tide at the output stations. Internally, the models use multiple input time-series of the form $\cos(\omega t)$ and$\sin(\omega t)$, where $\omega$ is the angular frequency of a tidal constituent. The model learns to combine these input time-series to predict the tide at each output station. The model architecture can be a simple linear combination of the input time-series, or it can be a more complex neural network that learns nonlinear interactions between the input time-series.
+Tide models predict water level at the output stations from **time alone** — there is no external forcing. Two inputs are built:
 
-All tide share the same two step structure:
-Step 1 (construct the forcing input). For each constituent frequency $\omega_i$,
-create the time features at a single dummy input location:
+- the **astronomical (Doodson) forcing** $\mathbf{x}_{ft}$: for each of $F$ tidal constituents with angular frequency $\omega_k$, the pair $\cos(\omega_k t),\ \sin(\omega_k t)$, giving $2F$ features indexed by $f$ at each time $t$;
+- the **station encoding** $\mathbf{s}_{eP}$: for each output station $P$, the 4 coordinate features $e \in \{\cos\mathrm{lat},\,\sin\mathrm{lat},\,\cos\mathrm{lon},\,\sin\mathrm{lon}\}$ (constant over time).
+
+The forcing $\mathbf{x}_{ft}$ is the same everywhere (it depends only on time); the station encoding $\mathbf{s}_{eP}$ tells the model *where* it is predicting. A tide model combines the two into a per-station tide value $\mathbf{y}_{PT}$ (batched over output time $t \to T$).
+
+### Product tide model
+
+The product tide model combines the two inputs **multiplicatively** in a learned feature space, then refines the result with residual gating layers. Two bias-free dense maps lift the station encoding and the Doodson forcing into a shared feature space $C$ (size $N_C$), and the initial representation is their element-wise product over that feature axis:
 $$
-X_t = \bigl[\cos(\omega_1 t),\sin(\omega_1 t),\dots,\cos(\omega_F t),\sin(\omega_F t)\bigr]^\top.
+\mathbf{H}^{0}_{CPt} = \big(\mathbf{W}^{s}_{Ce} \star \mathbf{s}_{eP}\big) \odot \big(\mathbf{W}^{x}_{Cf} \star \mathbf{x}_{ft}\big).
 $$
-These are the Doodson-style astronomical forcing inputs, reused by all tide
-models.
-Steps 2 (model-specific). The model architecture then maps the input features to the predicted tide at the output stations. 
+Each $\star$ is a dense contraction (over $e$, over $f$); the station factor is broadcast over time and the Doodson factor over station; and $\odot$ multiplies the two element-wise over the shared feature $C$. This product is the model's inductive bias — the tidal response at a station is a learned, per-feature product of "where" (station) and "when" (astronomical phase).
+
+A stack of $N_l$ **residual gating layers** then refines the representation. Each layer forms a dense ReLU gate and re-injects it multiplicatively:
+$$
+\mathbf{G}^{l}_{CPt} = \sigma\big(\mathbf{W}^{l}_{Cc} \star \mathbf{H}^{l}_{cPt} + \mathbf{b}^{l}_{C}\big),
+\qquad
+\mathbf{H}^{l+1}_{CPt} = \mathbf{H}^{l}_{CPt} + \mathbf{G}^{l}_{CPt} \odot \mathbf{H}^{l}_{CPt},
+$$
+where $\sigma$ is ReLU and $\mathbf{W}^{l}_{Cc}$ is a dense map over the feature axis ($P$ and $t$ pass through). Finally a dense read-out contracts the feature axis to the scalar tide value:
+$$
+\mathbf{y}_{P} = \mathbf{W}^{o}_{c} \star \mathbf{H}^{N_l}_{cP} + b ,
+$$
+yielding $\mathbf{y}_{PT}$ over the batched output time.
 
 ### DeepONet tide model
 
-The DeepONet tide model uses a branch/trunk architecture inspired by DeepONets. The second step (branch/trunk merge, no lags). The branch network $g_\theta$ maps $X_t$ to
-features $B_t \in \mathbb{R}^{r}$, and the trunk network $h_\phi$ maps station
-coordinates $S \in \mathbb{R}^{2 \times \tilde{N}}$ (lat, lon) to
-$T \in \mathbb{R}^{r \times \tilde{N}}$. As in the surge models, they are merged
-per station via a dot-product and downsampled:
-$$
-\mathbf{y}_t = d_\psi\bigl(T^\top B_t\bigr) \in \mathbb{R}^{\tilde{N}}.
-$$
-This matches the branch/trunk/downsample DeepONet in `TideModel` and produces
-one tide value per station at time $t$ (with $\tilde{P}=1$).
+A second tide model, `DeepONetTideModel` (a branch/trunk DeepONet-style variant), is also available but is not the current default and is not documented in detail here yet.
 
 ## Wave models
 
@@ -253,4 +244,3 @@ channel), whereas `DeepONetWaveModel` applies a linear dot product after the bra
 network has already collapsed the lag dimension.  The dot-product merge is simpler
 and has fewer parameters in the station branch, but it gives the station less
 control over the temporal processing of the wind input.
-

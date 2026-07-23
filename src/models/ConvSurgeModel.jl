@@ -86,9 +86,11 @@ function ConvSurgeModel(settings::Dict{String, Any})
         nlags_out = cld(nlags_out, filtersize)
     end
 
-    # The chain consumes the conv-ready (lag, channel, batch) tensor from
-    # preprocess directly — no internal reshape (that was the Note-2 bug).
+    # `only` unwraps the 1-tuple `(x,)` from preprocess; the chain then consumes
+    # the conv-ready (lag, channel, batch) tensor directly — no internal reshape
+    # (that was the Note-2 bug).
     chain = Chain(
+        only,
         [Conv((filtersize,), ch_seq[i] => ch_seq[i+1], f_act; stride=(filtersize,), pad=SamePad())
          for i in 1:length(ch_seq)-1]...,
         Flux.flatten,

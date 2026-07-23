@@ -87,30 +87,35 @@ between the customisation points:
 
 - `preprocess` returns `(x, output)` where `x` is a **tuple of tensors** (a
   1-tuple for single-input models, an N-tuple for multi-input models such as
-  `AttentionSurgeModel`). Batch-time is the **last** axis of every tensor, so
+  `AttentionSurgeModel`). Batch/sample is the **last** axis of every tensor, so
   `Flux.DataLoader((x, y))` batches them consistently (nested tuples are batched
   element-wise).
-- `forward` returns a 2-D `(locations, time)` array.
+- `forward` returns a **2-D** array (`(locations, time)` for surge/tide, or
+  `(1, nsamples)` for the station×time wave/interaction models).
 
-The **surge family** has been converted to this convention (steps 20e/f); the
-Flux model is called by splatting the tuple (`get_flux_model(m)(x...)`). The
-tide, wave, and interaction families still use their own historical shapes (a
-4-D input tensor and a 3-D `(locations, 1, time)` output); unifying them is
-deferred to step 20h. Each per-family section below documents its actual
-layout.
+**All four families** now follow this convention (step 20h). The Flux model is
+called uniformly as `get_flux_model(m)(x)` — every flux model is callable on its
+input tuple (single-input Dense/Conv chains prepend `only` to unwrap the 1-tuple;
+multi-arg models carry a `(m)(x::Tuple) = m(x...)` method). As a result `forward`
+and `train_model!` are provided **generically** at this level and no family
+overrides them; each per-family section below documents only its own
+`preprocess`/`postprocess!` layout.
 
 ### Required customisation points
 
 | Method | Signature | Purpose |
 |---|---|---|
-| `preprocess`    | `(m::M, input::Dict{String,TimeSeries}) -> (Tuple, Dict{String,TimeSeries})` | Build model-specific input tuple; pre-allocate output |
-| `forward`       | `(m::M, x::Tuple) -> AbstractMatrix` | Flux forward pass; returns `(locations, time)` |
-| `postprocess!`  | `(output::Dict{String,TimeSeries}, m::M, y)` | Fill output values in-place |
-| `get_flux_model`| `(m::M) -> <Flux model>` | Expose chain for save/load |
+| `preprocess` (predict) | `(m::M, input) -> (Tuple, Dict{String,TimeSeries})` | Build model-specific input tuple; pre-allocate output |
+| `preprocess` (train)   | `(m::M, input, target) -> (Tuple, Matrix)` | Build input tuple + target `y` in flux-output space; fit any train-time stats |
+| `postprocess!`  | `(output::Dict{String,TimeSeries}, m::M, y)` | Fill output values in-place from 2-D `y` |
+| `get_flux_model`| `(m::M) -> <Flux model>` | Expose chain for save/load; must be callable as `flux(x::Tuple)` |
 | `get_settings`  | `(m::M) -> Dict{String,Any}` | Return inference-time settings |
 
-(The surge family follows the `Tuple` → 2-D signatures shown here; tide/wave/
-interaction still use the 4-D-in / 3-D-out signatures pending step 20h.)
+`forward(::AbstractFluxModel, x) = get_flux_model(m)(x)` and
+`train_model!(::AbstractFluxModel, …)` are **provided** here, not customisation
+points — every family shares one training loop (`Flux.DataLoader` over the input
+tuple, `m(x)` per batch, checkpointing, val split, lr-decay). The only per-family
+training seam is the 2-arg vs 3-arg `preprocess`.
 
 `save_params` and `load_params!` are implemented once at this level using
 `get_flux_model` together with `Flux.state` / `Flux.loadmodel!` and JLD2.
@@ -118,9 +123,11 @@ interaction still use the 4-D-in / 3-D-out signatures pending step 20h.)
 ## AbstractSurgeModel (`AbstractSurgeModel.jl`)
 
 `AbstractSurgeModel <: AbstractFluxModel` is an intermediate abstract type that
-captures shared logic for all surge models.  Concrete subtypes only implement
+captures the surge-specific data extraction.  Concrete subtypes implement
 `preprocess` (their own tensor assembly) plus `get_flux_model` / `get_settings`;
-`forward`, `postprocess!`, and `train_model!` are provided generically here.
+`forward` and `train_model!` are inherited from `AbstractFluxModel` (generic for
+all families), and `postprocess!` + the train-form `preprocess(m, input, target)`
+are shared at this surge level.
 
 ### Shared implementations
 
@@ -128,9 +135,13 @@ captures shared logic for all surge models.  Concrete subtypes only implement
 |---|---|
 | `_surge_lag_windows` | Shared **data extraction**: aligns locations, converts wind→stress, scales pressure, and slices each field into `(nwind, nlags, nvalid)` lag windows. Each model's `preprocess` calls this, then assembles the windows into its own layout. |
 | `_alloc_surge_output` | Allocates the zero-initialised `Dict("surge" => ts)` output container. |
-| `forward` | Splats the input tuple into the Flux model (`get_flux_model(m)(x...)`); returns the 2-D `(nstations, ntimes)` output. |
+| `preprocess(m, input, target)` | Train form: reuses the per-model 2-arg `preprocess` for `x` and lag-trims the target to `y = get_values(target)[:, nlags:end]`. |
 | `postprocess!` | Writes the 2-D `y` into `output["surge"].values`. |
-| `train_model!` | Adam loop over `Flux.DataLoader((x, y))` (batches the input tuple element-wise), ProgressMeter, temporal train/val split; returns `(train_losses, val_losses)`. One loop serves single- and multi-input surge models alike. |
+
+`forward(::AbstractFluxModel, x) = get_flux_model(m)(x)` and the single generic
+`train_model!` (see the `AbstractFluxModel` section) serve every surge model —
+single-input (`LinearSurgeModel`, `ConvSurgeModel`) and multi-input
+(`AttentionSurgeModel`) alike.
 
 ### Input key handling
 
@@ -140,8 +151,8 @@ Data extraction accepts either `"stress_x"`/`"stress_y"` (used directly) or
 
 ```
 AbstractModel
-    └── AbstractFluxModel   — predict, save_params, load_params!
-            └── AbstractSurgeModel  — _surge_lag_windows, forward, postprocess!, train_model!
+    └── AbstractFluxModel   — predict, save_params, load_params!, forward, train_model!
+            └── AbstractSurgeModel  — _surge_lag_windows, preprocess(…,target), postprocess!
                     ├── LinearSurgeModel     — preprocess
                     ├── ConvSurgeModel       — preprocess
                     └── AttentionSurgeModel  — preprocess
@@ -177,7 +188,7 @@ model = LinearSurgeModel(settings)
 ```
 preprocess → x = (x_flat,)  with x_flat (3*nwind*nlags, ntimes_valid)
                 + output Dict("surge" => zeros TimeSeries)
-forward    → Dense(3*nwind*nlags => nstations) → (nstations, ntimes_valid)   [generic, splats (x_flat,)]
+forward    → Chain(only, Dense(3*nwind*nlags => nstations))(x) → (nstations, ntimes_valid)   [generic, m(x)]
 postprocess! → output["surge"].values .= y   [generic, 2-D]
 ```
 
@@ -219,8 +230,9 @@ so `forward` (generic) runs the chain with no internal reshape:
 
 ```
 preprocess → x = (xc,)  with xc (nlags, 3*nwind, ntimes_valid)   [lag, channel, batch]
-forward    → Conv1D × N (act, stride=filtersize, SamePad)         [generic, splats (xc,)]
-             → flatten → Dense(nlags_out*channels[end] → nstations)
+forward    → Chain(only, Conv1D × N, flatten, Dense)(x)          [generic, m(x); only unwraps (xc,)]
+             (Conv act, stride=filtersize, SamePad)
+             → Dense(nlags_out*channels[end] → nstations)
              → (nstations, ntimes_valid)
 postprocess! → output["surge"].values .= y   [generic, 2-D]
 ```
@@ -266,14 +278,14 @@ Required keys in `"model_pars"`:
 ### Overridden methods
 
 `AttentionSurgeModel` overrides only `preprocess` (it has two input tensors);
-`forward`, `postprocess!`, and `train_model!` are inherited from
+`forward` and `train_model!` come from `AbstractFluxModel`, `postprocess!` from
 `AbstractSurgeModel` — the shared loop batches the input tuple element-wise:
 
 | Method | Notes |
 |---|---|
 | `preprocess` | Returns `((x_station, x_wind), output)` — dual-input tuple |
-| `forward` | Inherited: splats the tuple → `AttentionSurgeFlux(x_station, x_wind)`, which returns the 2-D last-lag slice directly |
-| `train_model!` | Inherited shared surge loop |
+| `forward` | Inherited generic `m(x)`. `AttentionSurgeFlux` carries a `(m)(x::Tuple)=m(x...)` method, then runs `AttentionSurgeFlux(x_station, x_wind)`, returning the 2-D last-lag slice directly |
+| `train_model!` | Inherited generic loop |
 
 ### Data flow
 
@@ -301,9 +313,14 @@ those automatically.
 
 | Method | What it does |
 |---|---|
-| `preprocess` | Builds `(4, nstations, ntimes)` station tensor and `(2*nfreqs, ntimes)` Doodson tensor; pre-allocates output |
-| `postprocess!` | Writes `y[:, 1, :]` into `output["waterlevel"].values` |
-| `train_model!` | Adam loop with ProgressMeter, temporal train/val split, returns `(train_losses, val_losses)` |
+| `preprocess` (predict) | Builds `(4, nstations, ntimes)` station tensor and `(2*nfreqs, ntimes)` Doodson tensor; pre-allocates output |
+| `preprocess` (train) | Reuses the predict form for `x`; `y = get_values(target["waterlevel"])` — the full series, no lag, no normalisation |
+| `postprocess!` | Writes the 2-D `y` `(nstations, ntimes)` into `output["waterlevel"].values` |
+
+`forward` and `train_model!` are inherited generically from `AbstractFluxModel`.
+Both tide flux models (`TideModel`, `ProductTideFlux`) carry a
+`(m)(x::Tuple)=m(x...)` method so the generic `m(x)` call reaches their 2-arg
+implementation.
 
 ### Input convention
 
@@ -312,8 +329,8 @@ point to the same `TimeSeries`.
 
 ```
 AbstractModel
-    └── AbstractFluxModel   — predict, save_params, load_params!
-            └── AbstractTideModel  — preprocess, postprocess!, train_model!
+    └── AbstractFluxModel   — predict, save_params, load_params!, forward, train_model!
+            └── AbstractTideModel  — preprocess, preprocess(…,target), postprocess!
                     └── DeepONetTideModel
 ```
 
@@ -339,10 +356,11 @@ Required keys in `settings`:
 ### Data flow
 
 ```
-preprocess → x_station (4, nstations, ntimes)   [cos/sin lat, cos/sin lon]
+preprocess → x = (x_station, x_doodson)
+             x_station (4, nstations, ntimes)   [cos/sin lat, cos/sin lon]
              x_doodson (2*nfreqs, ntimes)        [cos/sin Doodson arguments]
-forward    → TideModel(x_station, x_doodson) → (nstations, ntimes) → (nstations, 1, ntimes)
-postprocess! → output["waterlevel"].values .= y[:, 1, :]
+forward    → TideModel(x_station, x_doodson) → (nstations, ntimes)   [generic m(x) via tuple method]
+postprocess! → output["waterlevel"].values .= y   [generic, 2-D]
 ```
 
 ## Utilities
@@ -427,7 +445,7 @@ ProductInputLayer:
 ProductGatingLayer × nlayers:
     x + Dense(nfeats → nfeats, relu)(x) * x
 
-Dense(nfeats → 1) → (nstations, 1, ntimes)
+Dense(nfeats → 1) → (1, nstations, ntimes) → drop feature axis → (nstations, ntimes)
 ```
 
 Inherits `preprocess`, `postprocess!`, `train_model!`, `save_params`, and
@@ -435,8 +453,8 @@ Inherits `preprocess`, `postprocess!`, `train_model!`, `save_params`, and
 
 ```
 AbstractModel
-    └── AbstractFluxModel   — predict, save_params, load_params!
-            └── AbstractTideModel  — preprocess, postprocess!, train_model!
+    └── AbstractFluxModel   — predict, save_params, load_params!, forward, train_model!
+            └── AbstractTideModel  — preprocess, preprocess(…,target), postprocess!
                     ├── DeepONetTideModel
                     └── ProductTideModel
 ```

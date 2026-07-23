@@ -160,20 +160,41 @@ function preprocess(model::AbstractWaveModel, input::Dict{String, TimeSeries})
     return (x_station, x_input), Dict{String, TimeSeries}("wave_height" => out_ts)
 end
 
-# ──────────────────────────────────────────────────────────────────────────────
-# forward / postprocess! — shared across all wave models
-# ──────────────────────────────────────────────────────────────────────────────
-
 """
-    forward(model::AbstractWaveModel, x::Tuple) -> Array{Float32, 2}
+    preprocess(model::AbstractWaveModel, input, target) -> (Tuple, Matrix)
 
-Run the model's Flux network on `(x_station, x_input)` from `preprocess`.  The
-tuple is passed as a **single argument** (`get_flux_model(m)(x)`, not splatted —
-the wave flux models unpack the tuple in their first layer).  Returns a 2-D
-`(1, nstations*ntimes_valid)` array: one scaled wave-height value per
-`(station, time)` sample.  `postprocess!` reshapes and unscales it.
+Train-form preprocess: build the input tuple `(x_station, x_input)` (reusing the
+2-arg predict form) and the scaled target `y :: (1, nstations*ntimes_valid)`,
+then **NaN-filter** input and target jointly — samples where any input block or
+the target value is `NaN` are dropped from all three.
+
+Consumed by the generic `train_model!`.  When explicit `val_input`/`val_target`
+are supplied to `train_model!`, this runs on the validation set too (so the val
+data is NaN-filtered as well).
 """
-forward(model::AbstractWaveModel, x::Tuple) = get_flux_model(model)(x)
+function preprocess(model::AbstractWaveModel, input::Dict{String, TimeSeries},
+                    target::Dict{String, TimeSeries})
+    settings   = get_settings(model)
+    nlags      = settings["nlags"]
+    wave_scale = Float32(get(settings, "wave_scale", 3.0))
+
+    (x_station, x_input), _ = preprocess(model, input)   # reuse 2-arg for x
+    y_flat = reshape(
+        Float32.(get_values(target["wave_height"]))[:, nlags:end] ./ wave_scale,
+        1, :,
+    )
+
+    # Drop (station × time) samples with any NaN in the input block or the target.
+    nsamples = size(x_input, 3)
+    valid = [i for i in 1:nsamples
+             if !any(isnan, x_input[:, :, i]) && !isnan(y_flat[1, i])]
+    return (x_station[:, valid], x_input[:, :, valid]), y_flat[:, valid]
+end
+
+# ──────────────────────────────────────────────────────────────────────────────
+# postprocess! — shared across all wave models
+# (forward and train_model! are inherited from AbstractFluxModel)
+# ──────────────────────────────────────────────────────────────────────────────
 
 """
     postprocess!(output::Dict{String, TimeSeries}, model::AbstractWaveModel,
@@ -192,154 +213,3 @@ function postprocess!(output::Dict{String, TimeSeries}, model::AbstractWaveModel
     nstations, ntimes = size(vals)
     vals .= reshape(y, nstations, ntimes) .* wave_scale
 end
-
-# ──────────────────────────────────────────────────────────────────────────────
-# train_model! — shared across all wave models
-# ──────────────────────────────────────────────────────────────────────────────
-
-"""
-    train_model!(model::AbstractWaveModel, train_settings::TrainingSettings,
-                 input::Dict{String, TimeSeries}, target::Dict{String, TimeSeries})
-        -> (Vector{Float32}, Vector{Float32})
-
-Train the model in-place using minibatch gradient descent (Adam) over
-`(station × time)` samples.
-
-`input` and `target` must contain `"wind_speed"`, `"wind_direction"`, and
-`"wave_height"`.  Records where any input or target value is NaN are silently
-dropped.
-
-On first call, `"out_names"`, `"out_lons"`, `"out_lats"`, and `"out_quantity"`
-are added to the model settings from the data.
-
-If `train_settings.validation_split > 0`, the last fraction of the time series
-(in the time dimension) is held out and its RMSE is shown in the progress bar.
-
-Returns `(train_losses, val_losses)` as `Vector{Float32}` per epoch.
-`val_losses` is empty when `validation_split == 0`.
-"""
-function train_model!(model::AbstractWaveModel, train_settings::TrainingSettings,
-                      input::Dict{String, TimeSeries}, target::Dict{String, TimeSeries};
-                      val_input::Union{Dict{String,TimeSeries},Nothing}  = nothing,
-                      val_target::Union{Dict{String,TimeSeries},Nothing} = nothing)
-
-    settings   = get_settings(model)
-    wave_scale = Float32(get(settings, "wave_scale", 3.0))
-    nlags      = settings["nlags"]
-
-    # Populate output metadata from target on first call
-    if !haskey(settings, "out_names")
-        ts_ref = target["wave_height"]
-        settings["out_names"]    = get_names(ts_ref)
-        settings["out_lons"]     = Float64.(get_longitudes(ts_ref))
-        settings["out_lats"]     = Float64.(get_latitudes(ts_ref))
-        settings["out_quantity"] = get_quantity(ts_ref)
-    end
-
-    # Build full tiled tensors
-    (x_station, x_input), _ = preprocess(model, input)
-    nstations    = size(x_station, 1)
-    nsamples     = size(x_input, 3)
-    ntimes_valid = nsamples ÷ nstations
-
-    # Target: (1, nstations * ntimes_valid), scaled
-    y_flat = reshape(
-        Float32.(get_values(target["wave_height"]))[:, nlags:end] ./ wave_scale,
-        1, :,
-    )
-
-    # Temporal train/val split (split on time axis, then NaN-filter each part)
-    n_val_times   = round(Int, train_settings.validation_split * ntimes_valid)
-    has_val       = n_val_times > 0
-    n_train_times = ntimes_valid - n_val_times
-    n_tr_samps    = n_train_times * nstations
-    n_val_samps   = n_val_times  * nstations
-
-    function _nanfilter(xs, xi, yf, n)
-        valid = [i for i in 1:n
-                 if !any(isnan, xi[:, :, i]) && !isnan(yf[1, i])]
-        return xs[:, valid], xi[:, :, valid], yf[:, valid]
-    end
-
-    x_s, x_i, y = _nanfilter(x_station, x_input, y_flat, n_tr_samps)
-
-    x_s_val = x_i_val = y_val = nothing
-    if has_val
-        x_s_val, x_i_val, y_val = _nanfilter(
-            x_station[:, n_tr_samps+1:end],
-            x_input[:, :, n_tr_samps+1:end],
-            y_flat[:, n_tr_samps+1:end],
-            n_val_samps,
-        )
-    end
-
-    # Bundle the two input tensors into a tuple so the loop matches the shared
-    # surge/tide form: DataLoader((x, y)) yields (xb::Tuple, yb). Wave flux models
-    # take the tuple as a SINGLE argument (`m(xb)`), unlike surge/tide (`m(xb...)`)
-    # — that call-form difference is unified by `apply_flux` at the 20h dedup step.
-    # NB: unlike surge/tide, `val_input`/`val_target` are ignored — wave validates
-    #     only via the `validation_split` fraction (with the NaN-filter). Loop is
-    #     otherwise identical to AbstractSurgeModel.train_model!.
-    x     = (x_s, x_i)
-    x_val = has_val ? (x_s_val, x_i_val) : nothing
-
-    flux_model = get_flux_model(model)
-    opt_state  = Flux.setup(Adam(train_settings.learning_rate), flux_model)
-    current_lr = Float64(train_settings.learning_rate)
-    loader = Flux.DataLoader((x, y); batchsize=train_settings.nbatches, shuffle=true)
-
-    checkpoint_dir = get(get_settings(model), "model_dir", nothing)
-
-    train_losses  = Float32[]
-    val_losses    = Float32[]
-    showvalues    = Pair{String, String}[]
-    progress      = Progress(train_settings.nepochs; desc="Training: ", showspeed=true)
-    log_every     = max(1, train_settings.nepochs ÷ 10)
-    best_val_rmse = Inf32
-
-    for epoch in 1:train_settings.nepochs
-        for (xb, yb) in loader
-            _, grads = Flux.withgradient(flux_model) do m
-                Flux.mse(m(xb), yb)
-            end
-            Flux.update!(opt_state, flux_model, grads[1])
-        end
-
-        train_rmse = sqrt(Flux.mse(flux_model(x), y))
-        push!(train_losses, train_rmse)
-
-        empty!(showvalues)
-        push!(showvalues, "train RMSE" => @sprintf("%.4f", train_rmse))
-        if has_val
-            val_rmse = sqrt(Flux.mse(flux_model(x_val), y_val))
-            push!(val_losses, val_rmse)
-            push!(showvalues, "val RMSE  " => @sprintf("%.4f", val_rmse))
-            if !isnothing(checkpoint_dir) && val_rmse < best_val_rmse
-                best_val_rmse = val_rmse
-                save_params(model, joinpath(checkpoint_dir, "params_best.jld2"); overwrite=true)
-            end
-        end
-        next!(progress; showvalues)
-
-        if !isnothing(checkpoint_dir) && !isnothing(train_settings.checkpoints) &&
-                epoch in train_settings.checkpoints
-            save_params(model, joinpath(checkpoint_dir, "params_epoch_$(epoch).jld2"); overwrite=true)
-        end
-
-        if epoch % log_every == 0 || epoch == train_settings.nepochs
-            msg = @sprintf("epoch %d/%d  train RMSE: %.4f", epoch, train_settings.nepochs, train_rmse)
-            has_val && (msg *= @sprintf("  val RMSE: %.4f", val_losses[end]))
-            @info msg
-        end
-
-        if !isnothing(train_settings.lr_decay_factor) &&
-                !isnothing(train_settings.lr_decay_rate) &&
-                epoch % train_settings.lr_decay_rate == 0
-            current_lr *= train_settings.lr_decay_factor
-            Flux.Optimisers.adjust!(opt_state, current_lr)
-        end
-    end
-
-    return train_losses, val_losses
-end
-

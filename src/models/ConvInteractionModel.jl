@@ -125,16 +125,4 @@ end
 get_flux_model(m::ConvInteractionModel) = m.flux_model
 get_settings(m::ConvInteractionModel)   = m.settings
 
-"""
-    forward(model::ConvInteractionModel, x::Tuple) -> Array{Float32, 3}
-
-Unpack `(x_station, x_ts)`, run `x_ts` through the Conv chain (ignoring station
-encoding), and return predictions reshaped to `(nstations, 1, ntimes_valid)`.
-"""
-function forward(model::ConvInteractionModel, x::Tuple)
-    x_station, x_ts = x
-    nstations = size(x_station, 1)
-    y = model.flux_model((x_station, x_ts))   # (1, nstations * ntimes_valid)
-    ntimes = size(y, 2) ÷ nstations
-    return reshape(y, nstations, 1, ntimes)
-end
+# forward, postprocess!, and train_model! are inherited from AbstractInteractionModel.

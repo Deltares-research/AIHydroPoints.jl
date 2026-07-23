@@ -221,6 +221,25 @@ model = Conv((N_Δt,), N_p*N_q => N_P, relu)
 
 In practice the input will arrive as 3 separate 2D arrays for the 3 quantities, each of size $(N_p, N_t)$, which can be stacked into a single 3D array with shape $(N_p, N_q, N_t)$ before being reshaped to $(N_t, N_p N_q)$ for the Conv layer, arrives as a 2D array of size $N_T, N_P$. The output will be reshaped back to $(N_P, N_T)$ after the Conv layer. Note that the order of the indices in the input and output tensors is needs to be adjusted in the pre- and post-processing steps to match the expected order of the Conv layer. _Permuting indices cannot be performed using a reshape, but also requires changing the order of the data in memory using eg permutedims._
 
+## Product operator without summation
+
+Throughout this notation a **repeated index is summed** — that is the norm. In $\mathbf{y}_I = \sigma(\mathbf{W}_{Ii}\star\mathbf{x}_i + \mathbf{b}_I)$ the repeated $i$ is contracted away, and the whole purpose of the index patterns of $\mathbf{W}$ (dense, convolution, pass-through) is to say *how* that summation happens. So whenever an index appears twice, the default is to sum over it.
+
+Occasionally, though, we need to combine two data tensors along a shared index **without** summing it — multiplying them element-wise and keeping the axis. For this we use the element-wise (Hadamard) product $\odot$, the data-only counterpart of $\star$ (which always involves weights). In code it is Julia's broadcasting `.*` (NumPy's `*`).
+
+For two tensors with the same indices it is a plain per-element product:
+
+$$\mathbf{z}_{Ci} = \mathbf{a}_{Ci} \odot \mathbf{b}_{Ci} \quad\Longleftrightarrow\quad [\mathbf{z}]_{Ci} = [\mathbf{a}]_{Ci}\,[\mathbf{b}]_{Ci} .$$
+
+Two things distinguish it from a contraction:
+
+- **The shared index is kept, not summed.** $\mathbf{a}_C \odot \mathbf{b}_C$ keeps the feature index $C$ (it survives to the output), whereas the contraction $\mathbf{a}_c\,\mathbf{b}_c$ — a dot product — sums $c$ away. So $\odot$ is precisely the "multiply but don't sum" case: a contraction *removes* a shared axis, $\odot$ *preserves* it.
+- **Broadcasting.** If a factor lacks an output index, it is repeated along that direction, which lets $\odot$ couple two tensors that share only some indices. Multiplying a per-station feature $\mathbf{a}_{CP}$ by a per-time feature $\mathbf{b}_{Ct}$ broadcasts each over the axis it lacks, coupling them through the shared feature $C$:
+
+$$\mathbf{H}_{CPt} = \mathbf{a}_{CP} \odot \mathbf{b}_{Ct} \quad\Longleftrightarrow\quad [\mathbf{H}]_{CPt} = [\mathbf{a}]_{CP}\,[\mathbf{b}]_{Ct} .$$
+
+This appears in the product tide model (an element-wise product of a station encoding and an astronomical-phase encoding — exactly the broadcasting example above) and in the wave and attention models (a learned gate multiplying a feature map).
+
 ## Lumped notation
 
 Some aspects of the models can be explained without knowing the exact details of the input and output locations, and we can use a more compact notation to describe the models. Here the inputs and outputs are assumed to be lumped together and only depend on time $t$. The input time-series is denoted as $\mathbf{X}_t \in \mathbb{R}^{N_i}$, and the output time-series is denoted as $\mathbf{Y}_t \in \mathbb{R}^{N_I}$. The model is a function $f_\theta$ with parameters $\theta$, that maps the input time-series in the input window to the output at time $t$:

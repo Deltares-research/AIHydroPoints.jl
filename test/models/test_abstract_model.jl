@@ -35,9 +35,12 @@ end
     @test get_settings(m)   === settings
     @test get_settings(m)["foo"] == 42
 
-    # Customisation-point fallbacks should error
+    # Must-implement customisation-point fallbacks should error.
+    # (forward and train_model! are now provided generically by AbstractFluxModel,
+    #  so they are no longer erroring fallbacks; preprocess — both the predict
+    #  2-arg and the train 3-arg form — and postprocess! remain per-family.)
     input = Dict{String, TimeSeries}()
     @test_throws ErrorException preprocess(m, input)
-    @test_throws ErrorException forward(m, zeros(Float32, 1, 1, 1, 1))
-    @test_throws ErrorException postprocess!(input, m, zeros(Float32, 1, 1, 1))
+    @test_throws ErrorException preprocess(m, input, input)   # train-form (x, y)
+    @test_throws ErrorException postprocess!(input, m, zeros(Float32, 1, 1))
 end

@@ -180,20 +180,28 @@ function _alloc_surge_output(model::AbstractSurgeModel, times_valid)
 end
 
 # ──────────────────────────────────────────────────────────────────────────────
-# forward / postprocess! — shared across all surge models
+# train-form preprocess / postprocess! — shared across all surge models
+# (forward and train_model! are inherited from AbstractFluxModel)
 # ──────────────────────────────────────────────────────────────────────────────
 
 """
-    forward(model::AbstractSurgeModel, x::Tuple) -> Array{Float32, 2}
+    preprocess(model::AbstractSurgeModel, input, target) -> (Tuple, Matrix)
 
-Run the model's Flux network on the tuple `x` from `preprocess` and return a
-2-D `(nlocations_output, ntimes)` array of surge predictions.
+Train-form preprocess: build the input tuple `x` (reusing the per-model 2-arg
+predict form) and the lag-aligned target `y = get_values(target)[:, nlags:end]`
+of shape `(nlocations_output, ntimes_valid)`.
 
-The tuple is splatted into the Flux model, so a 1-tuple `(x1,)` calls
-`flux_model(x1)` and an N-tuple calls `flux_model(x1, …, xN)`.  Every surge Flux
-model returns the 2-D `(nlocations_output, time)` shape directly.
+The `nlags:end` trim drops the first `nlags-1` target columns that have no
+complete lag window, matching the valid batch-time steps in `x`.  Consumed by the
+generic `train_model!`.
 """
-forward(model::AbstractSurgeModel, x::Tuple) = get_flux_model(model)(x...)
+function preprocess(model::AbstractSurgeModel, input::Dict{String, TimeSeries},
+                    target::Dict{String, TimeSeries})
+    x, _  = preprocess(model, input)   # per-model 2-arg form builds the input tuple
+    nlags = get_settings(model)["nlags"]
+    y = Float32.(get_values(first(values(target))))[:, nlags:end]  # (nstations, nvalid)
+    return x, y
+end
 
 """
     postprocess!(output::Dict{String, TimeSeries}, model::AbstractSurgeModel,
@@ -206,149 +214,3 @@ function postprocess!(output::Dict{String, TimeSeries}, model::AbstractSurgeMode
                       y::AbstractMatrix)
     output["surge"].values .= y
 end
-
-# ──────────────────────────────────────────────────────────────────────────────
-# train_model! — shared across all surge models
-# ──────────────────────────────────────────────────────────────────────────────
-
-"""
-    _take_last_dim(x::Tuple, idx) -> Tuple
-
-Slice every tensor in `x` along its last (batch-time) axis at indices `idx`,
-returning a new tuple of materialised arrays.  Used to split a preprocessed
-input tuple into train/validation portions.
-"""
-_take_last_dim(x::Tuple, idx) = map(a -> copy(selectdim(a, ndims(a), idx)), x)
-
-"""
-    train_model!(model::AbstractSurgeModel, train_settings::TrainingSettings,
-                 input::Dict{String, TimeSeries}, target::Dict{String, TimeSeries})
-        -> (Vector{Float32}, Vector{Float32})
-
-Train the model in-place using minibatch gradient descent (Adam).
-
-This single loop serves every surge model — single-input (`LinearSurgeModel`,
-`ConvSurgeModel`) and multi-input (`AttentionSurgeModel`) — because `preprocess`
-always returns the input as a tuple `x`, `Flux.DataLoader((x, y))` batches every
-tensor in that tuple along its shared last (batch-time) axis, and the Flux model
-is called by splatting the batched tuple (`m(xb...)`).
-
-`input` must contain `"wind_x"`, `"wind_y"`, and `"pressure"` (or the
-`"stress_*"` equivalents). `target` must contain one variable (the surge ground
-truth); its columns `nlags:end` correspond to the valid batch-time steps.
-
-On first call, `"out_names"`, `"out_lons"`, `"out_lats"`, and `"out_quantity"`
-are added to the model settings from the first `TimeSeries` in `target`.
-
-If `val_input` / `val_target` are supplied they are used directly and
-`validation_split` is ignored; otherwise the last `validation_split` fraction of
-the time axis is held out. Returns `(train_losses, val_losses)` per epoch;
-`val_losses` is empty when there is no validation data.
-"""
-function train_model!(model::AbstractSurgeModel, train_settings::TrainingSettings,
-                      input::Dict{String, TimeSeries}, target::Dict{String, TimeSeries};
-                      val_input::Union{Dict{String,TimeSeries},Nothing}  = nothing,
-                      val_target::Union{Dict{String,TimeSeries},Nothing} = nothing)
-
-    settings = get_settings(model)
-
-    # Populate output metadata from target if not yet present
-    if !haskey(settings, "out_names")
-        ts_ref = first(values(target))
-        settings["out_names"]    = get_names(ts_ref)
-        settings["out_lons"]     = Float64.(get_longitudes(ts_ref))
-        settings["out_lats"]     = Float64.(get_latitudes(ts_ref))
-        settings["out_quantity"] = get_quantity(ts_ref)
-    end
-
-    nlags = settings["nlags"]
-
-    # Build input tuple + target matrix (batch-time is the last axis of each).
-    x_full, _ = preprocess(model, input)                              # Tuple
-    y_full = Float32.(get_values(first(values(target))))[:, nlags:end]  # (nstations, nvalid)
-
-    # Validation data: explicit split takes priority over validation_split
-    if !isnothing(val_input)
-        x_val, _ = preprocess(model, val_input)
-        y_val    = Float32.(get_values(first(values(val_target))))[:, nlags:end]
-        x, y     = x_full, y_full
-        has_val  = true
-    else
-        nfull   = size(y_full, 2)
-        n_val   = round(Int, train_settings.validation_split * nfull)
-        has_val = n_val > 0
-        if has_val
-            n_train = nfull - n_val
-            x       = _take_last_dim(x_full, 1:n_train)
-            y       = y_full[:, 1:n_train]
-            x_val   = _take_last_dim(x_full, n_train+1:nfull)
-            y_val   = y_full[:, n_train+1:end]
-        else
-            x, y  = x_full, y_full
-            x_val = y_val = nothing
-        end
-    end
-
-    # Training loop
-    flux_model = get_flux_model(model)
-    opt_state  = Flux.setup(Adam(train_settings.learning_rate), flux_model)
-    current_lr = Float64(train_settings.learning_rate)
-    # DataLoader batches the nested tuple ((x1,…,xN), y) element-wise along the
-    # last axis, yielding (xb::Tuple, yb) each iteration.
-    loader = Flux.DataLoader((x, y); batchsize=train_settings.nbatches, shuffle=true)
-
-    checkpoint_dir = get(settings, "model_dir", nothing)
-
-    train_losses  = Float32[]
-    val_losses    = Float32[]
-    showvalues    = Pair{String,String}[]
-    progress      = Progress(train_settings.nepochs; desc="Training: ", showspeed=true)
-    log_every     = max(1, train_settings.nepochs ÷ 10)
-    best_val_rmse = Inf32
-
-    for epoch in 1:train_settings.nepochs
-        for (xb, yb) in loader
-            _, grads = Flux.withgradient(flux_model) do m
-                Flux.mse(m(xb...), yb)
-            end
-            Flux.update!(opt_state, flux_model, grads[1])
-        end
-
-        train_rmse = sqrt(Flux.mse(flux_model(x...), y))
-        push!(train_losses, train_rmse)
-
-        empty!(showvalues)
-        push!(showvalues, "train RMSE" => @sprintf("%.4f", train_rmse))
-        if has_val
-            val_rmse = sqrt(Flux.mse(flux_model(x_val...), y_val))
-            push!(val_losses, val_rmse)
-            push!(showvalues, "val RMSE  " => @sprintf("%.4f", val_rmse))
-            if !isnothing(checkpoint_dir) && val_rmse < best_val_rmse
-                best_val_rmse = val_rmse
-                save_params(model, joinpath(checkpoint_dir, "params_best.jld2"); overwrite=true)
-            end
-        end
-        next!(progress; showvalues)
-
-        if !isnothing(checkpoint_dir) && !isnothing(train_settings.checkpoints) &&
-                epoch in train_settings.checkpoints
-            save_params(model, joinpath(checkpoint_dir, "params_epoch_$(epoch).jld2"); overwrite=true)
-        end
-
-        if epoch % log_every == 0 || epoch == train_settings.nepochs
-            msg = @sprintf("epoch %d/%d  train RMSE: %.4f", epoch, train_settings.nepochs, train_rmse)
-            has_val && (msg *= @sprintf("  val RMSE: %.4f", val_losses[end]))
-            @info msg
-        end
-
-        if !isnothing(train_settings.lr_decay_factor) &&
-                !isnothing(train_settings.lr_decay_rate) &&
-                epoch % train_settings.lr_decay_rate == 0
-            current_lr *= train_settings.lr_decay_factor
-            Flux.Optimisers.adjust!(opt_state, current_lr)
-        end
-    end
-
-    return train_losses, val_losses
-end
-

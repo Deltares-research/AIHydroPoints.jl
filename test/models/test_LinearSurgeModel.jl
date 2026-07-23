@@ -60,10 +60,12 @@ end
     @test m isa AbstractFluxModel
     @test m isa AbstractModel
     @test get_settings(m) === settings
-    @test get_flux_model(m) isa Dense
+    # Flux model is Chain(only, Dense): `only` unwraps the 1-tuple, Dense maps.
+    @test get_flux_model(m) isa Chain
+    @test get_flux_model(m)[2] isa Dense
 
     # Dense layer has correct dimensions: 3*nwind*nlags → nstations
-    @test size(get_flux_model(m).weight) == (2, 3*3*4)
+    @test size(get_flux_model(m)[2].weight) == (2, 3*3*4)
 end
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -167,8 +169,8 @@ end
 @testset "LinearSurgeModel save/load params" begin
     m  = LinearSurgeModel(make_lsm_settings())
 
-    W_orig = copy(get_flux_model(m).weight)
-    b_orig = copy(get_flux_model(m).bias)
+    W_orig = copy(get_flux_model(m)[2].weight)   # Dense is layer 2 of Chain(only, Dense)
+    b_orig = copy(get_flux_model(m)[2].bias)
 
     fn = joinpath(temp_dir, "linear_surge_params.jld2")
     save_params(m, fn)
@@ -185,12 +187,12 @@ end
     bad_path = joinpath(temp_dir, "nonexistent_dir", "params.jld2")
     @test_throws ErrorException save_params(m, bad_path)
 
-    get_flux_model(m).weight .= 0f0
-    get_flux_model(m).bias   .= 0f0
+    get_flux_model(m)[2].weight .= 0f0
+    get_flux_model(m)[2].bias   .= 0f0
 
     load_params!(m, fn)
-    @test get_flux_model(m).weight ≈ W_orig
-    @test get_flux_model(m).bias   ≈ b_orig
+    @test get_flux_model(m)[2].weight ≈ W_orig
+    @test get_flux_model(m)[2].bias   ≈ b_orig
 end
 
 @testset "preprocess location alignment" begin

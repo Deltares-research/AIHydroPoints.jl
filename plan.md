@@ -62,9 +62,9 @@ The main goal of this project is to develop a machine learning model for predict
        `N_i, K_i → N_{Δi}`; summary table of three conv variants with parameter
        counts; `$\star$` reduced to "apply weights" (subscripts moved into the
        index pattern of `W`).
-    d. [ ] Extend `notation.md` to cover the *realistic* 4-axis input/output
-       (point, quantity, time-lag, batch-time) once the per-model layout
-       refactor (step 20) lands — see `docs/notes_dimensions.md`.
+    d. [x] Extend `notation.md` to cover the *realistic* 4-axis input/output
+       (point, quantity, time-lag, batch-time) — done as part of **step 20i**
+       (along with the `$\odot$` operator and the `background.md` reconciliation).
 19. Add dvc for data storage
 20. Tensor-layout review and refactor (working notes in `docs/notes_dimensions.md`)
     a. [x] Survey actual tensor shapes used in each model (preprocess vs.
@@ -105,54 +105,35 @@ The main goal of this project is to develop a machine learning model for predict
        their own (unchanged) 3-D layouts until 20h converts them. Also refreshed
        `docs/model_settings.md` (ConvSurgeModel stride + activation);
        `docs/settings.md` verified still accurate.
-    h. **(Option 2 — package-wide `train_model!` unification.)** Apply the surge
-       always-tuple + 2-D convention (from 20e/f) to the tide, wave, and
-       interaction families and collapse **all four** `train_model!` bodies into
-       one generic loop on `AbstractFluxModel`. **Strategy: convert one family at
-       a time**, copying the surge training routine into that family and adapting
-       it (verify each family in isolation; leave unconverted families untouched);
-       **deduplicate last**, once all four near-identical routines are visible,
-       by hoisting one generic loop with an `apply_flux` seam (splat vs
-       single-tuple flux call) and a per-family `build_training_tensors` hook.
-       `preprocess` already returns the nested tuple in every family; `postprocess!`
-       stays per-family (inverse transforms + the sample→station×time reshape for
-       wave/interaction). Originally deferred until the interaction baselines
-       (11c/d) settled; being picked up now. Substeps:
-       1. [x] **Tide** — generic 2-D `forward` on `AbstractTideModel`
-          (`get_flux_model(m)(x...)`); deleted the two concrete reshaping
-          `forward`s; `postprocess!`→2-D-in; `train_model!` replaced with the
-          surge routine (identical loop; only diff = no `nlags` target
-          alignment, full `y`). Confirmed tide has **no** feature surge lacks —
-          it is strictly simpler (no `nlags`, no `in_names` alignment). 590/590
-          tests pass; tide train scripts pass fresh; wave/interaction untouched.
-       2. [x] **Wave** (`ConvWaveModel`, `DeepONetWaveModel`) — generic
-          `forward(::AbstractWaveModel, x)` = `get_flux_model(m)(x)` returning
-          2-D `(1, nsamples)`; deleted the two concrete reshaping `forward`s;
-          `postprocess!` now reshapes `(1, nsamples)→(nstations, ntimes)` +
-          `wave_scale`; `train_model!` adapted (nested-tuple DataLoader,
-          single-tuple flux call `m(xb)`, NaN-filter preserved). 590/590 tests
-          pass; wave train scripts pass fresh; behaviour preserved.
-          **FINDING (needs a decision):** the wave `train_model!` accepts
-          `val_input`/`val_target` but **ignores them** — it validates only via
-          the `validation_split` fraction. Surge/tide/interaction honour explicit
-          validation data. Left as-is (behaviour-preserving) and flagged; decide
-          whether to add explicit-val support to wave (here, at the 20h dedup, or
-          as a separate fix).
-       3. [ ] **Interaction** (`ConvInteractionModel`, `ProductInteractionModel`)
-          — same shape as wave; the routine copy adds the Z-score statistic
-          computation (stored in settings for inference) + inverse Z-score in
-          `postprocess!`. Verify.
-       4. [ ] **Deduplicate** — the four routines now differ only in (a) the
-          flux-call form and (b) data-prep. Hoist one generic
-          `train_model!(::AbstractFluxModel, …)` with the `apply_flux` seam (splat
-          default; wave/interaction single-tuple) and the `build_training_tensors`
-          hook (per-family data-prep) plus a generic `forward`; delete the four
-          per-family `train_model!` copies and now-redundant `forward`s. Verify
-          numeric parity + smoke.
-       5. [ ] **Docs** — update `docs/design.md` (tide/wave/interaction sections
-          to tuple/2-D; drop the "pending 20h" caveats added in 20g), complete
-          18d (`notation.md` realistic 4-axis input/output), and update the
-          status. Full `Pkg.test()` + `check_training_scripts.sh` green.
+    h. [x] **(Option 2 — package-wide `train_model!` unification.)** Collapsed all
+       four families' `train_model!`/`forward` into ONE generic
+       `train_model!(::AbstractFluxModel)` + generic `forward` in
+       `abstract_flux_model.jl`. Two settled design choices: **uniform
+       `m(x::Tuple)`** flux call (bare surge `Dense`/`Chain` prepend `only`; the
+       four 2-arg flux structs gained `(m)(x::Tuple)=m(x...)`) rather than an
+       `apply_flux` seam; and **no new hook** — each family gained a 3-arg
+       `preprocess(model, input, target) -> (x, y)` train form (Option B). Done
+       loop-first on the zero-flux-change families (interaction → wave → tide →
+       surge), verified green after each; 591 tests + 11/11 smoke pass;
+       `docs/design.md` updated. Intended behaviour changes (documented, benign):
+       wave now honours explicit `val_input`; wave/interaction fraction-split
+       boundary is sample-based. Doc consistency for `notation.md`/`background.md`
+       split out to step 20i.
+    i. [x] Bring `docs/notation.md` and `docs/background.md` up to date with the
+       post-refactor design (steps 20e–h, 21). Done: `notation.md` gained the
+       realistic 4-axis surge example (point/quantity/time-lag/batch-time — the
+       old 18d), the `$\odot$` element-wise-product operator ("Product operator
+       without summation"), and the `t'`/`l` index rows. `background.md` — new
+       surge sections (Linear/Conv with strided conv from step 21; Attention
+       promoted from the old duplicate) in `$\star$`/`$\odot$` index notation;
+       Tide section rewritten with **ProductTideModel as the default** (star/⊙
+       notation); the whole "## Old background" duplicate block retired and the
+       stale draft warning refreshed; sections reordered so all new content sits
+       above where the divider was. **Deferred (not blocking 20i):** the
+       interaction models have no background writeup yet, and the DeepONet tide
+       model is a one-line placeholder (its code merge is FiLM-style scale/shift,
+       not a dot product — correction deferred). Track these as follow-on doc
+       work if/when needed.
 21. ConvSurgeModel architecture improvements (follow-on to step 20)
     a. [x] Reintroduce a stride on the Conv1D layers, set `stride = filtersize`
        so the kernel tiles the lag axis into non-overlapping windows (every lag
@@ -237,5 +218,32 @@ the 7 source ConvSurgeModel TOMLs set `activation = "swish"`. Full `Pkg.test()`
 (590) and `check_training_scripts.sh` (11/11) pass; a pre-existing false-FAIL in
 the smoke script's parallel result tally was also fixed. ConvSurgeModel baselines
 still to be regenerated by the user.
+
+Step 20h complete (package-wide `train_model!` unification). All four families
+(surge, tide, wave, interaction) now run through **one** generic
+`train_model!(::AbstractFluxModel)` + generic `forward` in
+`abstract_flux_model.jl`; the four per-family `train_model!`/`forward` bodies are
+gone (~4×90 lines → 1). Two design choices: **uniform `m(x::Tuple)`** flux call
+(bare surge `Dense`/`Chain` prepend `only`; the four 2-arg flux structs gained
+`(m)(x::Tuple)=m(x...)`), and **no new hook** — each family gained a 3-arg
+`preprocess(model, input, target) -> (x, y)` train form (Option B). Converted
+loop-first on the zero-flux-change families (interaction → wave → tide → surge),
+verified green after each. 591 unit tests + 11/11 smoke pass; `docs/design.md`
+updated (20h.5a). Intended behaviour changes: wave now honours explicit
+`val_input`; wave/interaction fraction-split boundary is sample-based (both
+benign, documented).
+
+Step 20i complete (docs reconciliation). `notation.md`: added the realistic
+4-axis surge example (old 18d), the `$\odot$` element-wise-product operator, and
+the `t'`/`l` index rows. `background.md`: new-notation surge sections
+(Linear/Conv/Attention), a Tide section led by **ProductTideModel as the
+default** (star/⊙ notation), the "## Old background" duplicate block retired, the
+stale draft warning refreshed, and sections reordered so all new content is above
+the old divider. Deferred as follow-on doc work (not blocking): interaction
+models have no background writeup yet; the DeepONet tide model is a placeholder
+(its code merge is FiLM-style, not a dot product). **Step 20 (tensor-layout
+review/refactor) is now fully complete** (20a–i); the only surge follow-ups left
+are the ConvSurgeModel baseline regeneration (11b note) and the still-open
+non-doc items elsewhere in the plan.
 
 

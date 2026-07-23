@@ -14,6 +14,8 @@
 using Flux
 using JLD2
 using Statistics: mean
+using Printf: @sprintf
+using ProgressMeter: Progress, next!
 using hatyan_core: constituent_list
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -94,6 +96,161 @@ function predict(model::AbstractFluxModel, input::Dict{String, TimeSeries})
     y = forward(model, x)
     postprocess!(output, model, y)
     return output
+end
+
+# ──────────────────────────────────────────────────────────────────────────────
+# train_model! — one generic loop for all AbstractFluxModel families
+# ──────────────────────────────────────────────────────────────────────────────
+
+"""
+    _take_last_dim(x::Tuple, idx) -> Tuple
+
+Slice every tensor in `x` along its last (batch-time / sample) axis at indices
+`idx`, returning a new tuple of materialised arrays.  Used to split a
+preprocessed input tuple into train/validation portions.
+"""
+_take_last_dim(x::Tuple, idx) = map(a -> copy(selectdim(a, ndims(a), idx)), x)
+
+"""
+    preprocess(model, input, target) -> (x::Tuple, y)
+
+Training-time form of `preprocess`: build the input tuple `x` **and** the target
+matrix `y` already in the model's flux-output space (2-D, batch/sample as the
+last axis).  This is the per-family seam the generic `train_model!` relies on;
+each concrete family implements it.  Any train-time fitting (e.g. Z-score
+statistics) is done here and stored in the model settings so that inference and
+the validation split reuse the same values.
+"""
+function preprocess(model::AbstractFluxModel, input::Dict{String, TimeSeries},
+                    target::Dict{String, TimeSeries})
+    error("train-form preprocess(model, input, target) not implemented for $(typeof(model))")
+end
+
+"""
+    train_model!(model::AbstractFluxModel, train_settings::TrainingSettings,
+                 input::Dict{String, TimeSeries}, target::Dict{String, TimeSeries};
+                 val_input=nothing, val_target=nothing)
+        -> (Vector{Float32}, Vector{Float32})
+
+Single generic training loop shared by **every** model family.  Minibatch Adam
+over `Flux.DataLoader((x, y))`, where `x` is the input tuple from the train-form
+`preprocess(model, input, target)` and the flux model is called uniformly as
+`m(x)`.  Handles per-epoch train/val RMSE, `params_best.jld2` on best val,
+epoch checkpoints, and learning-rate decay.
+
+Validation: if `val_input`/`val_target` are given they are preprocessed directly
+(and take priority over `validation_split`); otherwise the last
+`validation_split` fraction of the last axis is held out via `_take_last_dim`.
+
+On first call, `"out_names"`, `"out_lons"`, `"out_lats"`, and `"out_quantity"`
+are populated from the first `TimeSeries` in `target`.  Returns
+`(train_losses, val_losses)` per epoch; `val_losses` is empty when there is no
+validation data.
+"""
+function train_model!(model::AbstractFluxModel, train_settings::TrainingSettings,
+                      input::Dict{String, TimeSeries}, target::Dict{String, TimeSeries};
+                      val_input::Union{Dict{String,TimeSeries},Nothing}  = nothing,
+                      val_target::Union{Dict{String,TimeSeries},Nothing} = nothing)
+
+    settings = get_settings(model)
+
+    # Populate output metadata from target if not yet present
+    if !haskey(settings, "out_names")
+        ts_ref = first(values(target))
+        settings["out_names"]    = get_names(ts_ref)
+        settings["out_lons"]     = Float64.(get_longitudes(ts_ref))
+        settings["out_lats"]     = Float64.(get_latitudes(ts_ref))
+        settings["out_quantity"] = get_quantity(ts_ref)
+    end
+
+    # Build train tensors (per-family train-form preprocess). y is 2-D with the
+    # batch/sample axis last; x is the input tuple sharing that last axis.
+    x_full, y_full = preprocess(model, input, target)
+
+    # Validation: explicit data takes priority over the fraction split. The val
+    # preprocess runs AFTER the train one, so any fitted stats (Z-score) are
+    # already stored and reused.
+    if !isnothing(val_input)
+        x_val, y_val = preprocess(model, val_input, val_target)
+        x, y         = x_full, y_full
+        has_val      = true
+    else
+        nfull   = size(y_full, ndims(y_full))
+        n_val   = round(Int, train_settings.validation_split * nfull)
+        has_val = n_val > 0
+        if has_val
+            n_train = nfull - n_val
+            x       = _take_last_dim(x_full, 1:n_train)
+            y       = y_full[:, 1:n_train]
+            x_val   = _take_last_dim(x_full, n_train+1:nfull)
+            y_val   = y_full[:, n_train+1:end]
+        else
+            x, y  = x_full, y_full
+            x_val = y_val = nothing
+        end
+    end
+
+    flux_model = get_flux_model(model)
+    opt_state  = Flux.setup(Adam(train_settings.learning_rate), flux_model)
+    current_lr = Float64(train_settings.learning_rate)
+    # DataLoader batches the nested tuple ((x1,…,xN), y) element-wise along the
+    # last axis, yielding (xb::Tuple, yb) each iteration. Flux model is called as
+    # m(xb) — every flux model is callable on its input tuple.
+    loader = Flux.DataLoader((x, y); batchsize=train_settings.nbatches, shuffle=true)
+
+    checkpoint_dir = get(settings, "model_dir", nothing)
+
+    train_losses  = Float32[]
+    val_losses    = Float32[]
+    showvalues    = Pair{String,String}[]
+    progress      = Progress(train_settings.nepochs; desc="Training: ", showspeed=true)
+    log_every     = max(1, train_settings.nepochs ÷ 10)
+    best_val_rmse = Inf32
+
+    for epoch in 1:train_settings.nepochs
+        for (xb, yb) in loader
+            _, grads = Flux.withgradient(flux_model) do m
+                Flux.mse(m(xb), yb)
+            end
+            Flux.update!(opt_state, flux_model, grads[1])
+        end
+
+        train_rmse = sqrt(Flux.mse(flux_model(x), y))
+        push!(train_losses, train_rmse)
+
+        empty!(showvalues)
+        push!(showvalues, "train RMSE" => @sprintf("%.4f", train_rmse))
+        if has_val
+            val_rmse = sqrt(Flux.mse(flux_model(x_val), y_val))
+            push!(val_losses, val_rmse)
+            push!(showvalues, "val RMSE  " => @sprintf("%.4f", val_rmse))
+            if !isnothing(checkpoint_dir) && val_rmse < best_val_rmse
+                best_val_rmse = val_rmse
+                save_params(model, joinpath(checkpoint_dir, "params_best.jld2"); overwrite=true)
+            end
+        end
+        next!(progress; showvalues)
+
+        if !isnothing(checkpoint_dir) && !isnothing(train_settings.checkpoints) &&
+                epoch in train_settings.checkpoints
+            save_params(model, joinpath(checkpoint_dir, "params_epoch_$(epoch).jld2"); overwrite=true)
+        end
+
+        if epoch % log_every == 0 || epoch == train_settings.nepochs
+            msg = @sprintf("epoch %d/%d  train RMSE: %.4f", epoch, train_settings.nepochs, train_rmse)
+            has_val && (msg *= @sprintf("  val RMSE: %.4f", val_losses[end]))
+            @info msg
+        end
+
+        if !isnothing(train_settings.lr_decay_factor) &&
+                !isnothing(train_settings.lr_decay_rate) &&
+                epoch % train_settings.lr_decay_rate == 0
+            current_lr *= train_settings.lr_decay_factor
+            Flux.Optimisers.adjust!(opt_state, current_lr)
+        end
+    end
+
+    return train_losses, val_losses
 end
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -189,20 +346,19 @@ function preprocess(model::AbstractFluxModel, input::Dict{String, TimeSeries})
 end
 
 """
-    forward(model::AbstractFluxModel, x::Tuple) -> Array{Float32, 2}
+    forward(model::AbstractFluxModel, x::Tuple) -> AbstractMatrix
 
-Run the Flux forward pass on the tuple `x` produced by `preprocess` and return
-a 2-D array `(locations, time)`.
+Run the Flux forward pass on the input tuple `x` produced by `preprocess` and
+return the model's raw 2-D output.
 
-Single-input models receive a 1-tuple and typically splat it into their Flux
-chain (`get_flux_model(model)(x...)`); multi-input models unpack the tuple
-explicitly. Any internal reshaping is the model's responsibility.
-
-Must be implemented for each concrete model type.
+The flux model is called with the tuple as a **single argument**
+(`get_flux_model(model)(x)`) — every flux model in the package is callable on its
+input tuple (single-input Dense/Conv chains prepend `only` to unwrap the 1-tuple;
+multi-arg models carry a `(m)(x::Tuple) = m(x...)` method). This one generic
+definition therefore serves all families; `postprocess!` maps the raw output into
+the `Dict{String, TimeSeries}` result.
 """
-function forward(model::AbstractFluxModel, x)
-    error("forward not implemented for $(typeof(model))")
-end
+forward(model::AbstractFluxModel, x::Tuple) = get_flux_model(model)(x)
 
 """
     postprocess!(output::Dict{String, TimeSeries}, model::AbstractFluxModel,

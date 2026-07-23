@@ -53,7 +53,7 @@ end
     @test m isa AbstractModel
     @test get_settings(m) === settings
 
-    # Default channels [32, 16]: chain has reshape + 2 Conv + flatten + Dense
+    # Default channels [32, 16]: chain has only + 2 Conv + flatten + Dense
     chain = get_flux_model(m)
     @test chain isa Chain
 

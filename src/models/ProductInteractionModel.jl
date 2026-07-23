@@ -167,16 +167,4 @@ end
 get_flux_model(m::ProductInteractionModel) = m.flux_model
 get_settings(m::ProductInteractionModel)   = m.settings
 
-"""
-    forward(model::ProductInteractionModel, x::Tuple) -> Array{Float32, 3}
-
-Unpack `(x_station, x_ts)`, run through the Conv chain, and return
-predictions reshaped to `(nstations, 1, ntimes_valid)`.
-"""
-function forward(model::ProductInteractionModel, x::Tuple)
-    x_station, x_ts = x
-    nstations = size(x_station, 1)
-    y = model.flux_model((x_station, x_ts))   # (1, nstations * ntimes_valid)
-    ntimes = size(y, 2) ÷ nstations
-    return reshape(y, nstations, 1, ntimes)
-end
+# forward, postprocess!, and train_model! are inherited from AbstractInteractionModel.

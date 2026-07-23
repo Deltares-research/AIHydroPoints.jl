@@ -84,6 +84,10 @@ function (m::ProductTideFlux)(x_station, x_doodson)
     return y[1, :, :]                         # (nstations, ntimes)
 end
 
+# Tuple-call form so the generic train_model!/forward can invoke every flux model
+# uniformly as `m(x)`.
+(m::ProductTideFlux)(x::Tuple) = m(x...)
+
 @Flux.layer ProductTideFlux
 
 # ──────────────────────────────────────────────────────────────────────────────

@@ -102,7 +102,7 @@ end
 
     y = forward(m, (x_station, x_ts))
 
-    @test size(y) == (nstations, 1, ntimes)
+    @test size(y) == (1, nsamples)   # (1, nstations*ntimes) — reshaped in postprocess!
     @test eltype(y) == Float32
 end
 

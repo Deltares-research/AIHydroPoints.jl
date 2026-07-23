@@ -48,6 +48,10 @@ function (m::AttentionSurgeFlux)(x_station, x_wind)
     return m.downsample(merged)[:, end, :]
 end
 
+# Tuple-call form so the generic train_model!/forward can invoke every flux model
+# uniformly as `m(x)`.
+(m::AttentionSurgeFlux)(x::Tuple) = m(x...)
+
 @Flux.layer AttentionSurgeFlux
 
 # ──────────────────────────────────────────────────────────────────────────────

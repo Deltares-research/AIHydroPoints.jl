@@ -56,6 +56,10 @@ function (m::TideModel)(x_stations, x_doodson)
     return Flux.flatten(merged)
 end
 
+# Tuple-call form so the generic train_model!/forward can invoke every flux model
+# uniformly as `m(x)`.
+(m::TideModel)(x::Tuple) = m(x...)
+
 @Flux.layer TideModel
 
 # ──────────────────────────────────────────────────────────────────────────────
