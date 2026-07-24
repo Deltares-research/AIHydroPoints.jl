@@ -1,3 +1,7 @@
+# AIHydroPoints run configuration -- full settings reference:
+# https://deltares-research.github.io/AIHydroPoints.jl/settings.html
+format_version = 2
+
 # ProductTideModel — 1-year training baseline (2019), 317 stations
 #
 # Astronomically driven: inputs are Doodson numbers computed from time and
@@ -23,12 +27,12 @@ nfeats  = 64
 nlayers = 4
 
 [train_settings]
-nepochs         = 1000 # 50 250
-nbatches        = 64
+nepochs         = 250
+batch_size        = 64
 learning_rate   = 5.0e-3
-lr_decay_factor = 0.1
-lr_decay_rate   = 400
-patience        = 10
+lr_decay_factor = 0.5
+lr_decay_epochs   = 10
+early_stopping_epochs        = 10
 
 [data_settings.model_io]
 input  = ["waterlevel"]
@@ -67,36 +71,36 @@ tidal_analysis_constituents = "year"
     [[output_settings.outputs]]
     split          = "training"
     write_stats    = true
-    fft            = false
-    scatter        = false
+    plot_fft            = false
+    plot_scatter        = false
     write_series   = false
-    timeseries     = false
-    tidal_analysis = false
+    plot_timeseries     = false
+    plot_tidal_analysis = false
 
     [[output_settings.outputs]]
     split          = "validation"
     write_stats    = true
-    fft            = false
-    scatter        = true
+    plot_fft            = false
+    plot_scatter        = true
     write_series   = false
-    timeseries     = false
-    tidal_analysis = false
+    plot_timeseries     = false
+    plot_tidal_analysis = false
 
     [[output_settings.outputs]]
     split          = "testing"
     write_stats    = true
-    fft            = true
-    scatter        = true
+    plot_fft            = true
+    plot_scatter        = true
     write_series   = true
-    timeseries     = true
-    tidal_analysis = true
+    plot_timeseries     = true
+    plot_tidal_analysis = true
 
     [[output_settings.outputs]]
     split        = "testing"
     name         = "storm_eunice_2022"
     timerange    = ["2022-02-15", "2022-02-25"]
-    timeseries   = true
-    fft          = false
-    scatter      = true
+    plot_timeseries   = true
+    plot_fft          = false
+    plot_scatter      = true
     write_stats  = true
     write_series = false

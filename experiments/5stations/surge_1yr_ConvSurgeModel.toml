@@ -1,3 +1,7 @@
+# AIHydroPoints run configuration -- full settings reference:
+# https://deltares-research.github.io/AIHydroPoints.jl/settings.html
+format_version = 2
+
 # ConvSurgeModel — 1-year training baseline (2019)
 #
 # Training : 2019
@@ -13,19 +17,21 @@ description = "ConvSurgeModel baseline: 1-year training (2019), val 2020, test 2
 
 [model_settings]
 model_name = "ConvSurgeModel"
-nlags      = 16
+nlags      = 27 #16
 
 [model_settings.model_pars]
 channels   = [32, 16]
 filtersize = 3
+activation = "swish"
 
 [train_settings]
-nepochs         = 20
-nbatches        = 64
-learning_rate   = 1.0e-3
-lr_decay_factor = 0.1
-lr_decay_rate   = 400
-patience        = 10
+nepochs               = 20
+batch_size            = 64
+learning_rate         = 1.0e-3
+lr_decay_factor       = 0.1
+lr_decay_epochs       = 10
+early_stopping_epochs = 10
+weight_decay          = 1.0e-4
 
 [data_settings.model_io]
 input  = ["stress_x", "stress_y", "pressure"]
@@ -126,33 +132,33 @@ series_format = "netcdf"
     [[output_settings.outputs]]
     split        = "training"
     write_stats  = true
-    fft          = false
-    scatter      = false
+    plot_fft          = false
+    plot_scatter      = false
     write_series = false
-    timeseries   = false
+    plot_timeseries   = false
 
     [[output_settings.outputs]]
     split        = "validation"
     write_stats  = true
-    fft          = false
-    scatter      = true
+    plot_fft          = false
+    plot_scatter      = true
     write_series = false
-    timeseries   = false
+    plot_timeseries   = false
 
     [[output_settings.outputs]]
     split        = "testing"
     write_stats  = true
-    fft          = true
-    scatter      = true
+    plot_fft          = true
+    plot_scatter      = true
     write_series = true
-    timeseries   = true
+    plot_timeseries   = true
 
     [[output_settings.outputs]]
     split        = "testing"
     name         = "storm_eunice_2022"
     timerange    = ["2022-02-15", "2022-02-25"]
-    timeseries   = true
-    fft          = false
-    scatter      = true
+    plot_timeseries   = true
+    plot_fft          = false
+    plot_scatter      = true
     write_stats  = true
     write_series = false

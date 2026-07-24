@@ -116,7 +116,7 @@ end
         "model_pars" => Dict{String, Any}("nchannel" => [8, 1], "activation" => "relu"),
     )
     m  = DeepONetWaveModel(settings)
-    ts = TrainingSettings(nepochs=3, nbatches=32, learning_rate=1e-3)
+    ts = TrainingSettings(nepochs=3, batch_size=32, learning_rate=1e-3)
 
     train_losses, val_losses = train_model!(m, ts, input, target)
 
@@ -128,7 +128,7 @@ end
     @test all(train_losses .>= 0f0)
     @test isempty(val_losses)
 
-    ts_val = TrainingSettings(nepochs=3, nbatches=32, learning_rate=1e-3, validation_split=0.2)
+    ts_val = TrainingSettings(nepochs=3, batch_size=32, learning_rate=1e-3, validation_split=0.2)
     m2 = DeepONetWaveModel(Dict{String, Any}(
         "nlocations_output"  => DON_NSTATIONS,
         "nlocations_input"      => DON_NWIND,

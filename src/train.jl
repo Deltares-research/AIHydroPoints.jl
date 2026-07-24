@@ -22,6 +22,7 @@ function train(input_toml::String)
     toml_dir = dirname(settings_file)
 
     all_settings   = toml_read(settings_file)
+    check_format_version(all_settings)
     model_settings = all_settings["model_settings"]
     train_settings = TrainingSettings(all_settings["train_settings"])
 
@@ -32,7 +33,11 @@ function train(input_toml::String)
         end
     end
 
-    data         = load_data(all_settings["data_settings"])
+    data = load_data(all_settings["data_settings"])
+    haskey(data, "training") || error(
+        "train: no \"training\" split found in data_settings. Found split(s): " *
+        join(sort!(collect(keys(data))), ", ") *
+        ". At least one file entry must have split = \"training\".")
     train_input  = data["training"].input
     train_target = data["training"].target
 

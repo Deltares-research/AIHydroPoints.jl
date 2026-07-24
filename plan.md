@@ -59,17 +59,20 @@ Docs and comms
 
 ## Open tasks
 
-1. [ ] **Finalize the TOML input format** (breaking changes) — do this now, while
-   only ~34 hand-authored config files exist, before more baselines lock the
-   format in and make migration painful. Detailed in [`plan_1.md`](plan_1.md).
+1. [x] **Finalize the TOML input format** (breaking changes). **DONE.** Phase A
+   (renames, `format_version` gate, unknown-key rejection, data-settings validation
+   hardening; 39 TOMLs migrated; docs updated) and Phase B (task 2) both complete.
+   612 unit + 11 smoke pass.
    Introduces a `format_version` key (v2 = new format; v1/missing rejected with a
    migration message) — **document the key and a version-history section** in
    `docs/settings.md` (anchor `#format-versions`) and reference it from
    `docs/data_input_settings.md`, so future format changes have a place to record
    the version bump.
-2. [ ] **Implement dead `[train_settings]` knobs.** Three settings are documented
-   but never applied; the format renames (`plan_1.md`) only fix names, not
-   behaviour:
+2. [x] **Implement dead `[train_settings]` knobs.** **DONE** — all three
+   implemented in the generic `train_model!`, tested
+   (`test/test_training_features.jl`), 612 unit + 11 smoke pass. `early_stopping_epochs`
+   is now active whenever validation data is present (set `nothing` to disable).
+   Original scope:
    - **Early stopping** (`early_stopping_epochs`, ex-`patience`, Change 3): the
      loop always runs the full `1:nepochs`. Add an epochs-since-improvement
      counter and `break` when it exceeds the threshold, reusing the existing
@@ -86,11 +89,12 @@ Docs and comms
      loop — per-batch `x .+ input_noise_std .* randn`-style, gated on `> 0`. No
      rename (name is accurate), so this is implementation only, not a format change.
    All three are behaviour changes; do them alongside the format renames.
-3. [ ] **Regenerate ConvSurgeModel baselines** (1yr/5yr/20yr). The existing Conv
+3. [ ] **Improve scatter plot.**
+4. [ ] **Regenerate ConvSurgeModel baselines** (1yr/5yr/20yr). The existing Conv
    baselines are stale — trained before the reshape fix and before the strided
    Conv1D + `swish` activation changes. Linear (Dense is permutation-invariant)
    and Attention baselines remain valid. *(User to rerun.)*
-4. [ ] **Interaction model — datasets & first testing.** `ConvInteractionModel`
+5. [ ] **Interaction model — datasets & first testing.** `ConvInteractionModel`
    (simplified Conv1D, no station gate) does not learn. Data is hourly so
    `nlags=16` (16 h) covers a full tidal cycle — `nlags` is not the cause; root
    cause unknown and needs investigation. Note: the current interaction target is
@@ -98,9 +102,8 @@ Docs and comms
    meaningful target (residual = observed − tide_pred − surge_pred) requires a
    well-trained surge model and observed waterlevel data, which are not yet
    available.
-5. [ ] **Interaction baselines** 1yr/5yr/20yr (determine timespans). Blocked on
-   task 4.
-6. [ ] **Improve scatter plot.**
+6. [ ] **Interaction baselines** 1yr/5yr/20yr (determine timespans). Blocked on
+   task 5.
 7. [ ] **Create script for real-time forecasts.**
 8. [ ] **Create an environment for online demos.**
 9. [ ] **Add experiments for waves.**
@@ -110,6 +113,20 @@ Docs and comms
     models have no `background.md` writeup yet; (b) the DeepONet tide model is a
     one-line placeholder — its code merge is FiLM-style scale/shift, not a dot
     product; correct if/when needed.
+13. [ ] **Return the best model, not the last epoch.** After training with early
+    stopping, `train_model!` leaves the in-memory model at the *final* epoch, while
+    the best weights are saved only to `params_best.jld2`. So predicting straight
+    from the returned model can use worse-than-best weights. Reload `params_best`
+    before returning (or document the current behaviour). Pre-existing behaviour,
+    unchanged by the Phase B early-stopping work.
+14. [ ] **Stale `run_settings.toml` for pre-format-v2 baselines** (records only; not
+    replayable against the new reader unless migrated).
+15. [ ] **Minor data-settings robustness (deferred):** (a) warn when a variable is
+    provided by more than one file in the same split — `flat[as] = …` currently
+    overwrites silently; (b) detect mixed sampling grids — `_intersect_times` clips
+    the range only and does not verify a common timestamp grid, so e.g. hourly input
+    + 10-min target would pass and mis-align downstream (detect-and-error for now; a
+    resample/align policy is a larger change).
 
 ## Checklist for each step:
 - all source should eventually be in src/ and all tests should be in test/ and test data should be in test_data/

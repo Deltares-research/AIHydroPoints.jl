@@ -147,7 +147,7 @@ end
     input    = conv_make_surge_input(nwind=nwind, ntimes=ntimes)
     target   = conv_make_surge_target(nstations=nstations, ntimes=ntimes)
 
-    ts = TrainingSettings(nepochs=3, nbatches=16, learning_rate=1e-3)
+    ts = TrainingSettings(nepochs=3, batch_size=16, learning_rate=1e-3)
     train_losses, val_losses = train_model!(m, ts, input, target)
 
     @test haskey(m.settings, "out_names")
@@ -157,7 +157,7 @@ end
     @test isempty(val_losses)
 
     # With validation split
-    ts_val = TrainingSettings(nepochs=3, nbatches=16, learning_rate=1e-3, validation_split=0.2)
+    ts_val = TrainingSettings(nepochs=3, batch_size=16, learning_rate=1e-3, validation_split=0.2)
     m2 = ConvSurgeModel(Dict{String, Any}("nlocations_output" => nstations, "nlocations_input" => nwind, "nlags" => nlags))
     _, val_losses2 = train_model!(m2, ts_val, input, target)
     @test length(val_losses2) == ts_val.nepochs

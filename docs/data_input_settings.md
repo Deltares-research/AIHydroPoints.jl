@@ -5,6 +5,11 @@ For training, the data input is controlled by the `data_settings` dictionary in 
 We want to have a single `load_data` function that can load any dataset based on the settings
 and return input and target time series already separated per split.
 
+> Every input TOML must declare a top-level `format_version` (currently `2`); see
+> [Format versions](settings.md#format-versions). Each `[[data_settings.files]]`
+> entry accepts only the keys `path`, `format`, `split`, `variables`, and the
+> optional `locations`, `timerange`, `source` — unknown keys are rejected.
+
 
 ## Example: surge model
 

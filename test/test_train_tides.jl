@@ -34,7 +34,7 @@ using Dates
             "nlayers_down"   => 1,
         ),
     )
-    train_settings = TrainingSettings(nepochs=2, nbatches=64, learning_rate=1.0e-3)
+    train_settings = TrainingSettings(nepochs=2, batch_size=64, learning_rate=1.0e-3)
 
     model = DeepONetTideModel(settings)
     @test model isa DeepONetTideModel

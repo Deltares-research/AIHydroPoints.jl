@@ -60,6 +60,14 @@ mkdir(temp_dir) # create a new empty temp directory
       include("test_input_processing.jl")
    end
 
+   @testset "format_version and validation" begin
+      include("test_format_version.jl")
+   end
+
+   @testset "training features (weight decay, noise, early stopping)" begin
+      include("test_training_features.jl")
+   end
+
    @testset "model_registry" begin
       include("test_model_registry.jl")
    end

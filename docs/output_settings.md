@@ -29,12 +29,19 @@ the label in output file names; if omitted, the `split` label is used.
 | `split` | — | **Required.** Which data split to use (e.g. `"test"`, `"train"`). |
 | `name` | `split` value | Label used in output file names. Required when the same split appears more than once. |
 | `timerange` | full split | Two ISO-8601 strings restricting all outputs to a sub-window. Same syntax as `data_settings.files[].timerange`. |
-| `timeseries` | `true` if split is `"testing"`, else `false` | Plot predicted vs observed time series, one PNG per station. |
-| `fft` | `false` | Plot FFT spectra (observations, predicted, residual), one PNG per station. |
-| `scatter` | `false` | Scatter plot of predicted vs observed (one point per timestep), one PNG per station. |
+| `plot_timeseries` | `true` if split is `"testing"`, else `false` | Plot predicted vs observed time series, one PNG per station. |
+| `plot_fft` | `false` | Plot FFT spectra (observations, predicted, residual), one PNG per station. |
+| `plot_scatter` | `false` | Scatter plot of predicted vs observed (one point per timestep), one PNG per station. |
 | `write_stats` | `true` if split is `"testing"`, else `false` | Write per-station statistics (RMSE, bias, correlation) to `stats_<name>.csv`. |
 | `write_series` | `false` | Write predicted time series to `series_<name>.<ext>` in `series_format`. |
-| `tidal_analysis` | `false` | *(Tide models only.)* Run harmonic analysis on obs and predicted; save per-station amplitude+phase comparison PNGs to `<name>_tidal_analysis/`. Controlled by global keys `tidal_analysis_constituents` and `tidal_analysis_max_constituents`. |
+| `write_residuals` | `false` | Write observed − predicted residual series to `residual_<name>.jld2` (or `residual_path`). |
+| `plot_tidal_analysis` | `false` | *(Tide models only.)* Run harmonic analysis on obs and predicted; save per-station amplitude+phase comparison PNGs to `<name>_tidal_analysis/`. Controlled by global keys `tidal_analysis_constituents` and `tidal_analysis_max_constituents`. |
+
+> **Renamed in format version 2:** the plot flags gained a `plot_` prefix
+> (`timeseries` → `plot_timeseries`, `fft` → `plot_fft`, `scatter` →
+> `plot_scatter`, `tidal_analysis` → `plot_tidal_analysis`) and `residuals` →
+> `write_residuals`, giving a consistent `plot_*` (PNG) / `write_*` (file) scheme.
+> See [settings.md](settings.md#format-versions).
 
 If no `[[output_settings.outputs]]` entries are given, a single default entry is used
 (equivalent to `split = "testing"` with per-entry defaults applied).
@@ -70,32 +77,32 @@ write_summary = true
 
 # Full test split: plots, scatter, stats
 [[output_settings.outputs]]
-split        = "testing"
-timeseries   = true
-fft          = false
-scatter      = true
-write_stats  = true
-write_series = false
+split           = "testing"
+plot_timeseries = true
+plot_fft        = false
+plot_scatter    = true
+write_stats     = true
+write_series    = false
 
 # Full train split: stats only
 [[output_settings.outputs]]
-split        = "training"
-timeseries   = false
-fft          = false
-scatter      = false
-write_stats  = true
-write_series = false
+split           = "training"
+plot_timeseries = false
+plot_fft        = false
+plot_scatter    = false
+write_stats     = true
+write_series    = false
 
 # Named event within test split: all outputs including FFT
 [[output_settings.outputs]]
-split        = "testing"
-name         = "storm_jan_2012"
-timerange    = ["2012-01-13", "2012-01-16"]
-timeseries   = true
-fft          = true
-scatter      = true
-write_stats  = true
-write_series = false
+split           = "testing"
+name            = "storm_jan_2012"
+timerange       = ["2012-01-13", "2012-01-16"]
+plot_timeseries = true
+plot_fft        = true
+plot_scatter    = true
+write_stats     = true
+write_series    = false
 ```
 
 ---
@@ -110,9 +117,9 @@ The `[[output_settings.outputs]]` design is implemented in
 
 | Feature | Key | Notes |
 |---|---|---|
-| Time-series plot | `timeseries` | `_plot_station_series`; 2-panel (predicted + residual) |
-| FFT plot | `fft` | `_plot_station_fft`; 2-panel (obs + pred spectrum, residual spectrum); uses `hatyan_core.fft_series` |
-| Scatter plot | `scatter` | `_plot_station_scatter`; uses `MultiTimeSeries.scatter` |
+| Time-series plot | `plot_timeseries` | `_plot_station_series`; 2-panel (predicted + residual) |
+| FFT plot | `plot_fft` | `_plot_station_fft`; 2-panel (obs + pred spectrum, residual spectrum); uses `hatyan_core.fft_series` |
+| Scatter plot | `plot_scatter` | `_plot_station_scatter`; uses `MultiTimeSeries.scatter` |
 | Per-station stats | `write_stats` | `_write_station_stats`; uses `MultiTimeSeries.compute_statistics`; writes CSV |
 | Series output | `write_series` | `_write_station_series`; supports `"netcdf"`, `"jld2"`, `"noos"` |
 | Run summary | `write_summary` | writes `summary.toml` with `runid`, `description`, `model_name`, `out_quantities`, `n_params`, `train_time_s`, `rmse_<name>` (respects `timerange`), `predict_time_<name>_s` |

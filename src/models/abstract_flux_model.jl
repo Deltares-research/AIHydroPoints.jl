@@ -138,6 +138,12 @@ over `Flux.DataLoader((x, y))`, where `x` is the input tuple from the train-form
 `m(x)`.  Handles per-epoch train/val RMSE, `params_best.jld2` on best val,
 epoch checkpoints, and learning-rate decay.
 
+Regularisation / early stopping (all opt-in via `train_settings`):
+- `weight_decay > 0` wraps Adam in `OptimiserChain(WeightDecay, Adam)`.
+- `input_noise_std > 0` adds Gaussian noise to every input tensor per batch.
+- `early_stopping_epochs` halts once validation RMSE has not improved for that
+  many consecutive epochs (requires validation data; `nothing` disables).
+
 Validation: if `val_input`/`val_target` are given they are preprocessed directly
 (and take priority over `validation_split`); otherwise the last
 `validation_split` fraction of the last axis is held out via `_take_last_dim`.
@@ -191,12 +197,20 @@ function train_model!(model::AbstractFluxModel, train_settings::TrainingSettings
     end
 
     flux_model = get_flux_model(model)
-    opt_state  = Flux.setup(Adam(train_settings.learning_rate), flux_model)
+    # Weight decay (L2) is opt-in: wrap Adam in an OptimiserChain only when the
+    # coefficient is > 0, otherwise use bare Adam (unchanged behaviour).
+    base_opt   = Adam(train_settings.learning_rate)
+    opt_rule   = train_settings.weight_decay > 0 ?
+                 Flux.Optimisers.OptimiserChain(
+                     Flux.Optimisers.WeightDecay(train_settings.weight_decay), base_opt) :
+                 base_opt
+    opt_state  = Flux.setup(opt_rule, flux_model)
     current_lr = Float64(train_settings.learning_rate)
+    noise_std  = Float64(train_settings.input_noise_std)
     # DataLoader batches the nested tuple ((x1,…,xN), y) element-wise along the
     # last axis, yielding (xb::Tuple, yb) each iteration. Flux model is called as
     # m(xb) — every flux model is callable on its input tuple.
-    loader = Flux.DataLoader((x, y); batchsize=train_settings.nbatches, shuffle=true)
+    loader = Flux.DataLoader((x, y); batchsize=train_settings.batch_size, shuffle=true)
 
     checkpoint_dir = get(settings, "model_dir", nothing)
 
@@ -205,12 +219,17 @@ function train_model!(model::AbstractFluxModel, train_settings::TrainingSettings
     showvalues    = Pair{String,String}[]
     progress      = Progress(train_settings.nepochs; desc="Training: ", showspeed=true)
     log_every     = max(1, train_settings.nepochs ÷ 10)
-    best_val_rmse = Inf32
+    best_val_rmse        = Inf32
+    epochs_since_improve = 0
 
     for epoch in 1:train_settings.nepochs
         for (xb, yb) in loader
+            # Input-noise augmentation (opt-in): perturb every input tensor with
+            # Gaussian noise of std `noise_std`. `xb` is the batched input tuple.
+            xin = noise_std > 0 ?
+                  map(a -> a .+ eltype(a)(noise_std) .* randn(eltype(a), size(a)), xb) : xb
             _, grads = Flux.withgradient(flux_model) do m
-                Flux.mse(m(xb), yb)
+                Flux.mse(m(xin), yb)
             end
             Flux.update!(opt_state, flux_model, grads[1])
         end
@@ -224,9 +243,14 @@ function train_model!(model::AbstractFluxModel, train_settings::TrainingSettings
             val_rmse = sqrt(Flux.mse(flux_model(x_val), y_val))
             push!(val_losses, val_rmse)
             push!(showvalues, "val RMSE  " => @sprintf("%.4f", val_rmse))
-            if !isnothing(checkpoint_dir) && val_rmse < best_val_rmse
-                best_val_rmse = val_rmse
-                save_params(model, joinpath(checkpoint_dir, "params_best.jld2"); overwrite=true)
+            if val_rmse < best_val_rmse
+                best_val_rmse        = val_rmse
+                epochs_since_improve = 0
+                if !isnothing(checkpoint_dir)
+                    save_params(model, joinpath(checkpoint_dir, "params_best.jld2"); overwrite=true)
+                end
+            else
+                epochs_since_improve += 1
             end
         end
         next!(progress; showvalues)
@@ -243,10 +267,20 @@ function train_model!(model::AbstractFluxModel, train_settings::TrainingSettings
         end
 
         if !isnothing(train_settings.lr_decay_factor) &&
-                !isnothing(train_settings.lr_decay_rate) &&
-                epoch % train_settings.lr_decay_rate == 0
+                !isnothing(train_settings.lr_decay_epochs) &&
+                epoch % train_settings.lr_decay_epochs == 0
             current_lr *= train_settings.lr_decay_factor
             Flux.Optimisers.adjust!(opt_state, current_lr)
+        end
+
+        # Early stopping: halt when validation RMSE has not improved for
+        # `early_stopping_epochs` consecutive epochs (requires validation data;
+        # `nothing` disables it).
+        if has_val && !isnothing(train_settings.early_stopping_epochs) &&
+                epochs_since_improve >= train_settings.early_stopping_epochs
+            @info @sprintf("Early stopping at epoch %d/%d: no val improvement for %d epochs.",
+                           epoch, train_settings.nepochs, train_settings.early_stopping_epochs)
+            break
         end
     end
 
@@ -455,14 +489,14 @@ function write_outputs(model::AbstractFluxModel, data::Dict, all_settings::Dict)
         name      = get(entry, "name",      split)
         timerange = get(entry, "timerange", nothing)
 
-        do_timeseries     = get(entry, "timeseries",      split == "testing")
-        do_fft            = get(entry, "fft",             false)
-        do_scatter        = get(entry, "scatter",         false)
-        do_stats          = get(entry, "write_stats",     split == "testing")
-        do_series         = get(entry, "write_series",    false)
-        do_tidal_analysis = get(entry, "tidal_analysis",  false) &&
+        do_timeseries     = get(entry, "plot_timeseries",     split == "testing")
+        do_fft            = get(entry, "plot_fft",            false)
+        do_scatter        = get(entry, "plot_scatter",        false)
+        do_stats          = get(entry, "write_stats",         split == "testing")
+        do_series         = get(entry, "write_series",        false)
+        do_tidal_analysis = get(entry, "plot_tidal_analysis", false) &&
                             model isa AbstractTideModel
-        do_residuals      = get(entry, "residuals",       false)
+        do_residuals      = get(entry, "write_residuals",     false)
         residual_path     = get(entry, "residual_path",   nothing)
 
         if do_timeseries || do_fft || do_scatter || do_stats || do_series ||

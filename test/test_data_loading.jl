@@ -171,4 +171,64 @@ const DATA_DIR = joinpath(@__DIR__, "..", "test_data")
               get_times(data["testing"].input["wind_speed"])[1]
     end
 
+    @testset "error: declared variable not provided by any file" begin
+        data_settings = Dict{String,Any}(
+            "files" => [
+                Dict("path"      => joinpath(DATA_DIR, "surge_schureman_2011.nc"),
+                     "format"    => "netcdf",
+                     "split"     => "training",
+                     "variables" => ["surge"]),
+            ],
+            # "stress_x" is declared but no file provides it
+            "model_io" => Dict("input" => ["stress_x"], "target" => ["surge"]),
+        )
+        @test_throws ErrorException load_data(data_settings)
+    end
+
+    @testset "error: files with no overlapping time window" begin
+        data_settings = Dict{String,Any}(
+            "files" => [
+                Dict("path"      => joinpath(DATA_DIR, "surge_schureman_2011.nc"),
+                     "format"    => "netcdf",
+                     "split"     => "training",
+                     "variables" => ["surge"],
+                     "timerange" => ["2011-01-01", "2011-03-01"]),
+                Dict("path"      => joinpath(DATA_DIR, "era5_wind_stress_2011_testing.jld2"),
+                     "format"    => "jld2",
+                     "split"     => "training",
+                     "variables" => ["stress_x"],
+                     "timerange" => ["2011-06-01", "2011-09-01"]),
+            ],
+            "model_io" => Dict("input" => ["stress_x"], "target" => ["surge"]),
+        )
+        @test_throws ErrorException load_data(data_settings)
+    end
+
+    @testset "error: file entry missing required key" begin
+        data_settings = Dict{String,Any}(
+            "files" => [
+                # no "format"
+                Dict("path"      => joinpath(DATA_DIR, "surge_schureman_2011.nc"),
+                     "split"     => "training",
+                     "variables" => ["surge"]),
+            ],
+            "model_io" => Dict("input" => String[], "target" => ["surge"]),
+        )
+        @test_throws ErrorException load_data(data_settings)
+    end
+
+    @testset "error: file entry with unknown key" begin
+        data_settings = Dict{String,Any}(
+            "files" => [
+                Dict("path"      => joinpath(DATA_DIR, "surge_schureman_2011.nc"),
+                     "format"    => "netcdf",
+                     "split"     => "training",
+                     "variables" => ["surge"],
+                     "bogus"     => true),
+            ],
+            "model_io" => Dict("input" => String[], "target" => ["surge"]),
+        )
+        @test_throws ErrorException load_data(data_settings)
+    end
+
 end

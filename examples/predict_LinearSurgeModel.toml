@@ -1,3 +1,7 @@
+# AIHydroPoints run configuration -- full settings reference:
+# https://deltares-research.github.io/AIHydroPoints.jl/settings.html
+format_version = 2
+
 # LinearSurgeModel — inference example
 #
 # Train the model first:
@@ -34,5 +38,5 @@ write_summary = false
 
 [[output_settings.outputs]]
 split       = "testing"
-timeseries  = true
+plot_timeseries  = true
 write_stats = true

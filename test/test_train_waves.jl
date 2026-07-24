@@ -63,7 +63,7 @@ using DataFrames
         "n_input_channels"  => 4,
         "model_pars"        => Dict{String,Any}("nchannel" => [4, 1], "activation" => "swish"),
     )
-    train_settings = TrainingSettings(nepochs=2, nbatches=8, learning_rate=1e-3)
+    train_settings = TrainingSettings(nepochs=2, batch_size=8, learning_rate=1e-3)
 
     # ── Model creation ─────────────────────────────────────────────────────
     model = ConvWaveModel(settings)

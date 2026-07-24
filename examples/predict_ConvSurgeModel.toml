@@ -1,3 +1,7 @@
+# AIHydroPoints run configuration -- full settings reference:
+# https://deltares-research.github.io/AIHydroPoints.jl/settings.html
+format_version = 2
+
 # ConvSurgeModel — inference example
 #
 # Runs predictions using a previously trained ConvSurgeModel.
@@ -35,6 +39,6 @@ write_summary = false
 
 [[output_settings.outputs]]
 split       = "testing"
-timeseries  = true
-scatter     = true
+plot_timeseries  = true
+plot_scatter     = true
 write_stats = true

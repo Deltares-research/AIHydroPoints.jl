@@ -24,7 +24,7 @@ model_dir    = joinpath(examples_dir, "training_output", "example_LinearSurgeMod
         outputs = saved["output_settings"]["outputs"]
         @test length(outputs) == 1
         @test outputs[1]["split"] == "testing"
-        @test outputs[1]["timeseries"] == true
+        @test outputs[1]["plot_timeseries"] == true
 
         # timeseries subfolder is created with one PNG per station
         ts_dir = joinpath(model_dir, "testing_timeseries")

@@ -23,6 +23,7 @@ function predict(input_toml::String)
     toml_dir = dirname(settings_file)
 
     all_settings = toml_read(settings_file)
+    check_format_version(all_settings)
 
     # Resolve model_dir relative to TOML location
     model_dir = all_settings["model_settings"]["model_dir"]

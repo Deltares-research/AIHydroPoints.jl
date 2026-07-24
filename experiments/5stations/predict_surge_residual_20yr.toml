@@ -1,3 +1,7 @@
+# AIHydroPoints run configuration -- full settings reference:
+# https://deltares-research.github.io/AIHydroPoints.jl/settings.html
+format_version = 2
+
 # ConvSurgeModel (20yr) — full-period residual prediction
 #
 # Runs the trained 20yr ConvSurgeModel on the full 2000–2022 period and writes
@@ -57,5 +61,5 @@ write_summary = false
 [[output_settings.outputs]]
 split         = "testing"
 name          = "full_period"
-residuals     = true
+write_residuals     = true
 residual_path = "../../data/dscm_2000_2022_5points/surge_residual_20yr_ConvSurgeModel_2000_2022_5stations.jld2"

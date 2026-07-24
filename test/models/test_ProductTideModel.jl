@@ -105,7 +105,7 @@ end
     input  = prod_make_input(nstations=nstations, ntimes=ntimes)
     target = prod_make_input(nstations=nstations, ntimes=ntimes)
 
-    ts = TrainingSettings(nepochs=3, nbatches=16, learning_rate=1e-3)
+    ts = TrainingSettings(nepochs=3, batch_size=16, learning_rate=1e-3)
     train_losses, val_losses = train_model!(m, ts, input, target)
 
     @test haskey(m.settings, "out_names")
@@ -118,7 +118,7 @@ end
     @test isempty(val_losses)
 
     # With validation split
-    ts_val = TrainingSettings(nepochs=3, nbatches=16, learning_rate=1e-3, validation_split=0.2)
+    ts_val = TrainingSettings(nepochs=3, batch_size=16, learning_rate=1e-3, validation_split=0.2)
     m2 = ProductTideModel(Dict{String, Any}(
         "freqs" => freqs,
         "model_pars" => Dict{String, Any}("nfeats" => 8, "nlayers" => 2),

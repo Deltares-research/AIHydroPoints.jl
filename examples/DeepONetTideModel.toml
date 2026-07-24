@@ -1,3 +1,7 @@
+# AIHydroPoints run configuration -- full settings reference:
+# https://deltares-research.github.io/AIHydroPoints.jl/settings.html
+format_version = 2
+
 # DeepONetTideModel — branch/trunk DeepONet tide model
 #
 # Astronomically driven: inputs are Doodson numbers computed from time and
@@ -26,11 +30,13 @@ nlayers_down   = 1
 
 [train_settings]
 nepochs          = 10
-nbatches         = 64
+batch_size         = 64
 learning_rate    = 5.0e-3
 lr_decay_factor  = 0.1
-lr_decay_rate    = 400
-patience         = 5
+lr_decay_epochs    = 400
+early_stopping_epochs         = 5
+weight_decay          = 0.0    # L2 weight decay; 0 = off
+input_noise_std       = 0.0    # Gaussian input-noise augmentation; 0 = off
 validation_split = 0.2
 
 [data_settings.model_io]

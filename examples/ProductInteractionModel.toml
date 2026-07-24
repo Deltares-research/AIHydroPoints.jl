@@ -2,11 +2,10 @@
 # https://deltares-research.github.io/AIHydroPoints.jl/settings.html
 format_version = 2
 
-# ConvInteractionModel — convolutional tide-surge interaction model
+# ProductInteractionModel — multiplicative-gate interaction model
 #
-# Treats tide and surge as two input channels and applies strided Conv1D layers
-# over the lag dimension.  Simpler than ProductInteractionModel (no per-station
-# gate).
+# Uses a per-station InteractionInputLayer (multiplicative gate) followed by
+# strided Conv1D layers.
 #
 # PLACEHOLDER TARGET
 # This example uses surge as a stand-in for the interaction target (loaded
@@ -15,20 +14,20 @@ format_version = 2
 # residual target when available.
 #
 # Usage:
-#   pixi run julia --project train.jl examples/ConvInteractionModel.toml
+#   pixi run julia --project train.jl examples/ProductInteractionModel.toml
 #
 # Increase nepochs to 100+ for a meaningful training run.
 
 [run_info]
 runid       = "example"
-description = "Interaction model (dummy target) trained on 2011 Schureman tides and surge."
+description = "ProductInteraction model (dummy target) trained on 2011 Schureman tides and surge."
 
 [output_settings]
 plot_train = true
 plot_test  = true
 
 [model_settings]
-model_name = "ConvInteractionModel"
+model_name = "ProductInteractionModel"
 nlags      = 16
 
 [model_settings.model_pars]

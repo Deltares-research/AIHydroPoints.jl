@@ -50,7 +50,7 @@ using Dates
             "nlocations_input"      => nwind,
             "nlags"      => 4,
         )
-        train_settings = TrainingSettings(nepochs=2, nbatches=64, learning_rate=1e-3)
+        train_settings = TrainingSettings(nepochs=2, batch_size=64, learning_rate=1e-3)
 
         model = LinearSurgeModel(model_settings)
         @test model isa AbstractSurgeModel

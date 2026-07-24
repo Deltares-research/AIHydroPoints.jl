@@ -109,7 +109,7 @@ end
     input  = tide_make_input(nstations=nstations, ntimes=ntimes)
     target = tide_make_input(nstations=nstations, ntimes=ntimes)
 
-    ts = TrainingSettings(nepochs=3, nbatches=16, learning_rate=1e-3)
+    ts = TrainingSettings(nepochs=3, batch_size=16, learning_rate=1e-3)
     train_losses, val_losses = train_model!(m, ts, input, target)
 
     @test haskey(m.settings, "out_names")
@@ -123,7 +123,7 @@ end
     @test isempty(val_losses)
 
     # With validation_split
-    ts_val = TrainingSettings(nepochs=3, nbatches=16, learning_rate=1e-3, validation_split=0.2)
+    ts_val = TrainingSettings(nepochs=3, batch_size=16, learning_rate=1e-3, validation_split=0.2)
     m2 = DeepONetTideModel(Dict{String,Any}("freqs" => freqs,
                                             "model_pars" => Dict{String,Any}(
                                                 "nlayers_branch" => 1, "nhidden_branch" => 8,

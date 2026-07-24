@@ -4,6 +4,40 @@
 # Called after loading data and before constructing a model.
 
 """
+    CURRENT_FORMAT_VERSION
+
+The TOML input `format_version` this build understands. Bump when making a
+breaking change to the input format and record it in
+`docs/settings.md#format-versions`.
+"""
+const CURRENT_FORMAT_VERSION = 2
+
+"""
+    check_format_version(all_settings)
+
+Verify the top-level `format_version`. A file with no key is treated as version 1
+(the pre-`format_version` format) and rejected with a migration message; a newer
+version than this build understands is also rejected. Called from `train`/`predict`
+right after reading the TOML.
+"""
+function check_format_version(all_settings::AbstractDict)
+    v = get(all_settings, "format_version", 1)
+    if v < CURRENT_FORMAT_VERSION
+        error("""
+        This input uses TOML format version $v; the current format is version $CURRENT_FORMAT_VERSION.
+        Renamed keys: nbatches→batch_size, lr_decay_rate→lr_decay_epochs, \
+        patience→early_stopping_epochs, weight_reg→weight_decay; val_daterange removed; \
+        output flags → plot_*/write_* (e.g. timeseries→plot_timeseries, residuals→write_residuals).
+        Add `format_version = $CURRENT_FORMAT_VERSION` at the top of the file and migrate the keys.
+        See docs/settings.md#format-versions.""")
+    elseif v > CURRENT_FORMAT_VERSION
+        error("This input declares format_version $v, but this build supports only up to " *
+              "$CURRENT_FORMAT_VERSION. Update AIHydroPoints.")
+    end
+    return nothing
+end
+
+"""
     validate_and_augment_settings!(
         all_settings::Dict{String,Any},
         train_input::Dict{String,TimeSeries},
@@ -104,13 +138,13 @@ function validate_and_augment_settings!(
     get!(out, "write_summary", true)
     if !haskey(out, "outputs")
         out["outputs"] = [Dict{String,Any}(
-            "split"           => "testing",
-            "timeseries"      => true,
-            "fft"             => false,
-            "scatter"         => false,
-            "write_stats"     => true,
-            "write_series"    => false,
-            "tidal_analysis"  => false,
+            "split"               => "testing",
+            "plot_timeseries"     => true,
+            "plot_fft"            => false,
+            "plot_scatter"        => false,
+            "write_stats"         => true,
+            "write_series"        => false,
+            "plot_tidal_analysis" => false,
         )]
     end
 
