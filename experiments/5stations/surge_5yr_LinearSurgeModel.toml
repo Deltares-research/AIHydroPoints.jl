@@ -24,8 +24,9 @@ nepochs         = 20
 batch_size        = 64
 learning_rate   = 1.0e-3
 lr_decay_factor = 0.1
-lr_decay_epochs   = 400
+lr_decay_epochs   = 10
 early_stopping_epochs        = 10
+weight_decay      = 1.0e-4
 
 [data_settings.model_io]
 input  = ["stress_x", "stress_y", "pressure"]

@@ -133,6 +133,8 @@ bin/train examples/ConvSurgeModel.toml
 ```
 
 ```toml
+format_version = 2
+
 [run_info]
 runid       = "example"
 description = "Convolutional surge model: 2010 train, 2011 validation, 2012 test."
@@ -142,9 +144,9 @@ model_name = "ConvSurgeModel"
 nlags      = 16
 
 [train_settings]
-nepochs         = 50
-learning_rate   = 1.0e-3
-patience        = 5
+nepochs               = 50
+learning_rate         = 1.0e-3
+early_stopping_epochs = 5
 
 [data_settings.model_io]
 input  = ["stress_x", "stress_y", "pressure"]

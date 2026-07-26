@@ -89,12 +89,28 @@ Docs and comms
      loop — per-batch `x .+ input_noise_std .* randn`-style, gated on `> 0`. No
      rename (name is accurate), so this is implementation only, not a format change.
    All three are behaviour changes; do them alongside the format renames.
-3. [ ] **Improve scatter plot.**
-4. [ ] **Regenerate ConvSurgeModel baselines** (1yr/5yr/20yr). The existing Conv
+3. [x] **Improve scatter plot.** **DONE.** Density modes (`density=:auto`:
+   transparent points for small series, log-count heatmap for large) + `linear_fit!`
+   / `qq!` overlay helpers added to MultiTimeSeries.jl; AIHydroPoints scatter output
+   gained `scatter_add_fit` / `scatter_add_qq` overlays (default `true`) and a
+   `<station> RMSE = …` title matching the time-series plots. 614 unit + smoke pass.
+4. [x] **Combined `SurgeInteractionModel` series.** **First model DONE:**
+   `BiLinearSurgeInteractionModel` (`AbstractSurgeInteractionModel <:
+   AbstractSurgeModel`) — linear surge × a per-station tide modulation
+   `1 + a·σ(V ⋆ tide)`, forcing all-to-all + tide one-to-one at output stations;
+   documented in `docs/background.md`. Registry + example TOML + tests + smoke added.
+   Also fixed two latent issues surfaced by the mixed input grids:
+   `_surge_lag_windows` must not align `tide`, and `validate_and_augment_settings!`
+   now derives `in_names` from a non-`tide` input. 654 unit + smoke pass.
+   Experiments (5/317-station, 1–20yr): interaction gives ~5–6% aggregate storm gain,
+   **~+20% at shallow estuaries/Wadden**, hurts deep sites — **next: gate the
+   interaction per station** (see [surge-interaction findings] memory). `a≈0.5`;
+   `tanh`/`exp` variants still earmarked.
+5. [ ] **Regenerate ConvSurgeModel baselines** (1yr/5yr/20yr). The existing Conv
    baselines are stale — trained before the reshape fix and before the strided
    Conv1D + `swish` activation changes. Linear (Dense is permutation-invariant)
    and Attention baselines remain valid. *(User to rerun.)*
-5. [ ] **Interaction model — datasets & first testing.** `ConvInteractionModel`
+6. [ ] **Interaction model — datasets & first testing.** `ConvInteractionModel`
    (simplified Conv1D, no station gate) does not learn. Data is hourly so
    `nlags=16` (16 h) covers a full tidal cycle — `nlags` is not the cause; root
    cause unknown and needs investigation. Note: the current interaction target is
@@ -102,26 +118,26 @@ Docs and comms
    meaningful target (residual = observed − tide_pred − surge_pred) requires a
    well-trained surge model and observed waterlevel data, which are not yet
    available.
-6. [ ] **Interaction baselines** 1yr/5yr/20yr (determine timespans). Blocked on
-   task 5.
-7. [ ] **Create script for real-time forecasts.**
-8. [ ] **Create an environment for online demos.**
-9. [ ] **Add experiments for waves.**
-10. [ ] **Scale surge model to a large number of stations.**
-11. [ ] **Add DVC for data storage.**
-12. [ ] **Deferred documentation follow-ups** (non-blocking): (a) the interaction
+7. [ ] **Interaction baselines** 1yr/5yr/20yr (determine timespans). Blocked on
+   task 6.
+8. [ ] **Create script for real-time forecasts.**
+9. [ ] **Create an environment for online demos.**
+10. [ ] **Add experiments for waves.**
+11. [ ] **Scale surge model to a large number of stations.**
+12. [ ] **Add DVC for data storage.**
+13. [ ] **Deferred documentation follow-ups** (non-blocking): (a) the interaction
     models have no `background.md` writeup yet; (b) the DeepONet tide model is a
     one-line placeholder — its code merge is FiLM-style scale/shift, not a dot
     product; correct if/when needed.
-13. [ ] **Return the best model, not the last epoch.** After training with early
+14. [ ] **Return the best model, not the last epoch.** After training with early
     stopping, `train_model!` leaves the in-memory model at the *final* epoch, while
     the best weights are saved only to `params_best.jld2`. So predicting straight
     from the returned model can use worse-than-best weights. Reload `params_best`
     before returning (or document the current behaviour). Pre-existing behaviour,
     unchanged by the Phase B early-stopping work.
-14. [ ] **Stale `run_settings.toml` for pre-format-v2 baselines** (records only; not
+15. [ ] **Stale `run_settings.toml` for pre-format-v2 baselines** (records only; not
     replayable against the new reader unless migrated).
-15. [ ] **Minor data-settings robustness (deferred):** (a) warn when a variable is
+16. [ ] **Minor data-settings robustness (deferred):** (a) warn when a variable is
     provided by more than one file in the same split — `flat[as] = …` currently
     overwrites silently; (b) detect mixed sampling grids — `_intersect_times` clips
     the range only and does not verify a common timestamp grid, so e.g. hourly input

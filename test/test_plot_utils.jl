@@ -49,6 +49,15 @@ end
     @test isfile(joinpath(subdir, "StationB.png"))
 end
 
+@testset "_plot_station_scatter with fit + qq overlays" begin
+    subdir = joinpath(temp_dir, "scatter_overlay_test")
+    mkpath(subdir)
+    AIHydroPoints._plot_station_scatter(_plot_ts_pred, _plot_ts_true, subdir;
+                                        add_fit=true, add_qq=true)
+    @test isfile(joinpath(subdir, "StationA.png"))
+    @test isfile(joinpath(subdir, "StationB.png"))
+end
+
 @testset "_write_station_stats" begin
     path = joinpath(temp_dir, "stats_test.csv")
     AIHydroPoints._write_station_stats(_plot_ts_pred, _plot_ts_true, path)

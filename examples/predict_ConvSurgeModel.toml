@@ -41,4 +41,6 @@ write_summary = false
 split       = "testing"
 plot_timeseries  = true
 plot_scatter     = true
+scatter_add_fit  = true   # overlay least-squares fit + r/slope/offset/bias (default true)
+scatter_add_qq   = true   # overlay Q-Q curve + percentile dots (default true)
 write_stats = true

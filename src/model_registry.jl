@@ -13,6 +13,7 @@ const MODEL_REGISTRY = Dict{String,Type}(
     "DeepONetWaveModel"    => DeepONetWaveModel,
     "ConvInteractionModel"    => ConvInteractionModel,
     "ProductInteractionModel" => ProductInteractionModel,
+    "BiLinearSurgeInteractionModel" => BiLinearSurgeInteractionModel,
 )
 
 """
@@ -58,6 +59,7 @@ create_model(::Type{ConvWaveModel},       ms, _) = ConvWaveModel(ms)
 create_model(::Type{DeepONetWaveModel},   ms, _) = DeepONetWaveModel(ms)
 create_model(::Type{ConvInteractionModel},   ms, _) = ConvInteractionModel(ms)
 create_model(::Type{ProductInteractionModel},ms, _) = ProductInteractionModel(ms)
+create_model(::Type{BiLinearSurgeInteractionModel}, ms, _) = BiLinearSurgeInteractionModel(ms)
 
 function create_model(::Type{AttentionSurgeModel}, ms, _)
     in_points  = collect(zip(ms["in_lats"],  ms["in_lons"]))

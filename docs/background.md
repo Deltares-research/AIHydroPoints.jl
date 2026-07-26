@@ -123,6 +123,81 @@ As with the other surge models, the output time is carried as a batch dimension,
 one forward pass yields $\mathbf{y}_{PT}$ over the full output series — a 2-D
 $(\tilde N_p, N_T)$ array (the last-lag read-out is part of the model).
 
+## Surge-interaction models
+
+The surge models above predict the wind- and pressure-driven surge in isolation.
+In shallow water, though, surge and tide **interact**: the same forcing produces a
+larger or smaller surge depending on the tidal phase (through the water depth the
+surge rides on). The **surge-interaction models** fold this coupling *into* the
+surge model rather than treating it as a separate stage.
+
+They take the same forcing as the surge models (`stress_x`, `stress_y`, `pressure`
+at $N_p$ input stations — or the wind form) **plus** the tide `tide` at the
+$\tilde N_p$ output stations, and they predict the *same* target as the surge
+models: the practical surge $\mathbf{y}_P$ (water level minus tide). The tide is a
+**known input** (from a tide model or harmonic analysis), so it is not re-predicted
+here. Write the lagged forcing window as $\mathbf{x}_{pqt'}$ (input station $p$,
+quantity $q$, lag $t'$) and the lagged tide window as $\mathbf{z}_{Pt'}$ (output
+station $P$, lag $t'$).
+
+### Bilinear surge-interaction model
+
+The `BiLinearSurgeInteractionModel` multiplies a **linear surge** by a
+**tide-driven modulation**:
+
+$$
+\mathbf{y}_{P} \;=\; \underbrace{\big(\mathbf{W}_{Ppqt'} \star \mathbf{x}_{pqt'} + \mathbf{b}_P\big)}_{\text{surge } \mathbf{s}_P}\;\underbrace{\Big(1 + a\,\sigma\!\Big(\textstyle\sum_{t'} \mathbf{V}_{Pt'}\,\mathbf{z}_{Pt'}\Big)\Big)}_{\text{modulation } \mathbf{m}_P}.
+$$
+
+The modulation contraction runs over the lag axis $t'$ **only** — there is no sum
+over $P$, and it has **no bias** — so the modulation is exactly $1$ (and the model is
+exactly the linear surge model) wherever the learned tide contraction vanishes.
+
+The surge factor $\mathbf{s}_P$ is exactly the [linear surge model](#linear-surge-model):
+an **all-to-all** dense contraction of the forcing over input points, quantities and
+lags. The modulation factor $\mathbf{m}_P$ contracts each output station's **own**
+tide window with that station's **own** lag-weight vector $\mathbf{V}_{Pt'}$ — the
+weights are **location-dependent** (per output station), and the tide at station $P$
+modulates the surge at station $P$ only (**one-to-one**), so the modulation carries
+$\tilde N_p \times l$ parameters. This hand-picked connectivity — all-to-all for
+forcing $\to$ surge, one-to-one for tide $\to$ modulation — is a precursor to a
+future design in which an explicit graph specifies which inputs connect to which
+outputs.
+
+Because forcing lives on the $N_p$ input stations and tide on the $\tilde N_p$
+output stations, the two lagged windows have different shapes and cannot share one
+tensor; they are passed as a pair $(\mathbf{x}, \mathbf{z})$ that shares only the
+batched output-time axis.
+
+With the modulation activation $\sigma$ the **identity** (the literal bilinear
+case), expanding the product exposes the interaction as a genuine bilinear term:
+
+$$
+\mathbf{y}_P \;=\; \underbrace{\mathbf{W} \star \mathbf{x} + \mathbf{b}}_{\text{surge, linear in }\mathbf{x}} \;+\; a\underbrace{\big(\mathbf{W} \star \mathbf{x} + \mathbf{b}\big)\Big(\textstyle\sum_{t'}\mathbf{V}_{Pt'}\mathbf{z}_{Pt'}\Big)}_{\text{interaction, bilinear in }(\mathbf{x},\,\mathbf{z})},
+$$
+
+linear in the forcing $\mathbf{x}$ for a fixed tide, linear in the tide $\mathbf{z}$
+for fixed forcing, and multiplicative in their product. When the modulation weights
+vanish ($\mathbf{V} = 0$) the modulation is $1$ and the model reduces exactly to the
+linear surge model.
+
+The fixed scalar $a$ (a hyperparameter, e.g. $a = 0.1$) scales the interaction
+**branch**. It does not change what the model can represent — a learnable $a$ would
+just be absorbed into $\mathbf{V}$ — but it down-weights the interaction so the
+effective coupling $a\,\mathbf{V}$ grows *gradually* during training, keeping the fit
+focused on the dominant surge signal first (a LayerScale-style bias, and the
+practical way to get per-branch learning-rate scaling under one global optimizer).
+The output time is carried as a batch dimension, giving $\mathbf{y}_{PT}$ in one
+forward pass.
+
+Two variants extend the same form. Replacing $\sigma$ with $\tanh$ gives a
+**bounded** modulation $1 + a\tanh(\cdot) \in (1-a,\,1+a)$ that is sign-preserving
+and caps the interaction magnitude at $a$ — a one-line change to the modulation
+activation. A separate **exponential** variant, $\mathbf{m}_P = \exp\!\big(a\,
+\textstyle\sum_{t'}\mathbf{V}_{Pt'}\mathbf{z}_{Pt'}\big)$, is likewise strictly positive (the tide
+never flips the surge sign) but unbounded, and changes the outer form rather than
+just the activation.
+
 ## Tide models
 
 Tide models predict water level at the output stations from **time alone** — there is no external forcing. Two inputs are built:

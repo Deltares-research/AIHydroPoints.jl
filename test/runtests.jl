@@ -115,4 +115,8 @@ mkdir(temp_dir) # create a new empty temp directory
    @testset "ProductInteractionModel" begin
       include("models/test_ProductInteractionModel.jl")
    end
+
+   @testset "BiLinearSurgeInteractionModel" begin
+      include("models/test_BiLinearSurgeInteractionModel.jl")
+   end
 end

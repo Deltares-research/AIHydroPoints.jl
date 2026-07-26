@@ -124,11 +124,16 @@ function validate_and_augment_settings!(
 
     # ── Augment from input (skipped for tide models with no loaded inputs) ────
     if !isempty(train_input)
-        first_input = first(values(train_input))
+        # The input grid (in_names, nlocations_input) is the *forcing* grid. `tide`
+        # is an input on the OUTPUT stations (surge-interaction models), so it must
+        # not define the input grid — prefer any non-"tide" input as the reference.
+        forcing_keys = [k for k in keys(train_input) if k != "tide"]
+        ref_key      = isempty(forcing_keys) ? first(keys(train_input)) : first(forcing_keys)
+        ref_input    = train_input[ref_key]
         get!(model_settings, "in_quantities",    collect(keys(train_input)))
-        get!(model_settings, "in_names",         get_names(first_input))
-        get!(model_settings, "in_lons",          get_longitudes(first_input))
-        get!(model_settings, "in_lats",          get_latitudes(first_input))
+        get!(model_settings, "in_names",         get_names(ref_input))
+        get!(model_settings, "in_lons",          get_longitudes(ref_input))
+        get!(model_settings, "in_lats",          get_latitudes(ref_input))
         get!(model_settings, "nlocations_input", length(model_settings["in_names"]))
     end
 
@@ -142,6 +147,8 @@ function validate_and_augment_settings!(
             "plot_timeseries"     => true,
             "plot_fft"            => false,
             "plot_scatter"        => false,
+            "scatter_add_fit"     => true,
+            "scatter_add_qq"      => true,
             "write_stats"         => true,
             "write_series"        => false,
             "plot_tidal_analysis" => false,

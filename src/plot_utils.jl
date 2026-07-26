@@ -133,17 +133,23 @@ end
 
 """
     _plot_station_scatter(output, target, save_dir;
-                          timerange=nothing, station_names=nothing)
+                          timerange=nothing, station_names=nothing,
+                          add_fit=false, add_qq=false)
 
 Internal helper used by `write_outputs`.  Produces a predicted-vs-observed
 scatter plot per station and saves one PNG per station to `save_dir`
-(which must already exist).
+(which must already exist).  The scatter renders at `density=:auto` (transparent
+points for small series, a density heatmap for large ones).  Optional overlays:
+`add_fit` draws a least-squares fit line and an r/slope/offset/bias stats box;
+`add_qq` overlays a quantile-quantile curve with labelled percentile dots.
 """
 function _plot_station_scatter(output::Dict{String, TimeSeries},
                                 target::Dict{String, TimeSeries},
                                 save_dir::String;
                                 timerange     = nothing,
-                                station_names = nothing)
+                                station_names = nothing,
+                                add_fit::Bool = false,
+                                add_qq::Bool  = false)
 
     out_key = first(keys(output))
     ts_pred = output[out_key]
@@ -163,9 +169,17 @@ function _plot_station_scatter(output::Dict{String, TimeSeries},
         ts_true = select_timespan(ts_true, timerange[1], timerange[2])
     end
 
+    # Per-station RMSE for the title (matches `_plot_station_series`)
+    errors = get_values(ts_true) .- get_values(ts_pred)
+    rmses  = sqrt.(mean(abs2, errors; dims=2))[:, 1]
+
     names = get_names(ts_pred)
     for (i, station) in enumerate(names)
-        p = scatter(ts_true, ts_pred; location_index=i)
+        rmse_str = @sprintf("%.4f", rmses[i])
+        p = scatter(ts_true, ts_pred; location_index=i,
+                    title="$station  RMSE = $rmse_str")
+        add_fit && linear_fit!(p, ts_true, ts_pred; location_index=i)
+        add_qq  && qq!(p, ts_true, ts_pred; location_index=i)
         savefig(p, joinpath(save_dir, "$(station).png"))
     end
 end

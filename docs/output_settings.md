@@ -31,7 +31,9 @@ the label in output file names; if omitted, the `split` label is used.
 | `timerange` | full split | Two ISO-8601 strings restricting all outputs to a sub-window. Same syntax as `data_settings.files[].timerange`. |
 | `plot_timeseries` | `true` if split is `"testing"`, else `false` | Plot predicted vs observed time series, one PNG per station. |
 | `plot_fft` | `false` | Plot FFT spectra (observations, predicted, residual), one PNG per station. |
-| `plot_scatter` | `false` | Scatter plot of predicted vs observed (one point per timestep), one PNG per station. |
+| `plot_scatter` | `false` | Scatter plot of predicted vs observed, one PNG per station. Renders at `density=:auto`: transparent points for small series, a `log10(count)` density heatmap for large ones (> 10 000 points). |
+| `scatter_add_fit` | `true` | Overlay a least-squares fit line and an r/slope/offset/bias stats box on the scatter plot. Only applies when `plot_scatter` is enabled; set `false` to omit. |
+| `scatter_add_qq` | `true` | Overlay a quantile-quantile curve (`sort(obs)` vs `sort(pred)`) with labelled percentile dots on the scatter plot. Only applies when `plot_scatter` is enabled; set `false` to omit. |
 | `write_stats` | `true` if split is `"testing"`, else `false` | Write per-station statistics (RMSE, bias, correlation) to `stats_<name>.csv`. |
 | `write_series` | `false` | Write predicted time series to `series_<name>.<ext>` in `series_format`. |
 | `write_residuals` | `false` | Write observed − predicted residual series to `residual_<name>.jld2` (or `residual_path`). |
@@ -119,7 +121,9 @@ The `[[output_settings.outputs]]` design is implemented in
 |---|---|---|
 | Time-series plot | `plot_timeseries` | `_plot_station_series`; 2-panel (predicted + residual) |
 | FFT plot | `plot_fft` | `_plot_station_fft`; 2-panel (obs + pred spectrum, residual spectrum); uses `hatyan_core.fft_series` |
-| Scatter plot | `plot_scatter` | `_plot_station_scatter`; uses `MultiTimeSeries.scatter` |
+| Scatter plot | `plot_scatter` | `_plot_station_scatter`; uses `MultiTimeSeries.scatter` (`density=:auto`) |
+| Scatter fit overlay | `scatter_add_fit` | `_plot_station_scatter`; overlays `MultiTimeSeries.linear_fit!` |
+| Scatter Q-Q overlay | `scatter_add_qq` | `_plot_station_scatter`; overlays `MultiTimeSeries.qq!` |
 | Per-station stats | `write_stats` | `_write_station_stats`; uses `MultiTimeSeries.compute_statistics`; writes CSV |
 | Series output | `write_series` | `_write_station_series`; supports `"netcdf"`, `"jld2"`, `"noos"` |
 | Run summary | `write_summary` | writes `summary.toml` with `runid`, `description`, `model_name`, `out_quantities`, `n_params`, `train_time_s`, `rmse_<name>` (respects `timerange`), `predict_time_<name>_s` |

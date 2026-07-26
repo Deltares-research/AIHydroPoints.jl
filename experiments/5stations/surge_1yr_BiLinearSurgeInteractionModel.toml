@@ -2,34 +2,42 @@
 # https://deltares-research.github.io/AIHydroPoints.jl/settings.html
 format_version = 2
 
-# LinearSurgeModel — 20-year training baseline (2000–2019)
+# BiLinearSurgeInteractionModel — 1-year training baseline (2019)
+#
+# Linear surge with a per-station tide modulation (1 + a·σ(V ⋆ tide)).  Same
+# forcing/target/splits as surge_1yr_LinearSurgeModel, plus tide as an input at the
+# output stations.
 #
 # Training : 2019
 # Validation: 2020
 # Testing  : 2021–2022
 #
 # Usage:
-#   pixi run julia --project train.jl experiments/surge_20yr_LinearSurgeModel.toml
+#   pixi run julia --project train.jl experiments/5stations/surge_1yr_BiLinearSurgeInteractionModel.toml
 
 [run_info]
-runid       = "surge_20yr"
-description = "LinearSurgeModel baseline: 20-year training (2000–2019), val 2020, test 2021–2022."
+runid       = "surge_1yr"
+description = "BiLinearSurgeInteractionModel baseline: 1-year training (2019), val 2020, test 2021–2022."
 
 [model_settings]
-model_name = "LinearSurgeModel"
+model_name = "BiLinearSurgeInteractionModel"
 nlags      = 16
 
+[model_settings.model_pars]
+a              = 0.3          # fixed interaction-branch scale (not learnable)
+mod_activation = "identity"   # "identity" (bilinear) or "tanh" (bounded)
+
 [train_settings]
-nepochs         = 20
+nepochs           = 50
 batch_size        = 64
-learning_rate   = 1.0e-3
-lr_decay_factor = 0.1
+learning_rate     = 1.0e-3
+lr_decay_factor   = 0.1
 lr_decay_epochs   = 10
 early_stopping_epochs        = 10
 weight_decay      = 1.0e-4
 
 [data_settings.model_io]
-input  = ["stress_x", "stress_y", "pressure"]
+input  = ["stress_x", "stress_y", "pressure", "tide"]
 target = ["surge"]
 
 # ── Training: 2019 ────────────────────────────────────────────────────────────
@@ -37,28 +45,35 @@ target = ["surge"]
 path      = "../../data/dscm_2000_2022_5points/surge_schureman_2000_2022_5stations.jld2"
 format    = "jld2"
 split     = "training"
-timerange = ["2000-01-01", "2020-01-01"]
+timerange = ["2019-01-01", "2020-01-01"]
 variables = [{name="values", as="surge"}]
+
+[[data_settings.files]]
+path      = "../../data/dscm_2000_2022_5points/tides_schureman_2000_2022_5stations.jld2"
+format    = "jld2"
+split     = "training"
+timerange = ["2019-01-01", "2020-01-01"]
+variables = [{name="values", as="tide"}]
 
 [[data_settings.files]]
 path      = "../../data/era_2000_2022_9points/era5_2000_2022_9points_wind_stress_x.jld2"
 format    = "jld2"
 split     = "training"
-timerange = ["2000-01-01", "2020-01-01"]
+timerange = ["2019-01-01", "2020-01-01"]
 variables = [{name="values", as="stress_x"}]
 
 [[data_settings.files]]
 path      = "../../data/era_2000_2022_9points/era5_2000_2022_9points_wind_stress_y.jld2"
 format    = "jld2"
 split     = "training"
-timerange = ["2000-01-01", "2020-01-01"]
+timerange = ["2019-01-01", "2020-01-01"]
 variables = [{name="values", as="stress_y"}]
 
 [[data_settings.files]]
 path      = "../../data/era_2000_2022_9points/era5_2000_2022_9points_mean_sea_level_pressure.jld2"
 format    = "jld2"
 split     = "training"
-timerange = ["2000-01-01", "2020-01-01"]
+timerange = ["2019-01-01", "2020-01-01"]
 variables = [{name="values", as="pressure"}]
 
 # ── Validation: 2020 ──────────────────────────────────────────────────────────
@@ -68,6 +83,13 @@ format    = "jld2"
 split     = "validation"
 timerange = ["2020-01-01", "2021-01-01"]
 variables = [{name="values", as="surge"}]
+
+[[data_settings.files]]
+path      = "../../data/dscm_2000_2022_5points/tides_schureman_2000_2022_5stations.jld2"
+format    = "jld2"
+split     = "validation"
+timerange = ["2020-01-01", "2021-01-01"]
+variables = [{name="values", as="tide"}]
 
 [[data_settings.files]]
 path      = "../../data/era_2000_2022_9points/era5_2000_2022_9points_wind_stress_x.jld2"
@@ -97,6 +119,13 @@ format    = "jld2"
 split     = "testing"
 timerange = ["2021-01-01", "2023-01-01"]
 variables = [{name="values", as="surge"}]
+
+[[data_settings.files]]
+path      = "../../data/dscm_2000_2022_5points/tides_schureman_2000_2022_5stations.jld2"
+format    = "jld2"
+split     = "testing"
+timerange = ["2021-01-01", "2023-01-01"]
+variables = [{name="values", as="tide"}]
 
 [[data_settings.files]]
 path      = "../../data/era_2000_2022_9points/era5_2000_2022_9points_wind_stress_x.jld2"

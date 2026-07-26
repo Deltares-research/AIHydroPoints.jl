@@ -498,6 +498,8 @@ function write_outputs(model::AbstractFluxModel, data::Dict, all_settings::Dict)
                             model isa AbstractTideModel
         do_residuals      = get(entry, "write_residuals",     false)
         residual_path     = get(entry, "residual_path",   nothing)
+        scatter_add_fit   = get(entry, "scatter_add_fit",     true)
+        scatter_add_qq    = get(entry, "scatter_add_qq",      true)
 
         if do_timeseries || do_fft || do_scatter || do_stats || do_series ||
                 do_tidal_analysis || do_residuals
@@ -521,7 +523,9 @@ function write_outputs(model::AbstractFluxModel, data::Dict, all_settings::Dict)
                 subdir = joinpath(save_dir, "$(name)_scatter")
                 mkpath(subdir)
                 _plot_station_scatter(out, data[split].target, subdir;
-                                      timerange = timerange)
+                                      timerange = timerange,
+                                      add_fit = scatter_add_fit,
+                                      add_qq  = scatter_add_qq)
             end
 
             if do_stats
