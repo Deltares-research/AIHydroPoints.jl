@@ -58,6 +58,23 @@ end
     @test isfile(joinpath(subdir, "StationB.png"))
 end
 
+@testset "plot_map primitive (offline fallback)" begin
+    # fetch=false -> no network; returns a plot with empty lon/lat axes
+    p = AIHydroPoints.plot_map((2.0, 5.0, 50.0, 53.0); fetch=false)
+    @test p !== nothing
+    bbox = AIHydroPoints._bbox_from_points([3.0, 4.0], [51.0, 52.0])
+    @test bbox[1] < 3.0 && bbox[2] > 4.0 && bbox[3] < 51.0 && bbox[4] > 52.0  # padded
+end
+
+@testset "_plot_station_stats maps (offline)" begin
+    subdir = joinpath(temp_dir, "stats_map_test")
+    mkpath(subdir)
+    AIHydroPoints._plot_station_stats(_plot_ts_pred, _plot_ts_true, subdir;
+                                      stats=[:rmse, :bias], fetch=false)
+    @test isfile(joinpath(subdir, "map_rmse.png"))
+    @test isfile(joinpath(subdir, "map_bias.png"))
+end
+
 @testset "_write_station_stats" begin
     path = joinpath(temp_dir, "stats_test.csv")
     AIHydroPoints._write_station_stats(_plot_ts_pred, _plot_ts_true, path)

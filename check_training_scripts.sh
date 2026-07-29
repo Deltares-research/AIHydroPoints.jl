@@ -61,8 +61,10 @@ run_group() {
                       {2}
 
         # Parse joblog (tab-separated), skip header
-        while IFS=$'\t' read -r _ _ _ runtime _ _ exitval _ cmd; do
-            [[ "$_" == "Seq" ]] && continue  # header row uses first field
+        # (read the Seq column into a named var — `$_` is a bash special
+        # parameter and gets clobbered, so it can't be used to detect the header)
+        while IFS=$'\t' read -r seq _ _ runtime _ _ exitval _ cmd; do
+            [[ "$seq" == "Seq" ]] && continue  # header row
             local elapsed="${runtime%.*}"
             for entry in "$@"; do
                 if [[ "${entry#*:::}" == "$cmd" ]]; then
@@ -78,8 +80,14 @@ run_group() {
         done < "$joblog"
 
         while read -r status rest; do
-            [[ "$status" == "PASS" ]] && { RESULTS+=("PASS  $rest"); ((PASS++)); } \
-                                      || { RESULTS+=("FAIL  $rest"); ((FAIL++)); }
+            # NB: use if/else, not `A && B || C` — `((PASS++))` returns exit
+            # status 1 when PASS is 0 (post-increment yields the old value),
+            # which would wrongly trigger the `||` branch on the first PASS.
+            if [[ "$status" == "PASS" ]]; then
+                RESULTS+=("PASS  $rest"); ((PASS++))
+            else
+                RESULTS+=("FAIL  $rest"); ((FAIL++))
+            fi
         done < "$results_tmp"
 
         rm -f "$joblog" "$results_tmp"
@@ -106,7 +114,8 @@ run_group \
     "train ConvWaveModel:::bin/train examples/ConvWaveModel.toml" \
     "train DeepONetWaveModel:::bin/train examples/DeepONetWaveModel.toml" \
     "train ConvInteractionModel:::bin/train examples/ConvInteractionModel.toml" \
-    "train ProductInteractionModel:::bin/train examples/ProductInteractionModel.toml"
+    "train ProductInteractionModel:::bin/train examples/ProductInteractionModel.toml" \
+    "train BiLinearSurgeInteractionModel:::bin/train examples/BiLinearSurgeInteractionModel.toml"
 
 run_group \
     "predict ConvSurgeModel:::bin/predict examples/predict_ConvSurgeModel.toml" \

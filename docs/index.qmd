@@ -90,7 +90,7 @@ And the predicted surge timeseries at Hoek van Holland on the test period (RMSE 
 
 - [Notation](notation.md) — index-notation conventions used in [Background](background.md)
 
-## Presentation
+## Presentations
 
-An overview of the models and current results:
-<https://deltares-research.github.io/AIHydroPoints.jl/presentations/index.html>
+- Project overview (models and current results): <https://deltares-research.github.io/AIHydroPoints.jl/presentations/overview/index.html>
+- Development update: <https://deltares-research.github.io/AIHydroPoints.jl/presentations/update_20260730/index.html>

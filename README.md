@@ -23,10 +23,10 @@ The model has no internal state, which makes it equally suitable for hindcasts (
 Full documentation is available at:
 <https://deltares-research.github.io/AIHydroPoints.jl/>
 
-## Presentation
+## Presentations
 
-An overview of the models and results is available at:
-<https://deltares-research.github.io/AIHydroPoints.jl/presentations/index.html>
+- Project overview (models and results): <https://deltares-research.github.io/AIHydroPoints.jl/presentations/overview/index.html>
+- Development update: <https://deltares-research.github.io/AIHydroPoints.jl/presentations/update_20260730/index.html>
 
 ## Status
 

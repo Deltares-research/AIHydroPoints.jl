@@ -10,8 +10,8 @@
   <meta name="generator" content="quarto-1.9.37">
 
   <meta name="author" content="Martin Verlaan">
-  <meta name="dcterms.date" content="2026-05-27">
-  <title>ML-based water level forecasting</title>
+  <meta name="dcterms.date" content="2026-07-30">
+  <title>AIHydroPoints — Development Update</title>
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, minimal-ui">
@@ -197,8 +197,8 @@
     <div class="slides">
 
 <section id="title-slide" class="quarto-title-block center">
-  <h1 class="title">ML-based water level forecasting</h1>
-  <p class="subtitle">tides, surge, waves, and their interaction</p>
+  <h1 class="title">AIHydroPoints — Development Update</h1>
+  <p class="subtitle">progress since the project overview</p>
 
 <div class="quarto-title-authors">
 <div class="quarto-title-author">
@@ -208,357 +208,300 @@ Martin Verlaan
 </div>
 </div>
 
-  <p class="date">2026-05-27</p>
+  <p class="date">2026-07-30</p>
 </section>
-<section id="predicting-ocean-water-levels-at-points" class="slide level2">
-<h2>Predicting ocean water levels at points</h2>
-<p><strong>The goal:</strong> accurate, fast water level forecasts at coastal stations</p>
+<section id="outline" class="slide level2">
+<h2>Outline</h2>
 <div style="font-size: 0.8em;">
 <ul>
-<li>Needed for flood warnings, port operations, and coastal management</li>
-<li>Traditional approach: run a full 3-D numerical model (expensive)</li>
-<li>Alternative: train an ML model on output from a numerical reanalysis (DCSM-FM)</li>
+<li>AIHydroPoints goals</li>
+<li>Models — development of tide-surge interaction models</li>
+<li>Training — sweeps, scaling to 317 stations</li>
+<li>Code improvements — refactor, TOML format, bug fixes</li>
+<li>New functionality — TOML-driven output, visualization</li>
+</ul>
+</div>
+</section>
+<section id="aihydropoints-goals" class="slide level2">
+<h2>AIHydroPoints goals</h2>
+<p><strong>Fast, accurate and reliable ML water-level forecasts</strong></p>
+<div style="font-size: 0.8em;">
+<p><strong>What:</strong> tide + surge + interaction, at many locations in a single model</p>
+<p><strong>How:</strong> trained on DCSM-FM reanalysis + ERA5 forcing; one shared model architecture; TOML-configured — train and forecast without writing code</p>
+<p><strong>Bar:</strong> cheaper than running the full numerical model; production-grade code and model quality — version control, unit tests, continuous smoke-testing</p>
+</div>
+</section>
+<section id="recap" class="slide level2 smaller">
+<h2>Recap</h2>
+<p>Since the <a href="../overview/index.html">project overview</a> on 28 May 2026 (~2 months ago):</p>
+
+<img data-src="figures/tide_surge_interaction.png" class="quarto-figure quarto-figure-center r-stretch" style="width:85.0%"><div style="font-size: 0.75em;">
+<ul>
+<li>Tide and surge baselines established (1 yr / 5 yr / 20 yr)</li>
+<li>Model hierarchy (<code>AbstractFluxModel</code>) in place across all four components</li>
+<li>Baselines back then: harmonic analysis for tides, <code>LinearSurgeModel</code> for surge — interaction wasn’t working yet</li>
+</ul>
+</div>
+</section>
+<section id="models-revisiting-the-physics-based-split" class="slide level2">
+<h2>Models — revisiting the physics-based split</h2>
+<p>Two of the three pieces from the recap diagram you’ve already seen — today’s news is the third.</p>
+<div class="fragment">
+<p><strong>Linear surge benchmark</strong> (the baseline used throughout)</p>
+<p><span class="math display">\[s = W_s[\tau_x, \tau_y, p] + b\]</span></p>
+<div style="font-size: 0.8em;">
+<p>Dense, all-to-all fit of wind stress + pressure → surge at every output station.</p>
+</div>
+</div>
+</section>
+<section id="new-bilinear-surge-interaction-model" class="slide level2 smaller">
+<h2>New: bilinear surge-interaction model</h2>
+<p>Multiply the linear surge by a tide-driven correction:</p>
+<p><span class="math display">\[y = s \cdot \big(1 + a\,\sigma(V h)\big)\]</span></p>
+<div style="font-size: 0.8em;">
+<ul>
+<li><span class="math inline">\(s\)</span> — the linear surge above</li>
+<li><span class="math inline">\(h\)</span> — the (lagged) tide at that station</li>
+<li><span class="math inline">\(V\)</span> — a per-station tide weight; <span class="math inline">\(a\)</span> — a small fixed scale (e.g.&nbsp;0.5)</li>
 </ul>
 </div>
 <div class="fragment">
-<p><strong>This project:</strong> a Julia package (<code>AIHydroPoints</code>) for ML-based point forecasting</p>
+<div style="font-size: 0.75em;">
+<ul>
+<li><span class="math inline">\(V\)</span> starts at <strong>zero</strong> → the model starts out <em>exactly</em> the linear surge model, then learns the tidal correction from there</li>
+<li>Expanding: <span class="math inline">\(y = s + a\,s\,(Vh)\)</span> — linear in the forcing and linear in the tide separately, but their product makes it genuinely nonlinear</li>
+</ul>
+</div>
 </div>
 </section>
-<section id="the-traditional-approach-numerical-models" class="slide level2">
-<h2>The traditional approach: numerical models</h2>
-<p>Numerical models (e.g.&nbsp;Delft3D-FM) solve the shallow-water equations on a grid</p>
+<section id="surge-interaction-storm-result" class="slide level2 smaller">
+<h2>Surge-interaction — storm result</h2>
+<p>Comparing <code>BiLinearSurgeInteractionModel</code> against the matching <code>LinearSurgeModel</code> (same <code>nlags = 48</code>, same training settings), storm Eunice 2022:</p>
+<div class="columns">
+<div class="column" style="width:50%;">
+<p><strong>Hoek van Holland</strong> (open coast)</p>
+<p>RMSE: 0.149 → 0.146 (<span style="color:#4ade80">−2.2%</span>)</p>
+<div class="quarto-figure quarto-figure-center">
+<figure>
+<p><img data-src="figures/hoekvhld_storm_timeseries_nlags48.png" class="quarto-figure quarto-figure-center" style="width:100.0%"></p>
+</figure>
+</div>
+</div><div class="column" style="width:50%;">
+<p><strong>Harlingen</strong> (shallow Wadden Sea)</p>
+<p>RMSE: 0.260 → 0.224 (<span style="color:#4ade80">−14.1%</span>)</p>
+<div class="quarto-figure quarto-figure-center">
+<figure>
+<p><img data-src="figures/harlgn_storm_timeseries_nlags48.png" class="quarto-figure quarto-figure-center" style="width:100.0%"></p>
+</figure>
+</div>
+</div></div>
+<div style="font-size: 0.75em;">
+<ul>
+<li>RMSE shown as linear → bilinear, both <code>nlags=48</code></li>
+<li>All 317 stations, mean RMSE: testing <span style="color:#4ade80">−3.2%</span>, storm Eunice <span style="color:#4ade80">−6.7%</span></li>
+<li>Confirms the earlier finding: interaction gain concentrates in shallow water (Harlingen), much smaller on the open coast (Hoek van Holland)</li>
+</ul>
+</div>
+</section>
+<section id="surge-interaction-where-does-it-help" class="slide level2 smaller">
+<h2>Surge-interaction — where does it help?</h2>
+<p>RMSE change per station, bilinear vs.&nbsp;linear (<code>nlags=48</code>, storm Eunice 2022; negative = improvement):</p>
+
+<img data-src="figures/map_rmse_reduction_storm.png" class="quarto-figure quarto-figure-center r-stretch" style="width:65.0%"><div style="font-size: 0.75em;">
+<p>Greenest cluster sits right on the Dutch/German Wadden coast — the shallow estuaries where tide–surge coupling is strongest. One outlier station (Norwegian coast) regresses slightly.</p>
+</div>
+</section>
+<section id="surge-interaction-not-fully-there-yet" class="slide level2 smaller">
+<h2>Surge-interaction — not fully there yet</h2>
+<p>Harlingen, testing period — residual (observed − predicted) spectrum still has peaks:</p>
+
+<img data-src="figures/harlgn_fft_nlags48.png" class="quarto-figure quarto-figure-center r-stretch" style="width:70.0%"><div style="font-size: 0.75em;">
+<ul>
+<li>Peaks at 2, 4, 6, 8 cycles/day — exactly the tidal overtides (M2, M4, M6, M8)</li>
+<li>The bilinear model only captures part of the tide–surge coupling; higher-order nonlinear terms remain unmodelled</li>
+<li>The same station with the biggest gain (previous slide) still has the clearest leftover signal</li>
+</ul>
+</div>
+</section>
+<section id="training" class="slide level2 smaller">
+<h2>Training</h2>
+<div style="font-size: 0.8em;">
+<ul>
+<li>Hyperparameter sweeps (ongoing) — <code>scripts/parameter_sweep.jl</code></li>
+<li>Scaling to the full 317-station dataset</li>
+</ul>
+</div>
+<p><strong>Example: lag-window sweep</strong> (<code>BiLinearSurgeInteractionModel</code>, 317 stations, 5 yr)</p>
+<div style="font-size: 0.7em;">
 <table class="caption-top">
 <colgroup>
-<col style="width: 50%">
-<col style="width: 50%">
+<col style="width: 20%">
+<col style="width: 20%">
+<col style="width: 20%">
+<col style="width: 20%">
+<col style="width: 20%">
 </colgroup>
-<tbody>
-<tr class="odd">
-<td><strong>Strengths</strong></td>
-<td>Physics-based; works anywhere on the grid</td>
-</tr>
-<tr class="even">
-<td><strong>Limitations</strong></td>
-<td>Slow; output at a point is a by-product of a large spatial solve</td>
-</tr>
-</tbody>
-</table>
-<div class="fragment">
-<p><strong>ML models learn the input → point-output mapping directly from reanalysis data</strong></p>
-</div>
-</section>
-<section id="four-phenomena-tides-surge-waves-and-their-interaction" class="slide level2">
-<h2>Four phenomena: tides, surge, waves, and their interaction</h2>
-<p><span class="math display">\[\eta_\text{total} = \eta_\text{tide} + \eta_\text{surge} + \eta_\text{wave} + \eta_\text{interaction}\]</span></p>
-<div style="font-size: 0.8em;">
-<table class="caption-top">
 <thead>
 <tr class="header">
-<th>Component</th>
-<th>Driver</th>
-<th>Status</th>
+<th>nlags (h)</th>
+<th>RMSE testing (m)</th>
+<th>Δ testing</th>
+<th>RMSE storm Eunice (m)</th>
+<th>Δ storm</th>
 </tr>
 </thead>
 <tbody>
 <tr class="odd">
-<td><strong>Tides</strong></td>
-<td>Astronomical forcing</td>
-<td>baseline done</td>
+<td>12</td>
+<td>0.094</td>
+<td><span style="color:#f87171">+5.5%</span></td>
+<td>0.166</td>
+<td><span style="color:#f87171">+8.7%</span></td>
 </tr>
 <tr class="even">
-<td><strong>Storm surge</strong></td>
-<td>Wind stress + pressure</td>
-<td>baseline done</td>
+<td>16 (baseline)</td>
+<td>0.089</td>
+<td>—</td>
+<td>0.153</td>
+<td>—</td>
 </tr>
 <tr class="odd">
-<td><strong>Waves</strong></td>
-<td>Wind fields</td>
-<td>planned</td>
+<td>24</td>
+<td>0.083</td>
+<td><span style="color:#4ade80">−6.8%</span></td>
+<td>0.138</td>
+<td><span style="color:#4ade80">−10.0%</span></td>
 </tr>
 <tr class="even">
-<td><strong>Interaction</strong></td>
-<td>Nonlinear tide–surge coupling</td>
-<td>in progress</td>
+<td><strong>48</strong></td>
+<td><strong>0.080</strong></td>
+<td><span style="color:#4ade80"><strong>−9.7%</strong></span></td>
+<td><strong>0.137</strong></td>
+<td><span style="color:#4ade80"><strong>−10.3%</strong></span></td>
 </tr>
 </tbody>
 </table>
 </div>
-</section>
-<section id="inputs-and-outputs" class="slide level2">
-<h2>Inputs and outputs</h2>
-<p><strong>5 output stations</strong> — Dutch North Sea coast</p>
-<p>Vlissingen · Hoek van Holland · Den Helder · Harlingen · Delfzijl</p>
-<div class="fragment">
-<p><strong>Inputs vary by component</strong></p>
-<div style="font-size: 0.8em;">
-<table class="caption-top">
-<thead>
-<tr class="header">
-<th>Component</th>
-<th>Input variables</th>
-<th># Input locations</th>
-<th># Lags</th>
-</tr>
-</thead>
-<tbody>
-<tr class="odd">
-<td>Surge</td>
-<td>Wind stress (x, y) + pressure</td>
-<td>9</td>
-<td>16 h</td>
-</tr>
-<tr class="even">
-<td>Tide</td>
-<td>Time + selected constituents</td>
-<td>—</td>
-<td>—</td>
-</tr>
-<tr class="odd">
-<td>Waves</td>
-<td>Wind speed + direction</td>
-<td>9</td>
-<td>16 h</td>
-</tr>
-<tr class="even">
-<td>Interaction</td>
-<td>Tide + surge predictions</td>
-<td>5</td>
-<td>16 h</td>
-</tr>
-</tbody>
-</table>
-</div>
-<p>All inputs come from ERA5 reanalysis (hourly, ~0.25° grid).</p>
-</div>
-</section>
-<section id="tides" class="slide level2">
-<h2>Tides</h2>
-<p>Tides are almost entirely predictable from the positions of the Moon and Sun.</p>
-<p><strong>Model input:</strong> time only (no atmospheric data needed)</p>
-<div style="font-size: 0.8em;">
+<div style="font-size: 0.65em;">
 <ul>
-<li><p>Converts datetime → 6 Doodson astronomical components</p></li>
-<li><p>Components: lunar hour angle <em>T</em>, solar declination <em>S</em>, solar hour <em>H</em>, lunar longitude <em>P</em>, lunar node <em>N</em>, solar perigee <em>P₁</em></p></li>
-<li><p><code>ProductTideModel</code> — learned amplitude/phase per constituent</p></li>
-<li><p><code>DeepONetTideModel</code> — deep operator network</p></li>
+<li>Weight decay: light L2 (<code>5e-5</code>) helps a little; more (<code>5e-4</code>, <code>1e-3</code>) clearly hurts — now the default</li>
+<li>Learning-rate decay: mild decay (<code>factor=0.5</code>) beats aggressive decay, and edges out our current <code>0.2</code> — worth revisiting</li>
+<li>Batch size sweep still running</li>
 </ul>
 </div>
-<p>Tides contribute the dominant signal (~80% of variance at most stations).</p>
-</section>
-<section id="storm-surge" class="slide level2">
-<h2>Storm surge</h2>
-<p><strong>Physical mechanism:</strong> wind pushes water toward (or away from) the coast; low pressure raises sea level</p>
-<p><strong>Model input:</strong> ERA5 wind stress (x, y) + mean sea-level pressure at 9 grid points, with 16-hour lag window</p>
-<ul>
-<li><code>LinearSurgeModel</code> — single dense layer; 2,165 parameters</li>
-<li><code>ConvSurgeModel</code> — 1-D convolution over time lags; 5,461 parameters</li>
-<li><code>AttentionSurgeModel</code> — self-attention over lag window</li>
-</ul>
-</section>
-<section id="waves-sea-state-from-wind-fields" class="slide level2">
-<h2>Waves — sea-state from wind fields</h2>
-<p>Wave statistics (significant wave height, period) driven by local and upstream wind.</p>
-<p><strong>Model input:</strong> wind speed + direction at ERA5 grid points + one-hot station encoding</p>
-<p><strong>Models available</strong></p>
-<ul>
-<li><code>ConvWaveModel</code> — convolutional over spatial/temporal lags</li>
-<li><code>DeepONetWaveModel</code> — operator network</li>
-</ul>
-<div style="font-size: 0.8em; margin-top: 1em;">
-<p><em>Wave baselines are planned; results not yet in leaderboard.</em></p>
+<div style="font-size: 0.7em;">
+<p>Longer lag windows keep helping up to 48h.</p>
 </div>
 </section>
-<section id="tidesurge-interaction-why-1-1-2" class="slide level2">
-<h2>Tide–surge interaction — why 1 + 1 ≠ 2</h2>
-<p>In shallow water, tides and surges are not independent:</p>
-<ul>
-<li>A surge arriving at low tide propagates differently than at high tide</li>
-<li>Bottom friction is nonlinear: <span class="math inline">\(\tau_b \propto |\mathbf{u}|\mathbf{u}\)</span></li>
-<li>The residual (total − tide − surge) can reach tens of centimetres</li>
-</ul>
-<p><strong>Model input:</strong> predicted tide + surge at all stations, 16-hour lag window</p>
-<div style="font-size: 0.8em; margin-top: 1em;">
-<p><em>Active area of work — convergence issues under investigation.</em></p>
+<section id="code-improvements" class="slide level2 smaller">
+<h2>Code improvements</h2>
+<div style="font-size: 0.65em;">
+<p><strong>Goal:</strong> configure and run any model family the same way — swap the model, not the training script</p>
 </div>
-</section>
-<section id="training-a-model" class="slide level2 smaller">
-<h2>Training a model</h2>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1"><pre class="sourceCode numberSource bash number-lines code-with-copy"><code class="sourceCode bash"><span id="cb1-1"><a href=""></a><span class="ex">bin/train</span> examples/ConvSurgeModel.toml</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb2"><pre class="sourceCode numberSource toml number-lines code-with-copy"><code class="sourceCode toml"><span id="cb2-1"><a href=""></a><span class="kw">[run_info]</span></span>
-<span id="cb2-2"><a href=""></a><span class="dt">runid</span>       <span class="op">=</span> <span class="st">"example"</span></span>
-<span id="cb2-3"><a href=""></a><span class="dt">description</span> <span class="op">=</span> <span class="st">"Convolutional surge model: 2010 train, 2011 validation, 2012 test."</span></span>
-<span id="cb2-4"><a href=""></a></span>
-<span id="cb2-5"><a href=""></a><span class="kw">[model_settings]</span></span>
-<span id="cb2-6"><a href=""></a><span class="dt">model_name</span> <span class="op">=</span> <span class="st">"ConvSurgeModel"</span></span>
-<span id="cb2-7"><a href=""></a><span class="dt">nlags</span>      <span class="op">=</span> <span class="dv">16</span></span>
-<span id="cb2-8"><a href=""></a></span>
-<span id="cb2-9"><a href=""></a><span class="kw">[train_settings]</span></span>
-<span id="cb2-10"><a href=""></a><span class="dt">nepochs</span>         <span class="op">=</span> <span class="dv">50</span></span>
-<span id="cb2-11"><a href=""></a><span class="dt">learning_rate</span>   <span class="op">=</span> <span class="fl">1.0e-3</span></span>
-<span id="cb2-12"><a href=""></a><span class="dt">patience</span>        <span class="op">=</span> <span class="dv">5</span></span>
-<span id="cb2-13"><a href=""></a></span>
-<span id="cb2-14"><a href=""></a><span class="kw">[data_settings.model_io]</span></span>
-<span id="cb2-15"><a href=""></a><span class="dt">input</span>  <span class="op">=</span> <span class="op">[</span><span class="st">"stress_x"</span><span class="op">,</span> <span class="st">"stress_y"</span><span class="op">,</span> <span class="st">"pressure"</span><span class="op">]</span></span>
-<span id="cb2-16"><a href=""></a><span class="dt">target</span> <span class="op">=</span> <span class="op">[</span><span class="st">"surge"</span><span class="op">]</span></span>
-<span id="cb2-17"><a href=""></a></span>
-<span id="cb2-18"><a href=""></a><span class="kw">[[data_settings.files]]</span></span>
-<span id="cb2-19"><a href=""></a><span class="dt">path</span>      <span class="op">=</span> <span class="st">"surge_schureman_2010.nc"</span></span>
-<span id="cb2-20"><a href=""></a><span class="dt">split</span>     <span class="op">=</span> <span class="st">"training"</span></span>
-<span id="cb2-21"><a href=""></a><span class="dt">variables</span> <span class="op">=</span> <span class="op">[</span><span class="st">"surge"</span><span class="op">]</span></span>
-<span id="cb2-22"><a href=""></a></span>
-<span id="cb2-23"><a href=""></a><span class="kw">[[data_settings.files]]</span></span>
-<span id="cb2-24"><a href=""></a><span class="dt">path</span>      <span class="op">=</span> <span class="st">"era5_wind_stress_2010.jld2"</span></span>
-<span id="cb2-25"><a href=""></a><span class="dt">split</span>     <span class="op">=</span> <span class="st">"training"</span></span>
-<span id="cb2-26"><a href=""></a><span class="dt">variables</span> <span class="op">=</span> <span class="op">[</span><span class="st">"stress_x"</span><span class="op">,</span> <span class="st">"stress_y"</span><span class="op">,</span> <span class="st">"pressure"</span><span class="op">]</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-</section>
-<section id="leaderboard-comparing-models" class="slide level2">
-<h2>Leaderboard: comparing models</h2>
-<div class="quarto-figure quarto-figure-center">
-<figure>
-<p><img data-src="figures/leaderboard.png" class="quarto-figure quarto-figure-center" height="500"></p>
-</figure>
-</div>
-</section>
-<section id="tide-performance-hoek-van-holland" class="slide level2 smaller">
-<h2>Tide performance — Hoek van Holland</h2>
-<div class="columns">
-<div class="column" style="width:50%;">
-<div class="quarto-figure quarto-figure-center">
-<figure>
-<p><img data-src="figures/tide/hoekvhld_series.png" class="quarto-figure quarto-figure-center" style="width:100.0%"></p>
-</figure>
-</div>
-</div><div class="column" style="width:50%;">
-<div class="quarto-figure quarto-figure-center">
-<figure>
-<p><img data-src="figures/tide/hoekvhld_scatter.png" class="quarto-figure quarto-figure-center" style="width:100.0%"></p>
-</figure>
-</div>
-</div></div>
-<ul>
-<li><code>ProductTideModel</code> trained on 20 yr of DCSM-FM data; RMSE = <strong>0.025 m</strong> at Hoek van Holland</li>
-<li>Scatter plot nearly perfect — tidal signal is highly predictable from astronomical forcing alone</li>
-</ul>
-</section>
-<section id="tide-performance-tidal-constituents" class="slide level2 smaller">
-<h2>Tide performance — tidal constituents</h2>
-<div class="columns">
-<div class="column" style="width:50%;">
-<div class="quarto-figure quarto-figure-center">
-<figure>
-<p><img data-src="figures/tide/hoekvhld_tide.png" class="quarto-figure quarto-figure-center" style="width:100.0%"></p>
-</figure>
-</div>
-</div><div class="column" style="width:50%;">
-<div class="quarto-figure quarto-figure-center">
-<figure>
-<p><img data-src="figures/tide/hoekvhld_fft.png" class="quarto-figure quarto-figure-center" style="width:100.0%"></p>
-</figure>
-</div>
-</div></div>
-<ul>
-<li>Constituent amplitudes and phases match well; dominant M2 constituent correctly captured</li>
-<li>Using 20 years of data the nodal factor (~18.6 yr cycle) can also be estimated</li>
-</ul>
-</section>
-<section id="surge-performance-hoek-van-holland" class="slide level2 smaller">
-<h2>Surge performance — Hoek van Holland</h2>
-<div class="columns">
-<div class="column" style="width:50%;">
-<div class="quarto-figure quarto-figure-center">
-<figure>
-<p><img data-src="figures/surge/hoekvhld_test_series.png" class="quarto-figure quarto-figure-center" style="width:100.0%"></p>
-</figure>
-</div>
-</div><div class="column" style="width:50%;">
-<div class="quarto-figure quarto-figure-center">
-<figure>
-<p><img data-src="figures/surge/hoekvhld_scatter.png" class="quarto-figure quarto-figure-center" style="width:100.0%"></p>
-</figure>
-</div>
-</div></div>
-<ul>
-<li><code>ConvSurgeModel</code> trained on 20 yr; RMSE = <strong>0.114 m</strong> on test period (2021–2022)</li>
-<li>Scatter shows more spread than tides — surge is inherently harder to predict</li>
-</ul>
-</section>
-<section id="surge-performance-frequency-content" class="slide level2 smaller">
-<h2>Surge performance — frequency content</h2>
-<div class="columns">
-<div class="column" style="width:50%;">
-<div class="quarto-figure quarto-figure-center">
-<figure>
-<p><img data-src="figures/surge/hoekvhld_series.png" class="quarto-figure quarto-figure-center" style="width:100.0%"></p>
-</figure>
-</div>
-</div><div class="column" style="width:50%;">
-<div class="quarto-figure quarto-figure-center">
-<figure>
-<p><img data-src="figures/surge/hoekvhld_fft.png" class="quarto-figure quarto-figure-center" style="width:100.0%"></p>
-</figure>
-</div>
-</div></div>
-<ul>
-<li>Training period series (RMSE = 0.196 m) shows large events well captured, some misses on peaks</li>
-<li>FFT residual shows energy remaining at tidal frequencies — signature of tide–surge interaction not yet modelled</li>
-</ul>
-</section>
-<section id="open-question-the-interaction-model" class="slide level2">
-<h2>Open question: the interaction model</h2>
-<p>The interaction residual (total − tide − surge) is small but matters for extremes.</p>
-<p><strong>Challenge:</strong> the signal is ~5–20 cm, highly nonlinear, and correlated with both tide phase and surge amplitude.</p>
-<p><strong>Current status</strong></p>
-<ul>
-<li><code>ConvInteractionModel</code> and <code>ProductInteractionModel</code> implemented and passing unit tests</li>
-<li>Training does not converge — loss plateaus near the mean</li>
-<li>Likely causes: insufficient signal-to-noise ratio, or missing input features</li>
-</ul>
-<p><strong>Next steps:</strong> diagnose convergence, try predicting on synthetic interaction data first.</p>
-</section>
-<section id="a-shared-ml-architecture-for-all-components" class="slide level2">
-<h2>A shared ML architecture for all components</h2>
-<p>All models share the same abstract interface (<code>AbstractFluxModel</code>):</p>
+<div style="font-size: 1.4em;">
 <pre><code>AbstractModel
-└── AbstractFluxModel
-        ├── AbstractSurgeModel  →  Linear / Conv / Attention
-        ├── AbstractTideModel   →  Product / DeepONet
-        ├── AbstractWaveModel   →  Conv / DeepONet
-        └── AbstractInteractionModel  →  Conv / Product</code></pre>
-<p>Every model implements three customization points:</p>
+└─ AbstractFluxModel
+    ├─ AbstractTideModel   →  Product / DeepONet
+    └─ AbstractSurgeModel  →  Linear / Conv / Attention
+        └─ AbstractSurgeInteractionModel → BiLinear</code></pre>
+</div>
+<div style="font-size: 0.6em;">
 <ul>
-<li><code>preprocess</code> — build input tensor from <code>Dict{String, TimeSeries}</code></li>
-<li><code>forward</code> — Flux neural network pass</li>
-<li><code>postprocess!</code> — write predictions back into output dict</li>
+<li>Locked-down TOML schema — breaking changes now versioned (<code>format_version</code>), bad configs caught at load time instead of failing mid-run</li>
+<li>Single training routine replacing per-model scripts</li>
+<li>Documentation</li>
 </ul>
-<p>Generic <code>predict</code>, <code>save_params</code>, <code>load_params!</code> are inherited for free.</p>
+<p><strong>Bug fixes</strong></p>
+<ul>
+<li>Training knobs lost in the refactor, restored: early stopping, weight decay, input noise</li>
+<li>Learning-rate decay regression (accidentally omitted, restored)</li>
+<li>Windows compatibility (pixi win64, script robustness)</li>
+</ul>
+</div>
 </section>
-<section id="whats-working-whats-next" class="slide level2">
-<h2>What’s working, what’s next</h2>
+<section id="documentation-background.md" class="slide level2 smaller">
+<h2>Documentation — background.md</h2>
+<p>The model derivations (e.g.&nbsp;the bilinear surge-interaction expansion from earlier) now live in a rendered docs site, not just source comments:</p>
+
+<img data-src="figures/documentation_background.png" class="quarto-figure quarto-figure-center r-stretch" style="width:75.0%"><div style="font-size: 0.7em;">
+<p><a href="https://deltares-research.github.io/AIHydroPoints.jl/background.html" class="uri">https://deltares-research.github.io/AIHydroPoints.jl/background.html</a></p>
+</div>
+</section>
+<section id="new-functionality-toml-driven" class="slide level2 smaller">
+<h2>New functionality — TOML-driven</h2>
 <div style="font-size: 0.8em;">
-<p><strong>Working</strong></p>
-<ul>
-<li>Full model hierarchy: 12 concrete models across 4 families</li>
-<li>543 unit tests pass; all training scripts smoke-tested</li>
-<li>TOML-driven training/prediction pipeline</li>
-<li>Surge and tide baselines on 1 yr / 5 yr / 20 yr training data</li>
-<li>Automatic leaderboard generation</li>
-</ul>
+<p>Cleaned up TOML input files:</p>
+</div>
+<div style="font-size: 0.68em;">
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb2"><pre class="sourceCode numberSource toml number-lines code-with-copy"><code class="sourceCode toml"><span id="cb2-1"><a href=""></a><span class="dt">format_version</span> <span class="op">=</span> <span class="dv">2</span></span>
+<span id="cb2-2"><a href=""></a></span>
+<span id="cb2-3"><a href=""></a><span class="kw">[model_settings]</span></span>
+<span id="cb2-4"><a href=""></a><span class="dt">model_name</span> <span class="op">=</span> <span class="st">"LinearSurgeModel"</span></span>
+<span id="cb2-5"><a href=""></a><span class="dt">nlags</span>      <span class="op">=</span> <span class="dv">48</span></span>
+<span id="cb2-6"><a href=""></a></span>
+<span id="cb2-7"><a href=""></a><span class="kw">[train_settings]</span></span>
+<span id="cb2-8"><a href=""></a><span class="dt">nepochs</span>               <span class="op">=</span> <span class="dv">50</span></span>
+<span id="cb2-9"><a href=""></a><span class="dt">batch_size</span>            <span class="op">=</span> <span class="dv">64</span></span>
+<span id="cb2-10"><a href=""></a><span class="dt">learning_rate</span>         <span class="op">=</span> <span class="fl">1.0e-3</span></span>
+<span id="cb2-11"><a href=""></a><span class="dt">lr_decay_factor</span>       <span class="op">=</span> <span class="fl">0.2</span></span>
+<span id="cb2-12"><a href=""></a><span class="dt">lr_decay_epochs</span>       <span class="op">=</span> <span class="dv">10</span></span>
+<span id="cb2-13"><a href=""></a><span class="dt">early_stopping_epochs</span> <span class="op">=</span> <span class="dv">25</span></span>
+<span id="cb2-14"><a href=""></a><span class="dt">weight_decay</span>          <span class="op">=</span> <span class="fl">5.0e-5</span></span>
+<span id="cb2-15"><a href=""></a></span>
+<span id="cb2-16"><a href=""></a><span class="kw">[data_settings.model_io]</span></span>
+<span id="cb2-17"><a href=""></a><span class="dt">input</span>  <span class="op">=</span> <span class="op">[</span><span class="st">"stress_x"</span><span class="op">,</span> <span class="st">"stress_y"</span><span class="op">,</span> <span class="st">"pressure"</span><span class="op">]</span></span>
+<span id="cb2-18"><a href=""></a><span class="dt">target</span> <span class="op">=</span> <span class="op">[</span><span class="st">"surge"</span><span class="op">]</span></span>
+<span id="cb2-19"><a href=""></a></span>
+<span id="cb2-20"><a href=""></a><span class="kw">[[data_settings.files]]</span></span>
+<span id="cb2-21"><a href=""></a><span class="dt">path</span>      <span class="op">=</span> <span class="st">"surge_schureman_..._317stations.jld2"</span></span>
+<span id="cb2-22"><a href=""></a><span class="dt">split</span>     <span class="op">=</span> <span class="st">"training"</span></span>
+<span id="cb2-23"><a href=""></a><span class="dt">variables</span> <span class="op">=</span> <span class="op">[{</span><span class="dt">name</span><span class="op"> =</span> <span class="st">"values"</span><span class="op">, </span><span class="dt">as</span><span class="op"> =</span> <span class="st">"surge"</span><span class="op">}]</span></span>
+<span id="cb2-24"><a href=""></a></span>
+<span id="cb2-25"><a href=""></a><span class="kw">[[data_settings.files]]</span></span>
+<span id="cb2-26"><a href=""></a><span class="dt">path</span>      <span class="op">=</span> <span class="st">"era5_..._wind_stress_x.jld2"</span></span>
+<span id="cb2-27"><a href=""></a><span class="dt">split</span>     <span class="op">=</span> <span class="st">"training"</span></span>
+<span id="cb2-28"><a href=""></a><span class="dt">variables</span> <span class="op">=</span> <span class="op">[{</span><span class="dt">name</span><span class="op"> =</span> <span class="st">"values"</span><span class="op">, </span><span class="dt">as</span><span class="op"> =</span> <span class="st">"stress_x"</span><span class="op">}]</span></span>
+<span id="cb2-29"><a href=""></a></span>
+<span id="cb2-30"><a href=""></a><span class="kw">[output_settings]</span></span>
+<span id="cb2-31"><a href=""></a><span class="dt">write_summary</span> <span class="op">=</span> <span class="cn">true</span></span>
+<span id="cb2-32"><a href=""></a><span class="dt">series_format</span> <span class="op">=</span> <span class="st">"netcdf"</span></span>
+<span id="cb2-33"><a href=""></a></span>
+<span id="cb2-34"><a href=""></a>    <span class="kw">[[output_settings.outputs]]</span></span>
+<span id="cb2-35"><a href=""></a>    <span class="dt">split</span>        <span class="op">=</span> <span class="st">"testing"</span></span>
+<span id="cb2-36"><a href=""></a>    <span class="dt">plot_stats</span>   <span class="op">=</span> <span class="cn">true</span></span>
+<span id="cb2-37"><a href=""></a>    <span class="dt">plot_scatter</span> <span class="op">=</span> <span class="cn">true</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+</section>
+<section id="new-functionality-visualization" class="slide level2 smaller">
+<h2>New functionality — visualization</h2>
+<p><code>BiLinearSurgeInteractionModel</code>, <code>nlags=48</code>, testing split (317 stations):</p>
 <div class="columns">
-<div class="column" style="width:50%;">
-<p><strong>In progress</strong></p>
-<ul>
-<li>Interaction model convergence</li>
-<li>Wave model baselines</li>
-<li>Scatter plot improvements</li>
-</ul>
-</div><div class="column" style="width:50%;">
-<p><strong>Planned</strong></p>
-<ul>
-<li>Real-time forecast scripts</li>
-<li>Scale to more stations</li>
-<li>Online demo environment</li>
-</ul>
+<div class="column" style="width:45%;">
+<p><strong>Per-station RMSE map</strong></p>
+<div class="quarto-figure quarto-figure-center">
+<figure>
+<p><img data-src="figures/map_rmse_nlags48.png" class="quarto-figure quarto-figure-center" style="width:100.0%"></p>
+</figure>
+</div>
+</div><div class="column" style="width:55%;">
+<p><strong>Scatter — Hoek van Holland</strong></p>
+<div class="quarto-figure quarto-figure-center">
+<figure>
+<p><img data-src="figures/hoekvhld_scatter_nlags48.png" class="quarto-figure quarto-figure-center" style="width:100.0%"></p>
+</figure>
+</div>
 </div></div>
+</section>
+<section id="whats-next" class="slide level2">
+<h2>What’s next</h2>
+<div style="font-size: 0.8em;">
+<ul>
+<li>Complete hyper-parameter sweeps and training for North Sea</li>
+<li>Lake training</li>
+<li>Training world-wide GTSM surrogate (FUTURA)</li>
+<li>Online demo of North Sea model (format TBD)</li>
+<li>Storage for new and larger datasets</li>
+</ul>
 </div>
 
 </section>

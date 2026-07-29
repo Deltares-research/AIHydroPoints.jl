@@ -141,6 +141,7 @@ series_format = "netcdf"
 
     [[output_settings.outputs]]
     split        = "testing"
+    plot_stats   = true
     write_stats  = true
     plot_fft          = true
     plot_scatter      = true
@@ -149,6 +150,7 @@ series_format = "netcdf"
 
     [[output_settings.outputs]]
     split        = "testing"
+    plot_stats   = true
     name         = "storm_eunice_2022"
     timerange    = ["2022-02-15", "2022-02-25"]
     plot_timeseries   = true

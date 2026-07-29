@@ -1,0 +1,189 @@
+# AIHydroPoints run configuration -- full settings reference:
+# https://deltares-research.github.io/AIHydroPoints.jl/settings.html
+format_version = 2
+
+# BiLinearSurgeInteractionModel — 20-year training baseline (2000–2019), 317 stations
+#
+# Linear surge with a per-station tide modulation (1 + a·σ(V ⋆ tide)).  Same
+# forcing/target/splits/settings as surge_20yr_LinearSurgeModel (317 stations), plus
+# tide as an input at the output stations.
+#
+# Training : 2000–2019
+# Validation: 2020
+# Testing  : 2021–2022
+#
+# Usage:
+#   ../../bin/train surge_20yr_BiLinearSurgeInteractionModel.toml
+
+[run_info]
+runid       = "surge_20yr"
+description = "BiLinearSurgeInteractionModel baseline: 20-year training (2000–2019), val 2020, test 2021–2022. 317 stations."
+
+[model_settings]
+model_name = "BiLinearSurgeInteractionModel"
+nlags      = 16
+
+[model_settings.model_pars]
+a              = 0.5          # fixed interaction-branch scale (not learnable)
+mod_activation = "identity"   # "identity" (bilinear) or "tanh" (bounded)
+
+[train_settings]
+nepochs         = 20
+batch_size        = 64
+learning_rate   = 1.0e-3
+lr_decay_factor = 0.5
+lr_decay_epochs   = 10
+early_stopping_epochs        = 10
+
+[data_settings.model_io]
+input  = ["stress_x", "stress_y", "pressure", "tide"]
+target = ["surge"]
+
+# ── Training: 2000–2019 ───────────────────────────────────────────────────────
+[[data_settings.files]]
+path      = "../../data/dscm_2000_2022_317points/surge_schureman_2000_2022_317stations_his.jld2"
+format    = "jld2"
+split     = "training"
+timerange = ["2000-01-01", "2020-01-01"]
+variables = [{name="values", as="surge"}]
+
+[[data_settings.files]]
+path      = "../../data/dscm_2000_2022_317points/tides_schureman_2000_2022_317stations_his.jld2"
+format    = "jld2"
+split     = "training"
+timerange = ["2000-01-01", "2020-01-01"]
+variables = [{name="values", as="tide"}]
+
+[[data_settings.files]]
+path      = "../../data/era_2000_2022_317points/era5_2000_2022_317points_wind_stress_x.jld2"
+format    = "jld2"
+split     = "training"
+timerange = ["2000-01-01", "2020-01-01"]
+variables = [{name="values", as="stress_x"}]
+
+[[data_settings.files]]
+path      = "../../data/era_2000_2022_317points/era5_2000_2022_317points_wind_stress_y.jld2"
+format    = "jld2"
+split     = "training"
+timerange = ["2000-01-01", "2020-01-01"]
+variables = [{name="values", as="stress_y"}]
+
+[[data_settings.files]]
+path      = "../../data/era_2000_2022_317points/era5_2000_2022_317points_mean_sea_level_pressure.jld2"
+format    = "jld2"
+split     = "training"
+timerange = ["2000-01-01", "2020-01-01"]
+variables = [{name="values", as="pressure"}]
+
+# ── Validation: 2020 ──────────────────────────────────────────────────────────
+[[data_settings.files]]
+path      = "../../data/dscm_2000_2022_317points/surge_schureman_2000_2022_317stations_his.jld2"
+format    = "jld2"
+split     = "validation"
+timerange = ["2020-01-01", "2021-01-01"]
+variables = [{name="values", as="surge"}]
+
+[[data_settings.files]]
+path      = "../../data/dscm_2000_2022_317points/tides_schureman_2000_2022_317stations_his.jld2"
+format    = "jld2"
+split     = "validation"
+timerange = ["2020-01-01", "2021-01-01"]
+variables = [{name="values", as="tide"}]
+
+[[data_settings.files]]
+path      = "../../data/era_2000_2022_317points/era5_2000_2022_317points_wind_stress_x.jld2"
+format    = "jld2"
+split     = "validation"
+timerange = ["2020-01-01", "2021-01-01"]
+variables = [{name="values", as="stress_x"}]
+
+[[data_settings.files]]
+path      = "../../data/era_2000_2022_317points/era5_2000_2022_317points_wind_stress_y.jld2"
+format    = "jld2"
+split     = "validation"
+timerange = ["2020-01-01", "2021-01-01"]
+variables = [{name="values", as="stress_y"}]
+
+[[data_settings.files]]
+path      = "../../data/era_2000_2022_317points/era5_2000_2022_317points_mean_sea_level_pressure.jld2"
+format    = "jld2"
+split     = "validation"
+timerange = ["2020-01-01", "2021-01-01"]
+variables = [{name="values", as="pressure"}]
+
+# ── Testing: 2021–2022 ────────────────────────────────────────────────────────
+[[data_settings.files]]
+path      = "../../data/dscm_2000_2022_317points/surge_schureman_2000_2022_317stations_his.jld2"
+format    = "jld2"
+split     = "testing"
+timerange = ["2021-01-01", "2023-01-01"]
+variables = [{name="values", as="surge"}]
+
+[[data_settings.files]]
+path      = "../../data/dscm_2000_2022_317points/tides_schureman_2000_2022_317stations_his.jld2"
+format    = "jld2"
+split     = "testing"
+timerange = ["2021-01-01", "2023-01-01"]
+variables = [{name="values", as="tide"}]
+
+[[data_settings.files]]
+path      = "../../data/era_2000_2022_317points/era5_2000_2022_317points_wind_stress_x.jld2"
+format    = "jld2"
+split     = "testing"
+timerange = ["2021-01-01", "2023-01-01"]
+variables = [{name="values", as="stress_x"}]
+
+[[data_settings.files]]
+path      = "../../data/era_2000_2022_317points/era5_2000_2022_317points_wind_stress_y.jld2"
+format    = "jld2"
+split     = "testing"
+timerange = ["2021-01-01", "2023-01-01"]
+variables = [{name="values", as="stress_y"}]
+
+[[data_settings.files]]
+path      = "../../data/era_2000_2022_317points/era5_2000_2022_317points_mean_sea_level_pressure.jld2"
+format    = "jld2"
+split     = "testing"
+timerange = ["2021-01-01", "2023-01-01"]
+variables = [{name="values", as="pressure"}]
+
+# ── Output ────────────────────────────────────────────────────────────────────
+[output_settings]
+write_summary = true
+series_format = "netcdf"
+
+    [[output_settings.outputs]]
+    split        = "training"
+    write_stats  = true
+    plot_fft          = false
+    plot_scatter      = false
+    write_series = false
+    plot_timeseries   = false
+
+    [[output_settings.outputs]]
+    split        = "validation"
+    write_stats  = true
+    plot_fft          = false
+    plot_scatter      = true
+    write_series = false
+    plot_timeseries   = false
+
+    [[output_settings.outputs]]
+    split        = "testing"
+    plot_stats   = true
+    write_stats  = true
+    plot_fft          = true
+    plot_scatter      = true
+    write_series = true
+    plot_timeseries   = true
+
+    [[output_settings.outputs]]
+    split        = "testing"
+    plot_stats   = true
+    name         = "storm_eunice_2022"
+    timerange    = ["2022-02-15", "2022-02-25"]
+    plot_timeseries   = true
+    plot_fft          = false
+    plot_scatter      = true
+    write_stats  = true
+    write_series = false

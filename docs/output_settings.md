@@ -34,6 +34,7 @@ the label in output file names; if omitted, the `split` label is used.
 | `plot_scatter` | `false` | Scatter plot of predicted vs observed, one PNG per station. Renders at `density=:auto`: transparent points for small series, a `log10(count)` density heatmap for large ones (> 10 000 points). |
 | `scatter_add_fit` | `true` | Overlay a least-squares fit line and an r/slope/offset/bias stats box on the scatter plot. Only applies when `plot_scatter` is enabled; set `false` to omit. |
 | `scatter_add_qq` | `true` | Overlay a quantile-quantile curve (`sort(obs)` vs `sort(pred)`) with labelled percentile dots on the scatter plot. Only applies when `plot_scatter` is enabled; set `false` to omit. |
+| `plot_stats` | `false` | Geographic maps of per-station statistics (station lon/lat scatter on an EMODnet bathymetry background) in `<name>_stats/`. `true` maps RMSE + bias; a list (e.g. `["rmse","bias"]`) selects stats. The basemap is fetched once and cached (offline → plotted without background). |
 | `write_stats` | `true` if split is `"testing"`, else `false` | Write per-station statistics (RMSE, bias, correlation) to `stats_<name>.csv`. |
 | `write_series` | `false` | Write predicted time series to `series_<name>.<ext>` in `series_format`. |
 | `write_residuals` | `false` | Write observed − predicted residual series to `residual_<name>.jld2` (or `residual_path`). |
@@ -61,6 +62,7 @@ separated and are easy to browse.
 | Time-series plot | `<name>_timeseries/<station>.png` |
 | FFT plot | `<name>_fft/<station>.png` |
 | Scatter plot | `<name>_scatter/<station>.png` |
+| Per-station stat maps | `<name>_stats/map_<stat>.png` |
 | Statistics | `stats_<name>.csv` |
 | Predicted series | `series_<name>.<ext>` |
 | Run summary | `summary.toml` |
@@ -124,6 +126,7 @@ The `[[output_settings.outputs]]` design is implemented in
 | Scatter plot | `plot_scatter` | `_plot_station_scatter`; uses `MultiTimeSeries.scatter` (`density=:auto`) |
 | Scatter fit overlay | `scatter_add_fit` | `_plot_station_scatter`; overlays `MultiTimeSeries.linear_fit!` |
 | Scatter Q-Q overlay | `scatter_add_qq` | `_plot_station_scatter`; overlays `MultiTimeSeries.qq!` |
+| Per-station stat maps | `plot_stats` | `_plot_station_stats`; `plot_map` (cached EMODnet WMS bathymetry) + `scatter!`; RMSE/bias maps |
 | Per-station stats | `write_stats` | `_write_station_stats`; uses `MultiTimeSeries.compute_statistics`; writes CSV |
 | Series output | `write_series` | `_write_station_series`; supports `"netcdf"`, `"jld2"`, `"noos"` |
 | Run summary | `write_summary` | writes `summary.toml` with `runid`, `description`, `model_name`, `out_quantities`, `n_params`, `train_time_s`, `rmse_<name>` (respects `timerange`), `predict_time_<name>_s` |

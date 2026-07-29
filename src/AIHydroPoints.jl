@@ -30,6 +30,9 @@ export validate_and_augment_settings!
 include("plot_utils.jl")
 export save_loss_plot
 
+include("maps.jl")
+export plot_map
+
 include("models/training_settings.jl")
 export TrainingSettings, to_dict
 

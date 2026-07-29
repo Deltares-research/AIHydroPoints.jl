@@ -500,9 +500,13 @@ function write_outputs(model::AbstractFluxModel, data::Dict, all_settings::Dict)
         residual_path     = get(entry, "residual_path",   nothing)
         scatter_add_fit   = get(entry, "scatter_add_fit",     true)
         scatter_add_qq    = get(entry, "scatter_add_qq",      true)
+        plot_stats_val    = get(entry, "plot_stats",          false)
+        stats_list        = plot_stats_val === true ? [:rmse, :bias] :
+                            plot_stats_val isa AbstractVector ? Symbol.(plot_stats_val) : Symbol[]
+        do_stats_map      = !isempty(stats_list)
 
-        if do_timeseries || do_fft || do_scatter || do_stats || do_series ||
-                do_tidal_analysis || do_residuals
+        if do_timeseries || do_fft || do_scatter || do_stats_map || do_stats ||
+                do_series || do_tidal_analysis || do_residuals
             out = predict(model, data[split].input)
 
             if do_timeseries
@@ -526,6 +530,13 @@ function write_outputs(model::AbstractFluxModel, data::Dict, all_settings::Dict)
                                       timerange = timerange,
                                       add_fit = scatter_add_fit,
                                       add_qq  = scatter_add_qq)
+            end
+
+            if do_stats_map
+                subdir = joinpath(save_dir, "$(name)_stats")
+                mkpath(subdir)
+                _plot_station_stats(out, data[split].target, subdir;
+                                    stats = stats_list, timerange = timerange)
             end
 
             if do_stats

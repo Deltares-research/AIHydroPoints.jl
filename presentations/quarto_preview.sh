@@ -3,17 +3,18 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-# Support running from project root or presentation folder
-if [[ -f "$SCRIPT_DIR/index.qmd" ]]; then
-    PRESENTATION_DIR="$SCRIPT_DIR"
-elif [[ -f "$SCRIPT_DIR/coding_agents_presentation/index.qmd" ]]; then
-    PRESENTATION_DIR="$SCRIPT_DIR/coding_agents_presentation"
-else
-    echo "Error: cannot find index.qmd in $SCRIPT_DIR or $SCRIPT_DIR/coding_agents_presentation/" >&2
+# Each presentation lives in its own subfolder, e.g. presentations/overview/index.qmd
+PRESENTATION="${1:-overview}"
+PRESENTATION_DIR="$SCRIPT_DIR/$PRESENTATION"
+
+if [[ ! -f "$PRESENTATION_DIR/index.qmd" ]]; then
+    echo "Error: cannot find $PRESENTATION_DIR/index.qmd" >&2
+    echo "Available presentations:" >&2
+    find "$SCRIPT_DIR" -mindepth 2 -maxdepth 2 -name index.qmd -exec dirname {} \; | xargs -n1 basename >&2
     exit 1
 fi
 
-QMD_FILE="${1:-index.qmd}"
+QMD_FILE="index.qmd"
 
 find_pixi_manifest() {
     local dir="$1"

@@ -43,4 +43,5 @@ plot_timeseries  = true
 plot_scatter     = true
 scatter_add_fit  = true   # overlay least-squares fit + r/slope/offset/bias (default true)
 scatter_add_qq   = true   # overlay Q-Q curve + percentile dots (default true)
+plot_stats       = true   # per-station RMSE/bias maps on an EMODnet bathymetry background
 write_stats = true

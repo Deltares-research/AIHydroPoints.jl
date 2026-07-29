@@ -149,6 +149,7 @@ function validate_and_augment_settings!(
             "plot_scatter"        => false,
             "scatter_add_fit"     => true,
             "scatter_add_qq"      => true,
+            "plot_stats"          => false,
             "write_stats"         => true,
             "write_series"        => false,
             "plot_tidal_analysis" => false,

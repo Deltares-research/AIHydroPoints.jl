@@ -31,8 +31,11 @@ jobs:
       - name: Render docs
         run: pixi run quarto render docs/
 
-      - name: Render presentation
-        run: pixi run quarto render presentations/index.qmd --to revealjs
+      - name: Render presentations
+        run: |
+          for f in presentations/*/index.qmd; do
+            pixi run quarto render "$f" --to revealjs
+          done
 
       - name: Assemble site
         run: |
