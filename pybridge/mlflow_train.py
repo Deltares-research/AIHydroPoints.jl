@@ -142,8 +142,14 @@ def run_training(settings_toml_arg, run_id, log_file):
 
     # bufsize=1 (line-buffered) + text=True so `for line in proc.stdout`
     # yields lines as they're written, not only once the process exits.
+    #
+    # --overwrite: bin/train now refuses to run against an existing model_dir
+    # unless told --continue or --overwrite (added to guard against
+    # accidentally warm-starting a run). Each mlflow run should be an
+    # independent, comparable training run, not a continuation of whatever
+    # was last logged against the same settings.toml, so always overwrite.
     proc = subprocess.Popen(
-        [str(REPO_DIR / "bin" / "train"), str(settings_toml)],
+        [str(REPO_DIR / "bin" / "train"), str(settings_toml), "--overwrite"],
         cwd=REPO_DIR,
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,

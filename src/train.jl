@@ -1,5 +1,5 @@
 """
-    train(input_toml::String)
+    train(input_toml::String; on_existing_run::Symbol=:error)
 
 Run the full training pipeline from a TOML settings file.
 
@@ -15,8 +15,22 @@ optionally `[output_settings]` from `input_toml`, then:
 Relative paths in the TOML (data files, `model_dir`) are resolved relative
 to the directory containing `input_toml`, so the TOML is portable regardless
 of where Julia is invoked from.
+
+If `model_dir` already exists (from a previous run), `on_existing_run`
+decides what happens, *before* anything in it is touched:
+- `:error` (default) — raise an error naming the existing directory, rather
+  than silently continuing or overwriting it.
+- `:continue` — proceed as-is; if a weights file is present it gets loaded
+  and training continues from it (see the pretrained-weights check below).
+- `:overwrite` — delete any `params*` files in `model_dir` first (weights
+  and epoch checkpoints), then train from scratch as if the directory were
+  new.
 """
-function train(input_toml::String)
+function train(input_toml::String; on_existing_run::Symbol=:error)
+    on_existing_run in (:error, :continue, :overwrite) || error(
+        "train: on_existing_run must be :error, :continue, or :overwrite " *
+        "(got $(repr(on_existing_run)))")
+
     settings_file = abspath(input_toml)
     isfile(settings_file) || error("Settings file not found: $settings_file")
     toml_dir = dirname(settings_file)
@@ -49,12 +63,30 @@ function train(input_toml::String)
     end
 
     save_dir = model_settings["model_dir"]
+
+    # Decide up front, before anything below writes to save_dir, whether an
+    # existing run there should block, be resumed, or be cleared. See
+    # on_existing_run in the docstring.
+    if isdir(save_dir)
+        if on_existing_run == :error
+            error("A run already exists at $save_dir. Re-run with --continue to " *
+                  "resume from it, or --overwrite to discard it and train from " *
+                  "scratch (on_existing_run=:continue/:overwrite if calling " *
+                  "train() directly).")
+        elseif on_existing_run == :overwrite
+            for f in readdir(save_dir)
+                startswith(f, "params") && rm(joinpath(save_dir, f))
+            end
+        end
+    end
+
     mkpath(save_dir)
     toml_write(joinpath(save_dir, "run_settings.toml"), all_settings; overwrite=true)
 
     model = create_model(model_settings, train_input)
 
-    # Load pre-trained weights to continue training if the weights file exists
+    # Load pre-trained weights (on_existing_run=:continue) if a weights file
+    # is present -- absent after :overwrite, since that just cleared it above.
     pretrained = joinpath(save_dir, model_settings["model_weights"])
     if isfile(pretrained)
         load_params!(model, pretrained)

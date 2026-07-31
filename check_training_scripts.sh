@@ -105,17 +105,20 @@ run_group() {
 
 #run "analyse_tides_schureman" $JULIA analyse_tides_schureman.jl
 
+# --overwrite: these smoke tests are meant to be re-runnable, and their
+# model_dirs persist across runs, so they'd otherwise trip bin/train's
+# default refusal to reuse an existing model_dir.
 run_group \
-    "train LinearSurgeModel:::bin/train examples/LinearSurgeModel.toml" \
-    "train ConvSurgeModel:::bin/train examples/ConvSurgeModel.toml" \
-    "train AttentionSurgeModel:::bin/train examples/AttentionSurgeModel.toml" \
-    "train DeepONetTideModel:::bin/train examples/DeepONetTideModel.toml" \
-    "train ProductTideModel:::bin/train examples/ProductTideModel.toml" \
-    "train ConvWaveModel:::bin/train examples/ConvWaveModel.toml" \
-    "train DeepONetWaveModel:::bin/train examples/DeepONetWaveModel.toml" \
-    "train ConvInteractionModel:::bin/train examples/ConvInteractionModel.toml" \
-    "train ProductInteractionModel:::bin/train examples/ProductInteractionModel.toml" \
-    "train BiLinearSurgeInteractionModel:::bin/train examples/BiLinearSurgeInteractionModel.toml"
+    "train LinearSurgeModel:::bin/train examples/LinearSurgeModel.toml --overwrite" \
+    "train ConvSurgeModel:::bin/train examples/ConvSurgeModel.toml --overwrite" \
+    "train AttentionSurgeModel:::bin/train examples/AttentionSurgeModel.toml --overwrite" \
+    "train DeepONetTideModel:::bin/train examples/DeepONetTideModel.toml --overwrite" \
+    "train ProductTideModel:::bin/train examples/ProductTideModel.toml --overwrite" \
+    "train ConvWaveModel:::bin/train examples/ConvWaveModel.toml --overwrite" \
+    "train DeepONetWaveModel:::bin/train examples/DeepONetWaveModel.toml --overwrite" \
+    "train ConvInteractionModel:::bin/train examples/ConvInteractionModel.toml --overwrite" \
+    "train ProductInteractionModel:::bin/train examples/ProductInteractionModel.toml --overwrite" \
+    "train BiLinearSurgeInteractionModel:::bin/train examples/BiLinearSurgeInteractionModel.toml --overwrite"
 
 run_group \
     "predict ConvSurgeModel:::bin/predict examples/predict_ConvSurgeModel.toml" \

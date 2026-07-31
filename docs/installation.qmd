@@ -93,6 +93,8 @@ Output (weights, loss plot, statistics) is written to `examples/training_output/
 The example config uses `nepochs = 5` for a fast smoke-test. For a meaningful run increase this to 100 or more in the TOML file.
 :::
 
+Running the same command again will refuse, since `example_LinearSurgeModel/` now already exists — add `--continue` to resume from the saved weights or `--overwrite` to start over. See [Script usage](scripts.md) for the full CLI reference.
+
 ## 8. Run inference
 
 ```bash

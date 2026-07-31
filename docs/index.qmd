@@ -67,6 +67,9 @@ Run training with:
 bin/train examples/ConvSurgeModel.toml
 ```
 
+Re-running against an output directory that already exists requires
+`--continue` or `--overwrite` — see [Script usage](scripts.md).
+
 ## Example results
 
 After training, output is written to `examples/training_output/example_ConvSurgeModel/`.

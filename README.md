@@ -57,6 +57,11 @@ To smoke-test all examples end-to-end:
 bash check_training_scripts.sh
 ```
 
+To sweep one setting over several values (repeats, baseline comparison, `results.csv`), see
+`scripts/parameter_sweep.jl`. Full CLI reference for all three scripts (including the
+`--continue`/`--overwrite` flags for re-running into an existing output directory):
+[Script usage](https://deltares-research.github.io/AIHydroPoints.jl/scripts.html).
+
 ## Data downloads
 
 We aim to have the main datasets available in Zarr format in the cloud.
@@ -111,6 +116,7 @@ Time-series I/O (NetCDF, Zarr, JLD2, NOOS) is provided by
 See `docs/settings.md` for a full reference of all settings fields.
 See `docs/output_settings.md` for output configuration.
 See `docs/data_input_settings.md` for data loading configuration.
+See `docs/scripts.md` for CLI usage of `bin/train`, `bin/predict`, and `scripts/parameter_sweep.jl`.
 
 ## Analysis scripts
 
@@ -130,6 +136,7 @@ See `docs/data_input_settings.md` for data loading configuration.
   saved as `params.jld2` (final epoch) and `params_best.jld2` (best validation loss, when
   validation data is provided).  The `model_weights` key in `model_settings.toml` records
   which file to load for inference (defaults to `params_best.jld2` when available).
-- Continuing training from saved weights is automatic: if the weights file already exists in
-  `model_dir` when `train()` is called, it is loaded before training begins.
+- If `model_dir` already has a previous run in it, `train()` refuses to run unless told
+  `--continue` (resume from saved weights) or `--overwrite` (discard them and start fresh) —
+  see [Script usage](https://deltares-research.github.io/AIHydroPoints.jl/scripts.html).
 - Output is fully configurable via `[output_settings]` in the TOML — see `docs/output_settings.md`.

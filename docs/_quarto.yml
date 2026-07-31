@@ -29,6 +29,7 @@ website:
           - training_settings.md
           - data_input_settings.md
           - output_settings.md
+      - scripts.md
       - background.md
       - design.md
       - section: "Appendix"

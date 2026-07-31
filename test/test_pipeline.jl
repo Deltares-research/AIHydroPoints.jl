@@ -10,7 +10,10 @@ model_dir    = joinpath(examples_dir, "training_output", "example_LinearSurgeMod
 @testset "train/predict pipeline (LinearSurgeModel)" begin
 
     @testset "train" begin
-        train(train_toml)
+        # :overwrite -- this test asserts train() produces a correct fresh
+        # output set, and model_dir persists across test runs, so it must
+        # not depend on (or trip over) on_existing_run's new :error default.
+        train(train_toml; on_existing_run=:overwrite)
 
         @test isdir(model_dir)
         @test isfile(joinpath(model_dir, "params.jld2"))

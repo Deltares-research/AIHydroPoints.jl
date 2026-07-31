@@ -105,6 +105,30 @@ exactly, step for step.
 
 ## Follow-up tasks
 
+- ~~**Explicit `--continue`/`--overwrite` for existing runs.**~~ **Done.**
+  `train()` (`src/train.jl`) previously silently warm-started from
+  `<model_dir>/params.jld2` whenever it already existed — easy to trigger by
+  accident (e.g. re-running the same settings.toml, as happened repeatedly
+  while testing the mlflow wrapper). Now takes `on_existing_run::Symbol`
+  (`:error` default, `:continue`, `:overwrite`), checked via `isdir(model_dir)`
+  *before* any writes — any pre-existing `model_dir` blocks by default, not
+  just one with a weights file already in it. `:overwrite` deletes all
+  `params*` files (weights + epoch checkpoints) before training. Plumbed
+  through as CLI flags: `bin/train <settings.toml> [--continue|--overwrite]`,
+  `scripts/train.jl` parses them too. `scripts/parameter_sweep.jl`'s old
+  single `--force` flag was split into sweep-level `--continue` (skip
+  finished points, retrain unfinished ones from scratch — never warm-start a
+  sweep point, since that would bias comparisons across the sweep) and
+  `--overwrite` (delete the whole `sweep_dir` and start over); it now passes
+  `on_existing_run=:overwrite` per-point instead of its own manual
+  `params*`-deletion loop. `mlflow_train.py` and `check_training_scripts.sh`
+  both updated to pass `--overwrite`, since they need every (re-)run to be
+  independent/comparable rather than continuing from whatever was last
+  there. Full test suite (658 tests) and `check_training_scripts.sh` (12/12)
+  both pass after the change; `test/test_pipeline.jl` updated to pass
+  `on_existing_run=:overwrite` explicitly since its `model_dir` persists
+  across test runs.
+
 - **Multi-machine tracking server.** Currently `bin/mlflow-server-start`
   binds to localhost only, so only the machine running the server can log
   to it. To let multiple training machines log to one shared server:

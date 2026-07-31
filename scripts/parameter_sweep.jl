@@ -11,16 +11,17 @@
 #
 # Usage — edit the defaults below, or pass positionally:
 #   pixi run julia --project scripts/parameter_sweep.jl \
-#       [base.toml] [dotted.param.path] [v1,v2,v3] [nrepeats] [experiment] [--force]
+#       [base.toml] [dotted.param.path] [v1,v2,v3] [nrepeats] [experiment] [--continue|--overwrite]
 #
-# If `sweeps/<experiment>/` already exists, the script refuses to run (and requires
-# `--force` to proceed) rather than silently reusing/overwriting whatever is in there.
-# Whether reuse makes sense (e.g. extending a sweep with more reps/values vs. stale
-# runs from an earlier attempt) is a judgment call left to whoever passes `--force`.
-#
-# With `--force`, any run tag whose output dir already has a completed `summary.toml`
-# is skipped rather than re-trained -- so re-running the same command resumes a sweep
-# that was interrupted partway through instead of redoing finished runs.
+# If `sweeps/<experiment>/` already exists, the script refuses to run without one of:
+#   --continue  — resume it: any run tag whose output dir already has a completed
+#                 `summary.toml` is skipped; everything else (never started, or
+#                 interrupted partway through) is retrained from scratch, so
+#                 re-running the same command resumes an interrupted sweep without
+#                 redoing finished runs.
+#   --overwrite — delete `sweeps/<experiment>/` entirely and start over.
+# Whether resuming makes sense (e.g. extending a sweep with more reps/values vs. stale
+# runs from an earlier attempt) is a judgment call left to whoever passes `--continue`.
 
 using AIHydroPoints, Random, Statistics, Printf, CSV, DataFrames
 
@@ -36,8 +37,11 @@ experiment_default = "surge_317s_5yr_nlags48plus_sweep"
 plot_outputs_default = false    # keep plots per run; set false for large sweeps (speed)
 write_series_default = false   # write full output series per run; off by default (bulky)
 
-force  = "--force" in ARGS
-posargs = filter(!=("--force"), ARGS)
+continue_sweep  = "--continue" in ARGS
+overwrite_sweep = "--overwrite" in ARGS
+continue_sweep && overwrite_sweep &&
+    error("Pass at most one of --continue / --overwrite.")
+posargs = filter(a -> a ∉ ("--continue", "--overwrite"), ARGS)
 
 base_toml  = length(posargs) >= 1 ? posargs[1] :
              base_toml_default
@@ -53,9 +57,15 @@ const METRICS    = ["rmse_testing", "rmse_storm_eunice_2022"]
 pname     = param_path[end]
 base_dir  = dirname(abspath(base_toml))
 sweep_dir = joinpath(SWEEP_ROOT, experiment)
-isdir(sweep_dir) && !force && error(
-    "sweep dir $sweep_dir already exists. Pass --force to reuse it (e.g. to extend " *
-    "an existing sweep with more reps/values), or remove it first.")
+if isdir(sweep_dir)
+    if overwrite_sweep
+        rm(sweep_dir; recursive=true, force=true)
+    elseif !continue_sweep
+        error("sweep dir $sweep_dir already exists. Pass --continue to resume it " *
+              "(skip finished runs, retrain unfinished ones), or --overwrite to " *
+              "discard it and start over.")
+    end
+end
 mkpath(sweep_dir)
 
 # ── helpers ───────────────────────────────────────────────────────────────────────
@@ -112,7 +122,9 @@ function _run(tag, value)
                         _run_counter[], TOTAL_RUNS, tag, setting)
         return
     end
-    @info @sprintf("[run %d/%d] %-24s | %s", _run_counter[], TOTAL_RUNS, tag, setting)
+    retraining = isdir(md)
+    @info @sprintf("[run %d/%d] %-24s | %s%s", _run_counter[], TOTAL_RUNS, tag, setting,
+                    retraining ? " -- previous attempt incomplete, retraining from scratch" : "")
     cfg = AIHydroPoints.toml_read(base_toml)
     for f in cfg["data_settings"]["files"]              # make data paths absolute
         f["path"] = normpath(joinpath(base_dir, f["path"]))
@@ -120,12 +132,9 @@ function _run(tag, value)
     value === nothing || _setpath!(cfg, param_path, value)
     _apply_output_overrides!(cfg; plot_outputs=plot_outputs_default, write_series=write_series_default)
     cfg["model_settings"]["model_dir"] = md
-    isdir(md) && for pf in readdir(md)                  # clear stale weights (no warm-start)
-        occursin("params", pf) && rm(joinpath(md, pf))
-    end
     tmp = joinpath(sweep_dir, "cfg_$tag.toml")
     AIHydroPoints.toml_write(tmp, cfg; overwrite=true)
-    AIHydroPoints.train(tmp)
+    AIHydroPoints.train(tmp; on_existing_run=:overwrite)
 end
 
 function _metrics(tag)
