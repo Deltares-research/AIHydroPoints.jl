@@ -11,7 +11,16 @@
 #
 # Usage — edit the defaults below, or pass positionally:
 #   pixi run julia --project scripts/parameter_sweep.jl \
-#       [base.toml] [dotted.param.path] [v1,v2,v3] [nrepeats] [experiment]
+#       [base.toml] [dotted.param.path] [v1,v2,v3] [nrepeats] [experiment] [--force]
+#
+# If `sweeps/<experiment>/` already exists, the script refuses to run (and requires
+# `--force` to proceed) rather than silently reusing/overwriting whatever is in there.
+# Whether reuse makes sense (e.g. extending a sweep with more reps/values vs. stale
+# runs from an earlier attempt) is a judgment call left to whoever passes `--force`.
+#
+# With `--force`, any run tag whose output dir already has a completed `summary.toml`
+# is skipped rather than re-trained -- so re-running the same command resumes a sweep
+# that was interrupted partway through instead of redoing finished runs.
 
 using AIHydroPoints, Random, Statistics, Printf, CSV, DataFrames
 
@@ -20,20 +29,23 @@ _parsenum(s) = something(tryparse(Int, String(s)), parse(Float64, String(s)))
 
 # defaults
 base_toml_default = "experiments/317stations/surge_5yr_BiLinearSurgeInteractionModel.toml"
-param_path_default = ["train_settings", "batch_size"]
-values_default = Any[32, 128, 256, 512]
+param_path_default = ["model_settings", "nlags"]
+values_default = Any[3*24, 4*24, 5*24, 6*24]   # 3,4,5,6 days
 nrepeats_default = 1
-experiment_default = "surge_317s_5yr_batch_size_sweep"
-plot_outputs_default = true    # keep plots per run; set false for large sweeps (speed)
+experiment_default = "surge_317s_5yr_nlags48plus_sweep"
+plot_outputs_default = false    # keep plots per run; set false for large sweeps (speed)
 write_series_default = false   # write full output series per run; off by default (bulky)
 
-base_toml  = length(ARGS) >= 1 ? ARGS[1] :
+force  = "--force" in ARGS
+posargs = filter(!=("--force"), ARGS)
+
+base_toml  = length(posargs) >= 1 ? posargs[1] :
              base_toml_default
-param_path = String.(length(ARGS) >= 2 ? split(ARGS[2], ".") :
+param_path = String.(length(posargs) >= 2 ? split(posargs[2], ".") :
              param_path_default)
-values     = length(ARGS) >= 3 ? _parsenum.(split(ARGS[3], ",")) : values_default
-nrepeats   = length(ARGS) >= 4 ? parse(Int, ARGS[4]) : nrepeats_default
-experiment = length(ARGS) >= 5 ? ARGS[5] : experiment_default
+values     = length(posargs) >= 3 ? _parsenum.(split(posargs[3], ",")) : values_default
+nrepeats   = length(posargs) >= 4 ? parse(Int, posargs[4]) : nrepeats_default
+experiment = length(posargs) >= 5 ? posargs[5] : experiment_default
 
 const SWEEP_ROOT = "sweeps"
 const METRICS    = ["rmse_testing", "rmse_storm_eunice_2022"]
@@ -41,6 +53,9 @@ const METRICS    = ["rmse_testing", "rmse_storm_eunice_2022"]
 pname     = param_path[end]
 base_dir  = dirname(abspath(base_toml))
 sweep_dir = joinpath(SWEEP_ROOT, experiment)
+isdir(sweep_dir) && !force && error(
+    "sweep dir $sweep_dir already exists. Pass --force to reuse it (e.g. to extend " *
+    "an existing sweep with more reps/values), or remove it first.")
 mkpath(sweep_dir)
 
 # ── helpers ───────────────────────────────────────────────────────────────────────
@@ -70,11 +85,33 @@ function _apply_output_overrides!(cfg; plot_outputs, write_series)
     end
 end
 
-"Run one config: `value === nothing` is the unmodified baseline."
+"`summary.toml` is the last file `train()` writes -- after all per-split stats/plots --
+so its presence (and parseability, in case a kill landed mid-write) means `md` holds a
+completed run, not one interrupted partway through."
+function _run_complete(md)
+    path = joinpath(md, "summary.toml")
+    isfile(path) || return false
+    try
+        AIHydroPoints.toml_read(path)
+        true
+    catch
+        false
+    end
+end
+
+"Run one config: `value === nothing` is the unmodified baseline. Skips training (still
+counts towards the run total) if `tag`'s output dir already completed -- lets a sweep
+interrupted partway through be resumed by just re-running the same command."
 function _run(tag, value)
     _run_counter[] += 1
     setting = value === nothing ? "$(pname) = $(base_val)  (unmodified baseline)" :
                                   "$(pname) = $(value)"
+    md = abspath(joinpath(sweep_dir, tag))
+    if _run_complete(md)
+        @info @sprintf("[run %d/%d] %-24s | %s -- already complete, skipping",
+                        _run_counter[], TOTAL_RUNS, tag, setting)
+        return
+    end
     @info @sprintf("[run %d/%d] %-24s | %s", _run_counter[], TOTAL_RUNS, tag, setting)
     cfg = AIHydroPoints.toml_read(base_toml)
     for f in cfg["data_settings"]["files"]              # make data paths absolute
@@ -82,7 +119,6 @@ function _run(tag, value)
     end
     value === nothing || _setpath!(cfg, param_path, value)
     _apply_output_overrides!(cfg; plot_outputs=plot_outputs_default, write_series=write_series_default)
-    md = abspath(joinpath(sweep_dir, tag))
     cfg["model_settings"]["model_dir"] = md
     isdir(md) && for pf in readdir(md)                  # clear stale weights (no warm-start)
         occursin("params", pf) && rm(joinpath(md, pf))
