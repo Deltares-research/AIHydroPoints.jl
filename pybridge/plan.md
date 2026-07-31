@@ -79,11 +79,29 @@ epoch,train_rmse,val_rmse
   (standard `tail -f` semantics) — no per-check close/reopen needed on the
   read side.
 
-For now: `pybridge/example_losses.csv` is a dummy fixture (fake rows in
-this exact format) to build and test the polling/parsing logic against.
-**Follow-up (needs separate go-ahead, touches `src/` outside `pybridge/`)**:
-teach `train.jl` to write a real `losses.csv` incrementally during training
-so the wrapper logs actual live per-epoch RMSE curves.
+**Implemented.** `abstract_flux_model.jl`'s epoch loop rewrites (not
+appends) `<model_dir>/losses.csv` every epoch from the in-memory
+`train_losses`/`val_losses` vectors, via `CSV.write(..., DataFrame(epoch=...,
+train_rmse=round.(...; digits=6), val_rmse=has_val ? round.(...; digits=6) :
+missing))`. `CSV.write` opens/writes/closes atomically each call, so there's
+no persistent file handle to manage across early stopping's `break`. Values
+rounded to 6 digits, matching `summary.toml`'s `rmse_*` convention.
+
+**Stale-file race (found and fixed during testing):** a leftover
+`losses.csv` from a *previous* run in the same `model_dir` could get read by
+`mlflow_train.py`'s poller before the new Julia process even reached its
+training loop (Julia takes several seconds to start up/precompile first),
+poisoning the poller's row-count bookmark so the new run's real rows were
+silently never logged once written (confirmed empirically: the previous
+run's stale values showed up in mlflow's metric history instead of the new
+run's). Fixed on both sides: `train_model!` now deletes any existing
+`losses.csv` at the very start of the function (before the loop), and
+`mlflow_train.py`'s `run_training()` also deletes it before even launching
+the subprocess — the Python-side delete is the one that actually closes the
+race (it runs before the poller thread starts), the Julia-side delete is
+defense-in-depth for anyone calling `train_model!` directly. Verified with a
+real run: `losses.csv` on disk and mlflow's `metrics/get-history` now match
+exactly, step for step.
 
 ## Follow-up tasks
 

@@ -126,6 +126,20 @@ def run_training(settings_toml_arg, run_id, log_file):
     resolved model_dir the caller should look in for training outputs.
     """
     settings_toml = Path(settings_toml_arg).resolve()
+    toml_dir = settings_toml.parent
+    settings = toml.load(settings_toml)
+    model_dir = resolve_model_dir(settings, toml_dir)
+    losses_csv = model_dir / "losses.csv"
+
+    # Julia deletes losses.csv itself at the start of train_model!, but that
+    # happens only after several seconds of startup/precompilation — too
+    # late to stop the poller below from reading a *previous* run's
+    # leftover file the moment it starts and bookmarking past it, silently
+    # dropping this run's real rows once they arrive (seen empirically).
+    # Clearing it here, before the subprocess/poller even start, closes
+    # that window from the reader's side too.
+    losses_csv.unlink(missing_ok=True)
+
     # bufsize=1 (line-buffered) + text=True so `for line in proc.stdout`
     # yields lines as they're written, not only once the process exits.
     proc = subprocess.Popen(
@@ -136,11 +150,6 @@ def run_training(settings_toml_arg, run_id, log_file):
         text=True,
         bufsize=1,
     )
-
-    toml_dir = settings_toml.parent
-    settings = toml.load(settings_toml)
-    model_dir = resolve_model_dir(settings, toml_dir)
-    losses_csv = model_dir / "losses.csv"
 
     # Start the losses.csv poller before consuming stdout below, so it runs
     # concurrently with (not after) the blocking read loop.

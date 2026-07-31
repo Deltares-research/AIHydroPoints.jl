@@ -11,6 +11,8 @@
 #       constructed as MyFluxModel values, with domain-specific preprocess /
 #       forward / postprocess! methods dispatching on the model type.
 
+using CSV
+using DataFrames
 using Flux
 using JLD2
 using Statistics: mean
@@ -214,6 +216,15 @@ function train_model!(model::AbstractFluxModel, train_settings::TrainingSettings
 
     checkpoint_dir = get(settings, "model_dir", nothing)
 
+    # Remove any losses.csv left over from a previous run in this model_dir
+    # before training starts. Otherwise an external poller reading the file
+    # (see pybridge/mlflow_train.py) can pick up stale rows from the last
+    # run before this call's first epoch overwrites them — and if this run
+    # ends up shorter than the previous one, its own rows never get seen.
+    if !isnothing(checkpoint_dir)
+        rm(joinpath(checkpoint_dir, "losses.csv"); force=true)
+    end
+
     train_losses  = Float32[]
     val_losses    = Float32[]
     showvalues    = Pair{String,String}[]
@@ -253,6 +264,19 @@ function train_model!(model::AbstractFluxModel, train_settings::TrainingSettings
                 epochs_since_improve += 1
             end
         end
+
+        # Rewrite losses.csv from the in-memory loss history every epoch
+        # (rather than appending), so it's always a complete, consistent
+        # file for an external poller to read — no open file handle to
+        # manage across the loop, and nothing to clean up if training is
+        # interrupted (e.g. by early stopping's `break` below).
+        if !isnothing(checkpoint_dir)
+            CSV.write(joinpath(checkpoint_dir, "losses.csv"),
+                      DataFrame(epoch      = 1:length(train_losses),
+                                train_rmse = round.(train_losses; digits=6),
+                                val_rmse   = has_val ? round.(val_losses; digits=6) : missing))
+        end
+
         next!(progress; showvalues)
 
         if !isnothing(checkpoint_dir) && !isnothing(train_settings.checkpoints) &&
