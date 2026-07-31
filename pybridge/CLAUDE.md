@@ -53,3 +53,28 @@ pybridge/bin/python path/to/script.py
 ```bash
 pixi run --manifest-path pybridge/pixi.toml python
 ```
+
+**mlflow tracking server:**
+```bash
+pybridge/bin/mlflow-server-start [port]   # background, logs to pybridge/run/
+pybridge/bin/mlflow-server-stop
+```
+
+**Train a model, logged to mlflow:**
+```bash
+pybridge/bin/python pybridge/mlflow_train.py path/to/settings.toml
+```
+
+**Parameter sweep, logged to mlflow** (mirrors `scripts/parameter_sweep.jl`,
+same `sweeps/<experiment>/` output — see `plan.md`):
+```bash
+pybridge/bin/python pybridge/mlflow_sweep.py \
+    [base.toml] [dotted.param.path] [v1,v2,v3] [nrepeats] [experiment] [--continue|--overwrite]
+```
+
+**Permanently purge mlflow experiments/runs deleted via the UI** (the UI's
+delete is always a soft delete; this is the only way to actually free the
+space/name):
+```bash
+pybridge/bin/mlflow-gc [--older-than DURATION]   # default: 1d
+```

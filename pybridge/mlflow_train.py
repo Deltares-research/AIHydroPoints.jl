@@ -237,8 +237,13 @@ def main():
     mlflow.set_tracking_uri(tracking_uri)
     # One mlflow experiment per settings.toml directory (e.g. "5stations",
     # "317stations"), mirroring the grouping already used by
-    # experiments/leaderboard.qmd.
-    mlflow.set_experiment(settings_toml.parent.name)
+    # experiments/leaderboard.qmd -- unless a caller (e.g. mlflow_sweep.py,
+    # to group every point of one sweep together) has already set
+    # MLFLOW_EXPERIMENT_NAME, mlflow's own standard override for this;
+    # mlflow.start_run() picks that up on its own, so nothing further to do
+    # here in that case.
+    if "MLFLOW_EXPERIMENT_NAME" not in os.environ:
+        mlflow.set_experiment(settings_toml.parent.name)
 
     # Flatten just the sections worth logging as params. data_settings.files
     # (the list of input/target file entries) is deliberately excluded: it's
@@ -256,8 +261,14 @@ def main():
     # run_name surfaces as the default identifying column in the mlflow UI
     # (replacing an auto-generated name like "resilient-crow-840"), unlike
     # params, which are only shown in the runs table once manually toggled
-    # on via its column selector.
-    with mlflow.start_run(run_name=settings["run_info"]["runid"]) as run:
+    # on via its column selector. Defaults to the toml's own runid, but a
+    # caller (e.g. mlflow_sweep.py, to give each sweep point a distinct,
+    # informative name instead of every point sharing the base runid) can
+    # override it via MLFLOW_RUN_NAME -- unlike MLFLOW_EXPERIMENT_NAME this
+    # isn't an mlflow-recognized variable, just our own convention, since
+    # mlflow has no automatic env-var pickup for run_name.
+    run_name = os.environ.get("MLFLOW_RUN_NAME", settings["run_info"]["runid"])
+    with mlflow.start_run(run_name=run_name) as run:
         mlflow.log_params(params)
         mlflow.set_tags({
             "model_name": settings["model_settings"]["model_name"],

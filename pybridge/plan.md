@@ -103,6 +103,99 @@ defense-in-depth for anyone calling `train_model!` directly. Verified with a
 real run: `losses.csv` on disk and mlflow's `metrics/get-history` now match
 exactly, step for step.
 
+## Design: mlflow parameter sweep logging (settled)
+
+Goal: get parameter sweeps visible in mlflow too — comparable/filterable in
+the UI the same way single training runs already are.
+
+Earlier sketch considered and dropped: `pybridge/mlflow_sweep.py` launching
+`parameter_sweep.jl` as a subprocess and polling `sweeps/<experiment>/*/`
+for newly-complete points, using mlflow's nested-runs feature (one parent
+run per sweep, one child run per point). Dropped in favor of the simpler
+design below, which is more deterministic (no polling/race concerns) and
+reuses `mlflow_train.py` as-is per point rather than needing new nested-run
+plumbing.
+
+**Settled architecture**: `pybridge/mlflow_sweep.py` reimplements
+`parameter_sweep.jl`'s sweep loop directly in Python — same CLI shape
+(`base_toml`, `dotted.param.path`, `values`, `nrepeats`, `experiment`,
+`--continue`/`--overwrite`), same tag naming (`baseline_rep<k>`,
+`<param>=<value>_rep<k>`), same skip-if-already-complete check (a point's
+`model_dir` has a valid, parseable `summary.toml`). For each point that
+needs (re)training, it calls `bin/python mlflow_train.py <cfg_tag.toml>` as
+a subprocess — reusing all of `mlflow_train.py`'s existing training +
+logging machinery unmodified, rather than reimplementing it. Only the sweep
+*orchestration* is duplicated between the two languages, not the actual
+train/log logic.
+
+**Known tradeoff, accepted**: sweep orchestration logic now exists in two
+places (Julia and Python). If `parameter_sweep.jl` changes (new flag, new
+tag format, new default), this won't follow automatically — has to be
+mirrored by hand.
+
+Settled decisions:
+
+- **Output location: exactly `sweeps/<experiment>/`**, same as
+  `parameter_sweep.jl` — not a separate `pybridge/`-local directory. Since
+  every point, regardless of which tool triggered it, ultimately calls the
+  same `AIHydroPoints.train()` pipeline (Python's route:
+  `mlflow_sweep.py` → `mlflow_train.py` → `bin/train` → `train()`; Julia's:
+  direct), output is genuinely format-identical, not just similarly shaped
+  — a sweep can be resumed with `--continue` via either tool interchangeably.
+- **`results.csv`**: also written to `sweeps/<experiment>/results.csv`, same
+  computation (mean/std/% reduction vs. baseline across repeats), same
+  approach (regenerated from whatever points are complete on disk) — keeps
+  the two tools' output substitutable, not just their inputs.
+- **mlflow experiment grouping: explicit, not inferred.** `mlflow_sweep.py`
+  takes `experiment` as an explicit argument (mirrors Julia's positional arg
+  exactly) and sets `MLFLOW_EXPERIMENT_NAME=<experiment>` in the environment
+  when invoking each point's `mlflow_train.py` subprocess call.
+- **Small `mlflow_train.py` change needed**: only fall back to its current
+  `settings_toml.parent.name`-derived experiment name when
+  `MLFLOW_EXPERIMENT_NAME` isn't already set in the environment —
+  `mlflow.start_run()` picks up that env var on its own otherwise (it's
+  mlflow's own standard mechanism for this). Zero change to standalone
+  (non-sweep) behavior, since the env var is simply unset in that case.
+- **Per-point skip logic** mirrors `parameter_sweep.jl`'s `_run_complete`:
+  check for a valid, parseable `summary.toml` in the point's `model_dir`
+  before deciding whether to invoke `mlflow_train.py` for that point at all.
+- **When a point *is* run**, `mlflow_train.py` is called completely
+  unmodified for the training/logging part — it already always passes
+  `--overwrite` to `bin/train`, which matches `parameter_sweep.jl`'s own
+  `on_existing_run=:overwrite` per point (never warm-start a sweep point,
+  since that would bias comparisons across the sweep).
+
+**Implemented** as `pybridge/mlflow_sweep.py`, plus the small
+`MLFLOW_EXPERIMENT_NAME` opt-out added to `mlflow_train.py`. Verified against
+a real (small, fast) sweep: fresh `--overwrite` run, dotted-path override
+confirmed both in the generated `cfg_<tag>.toml` and in the logged mlflow
+params, `--continue` correctly skips already-complete points and only
+(re)trains new/incomplete ones, no-flag correctly refuses against an
+existing sweep dir, all points landed in one mlflow experiment via
+`MLFLOW_EXPERIMENT_NAME`, and `results.csv` matches `parameter_sweep.jl`'s
+column layout and values exactly (including `"NaN"` formatting for
+single-repeat runs' std).
+
+**Known limitations, not fixed:**
+- **No cross-repeat reproducibility.** `parameter_sweep.jl` calls
+  `Random.seed!(rep)` before each point within one long-lived Julia process.
+  Here, each point is a fresh Julia subprocess (via `mlflow_train.py` →
+  `bin/train`), and nothing seeds it — `bin/train` has no seed option today.
+  Repeats are therefore not reproducible run-to-run via this tool, unlike
+  via `parameter_sweep.jl`. Fixing this would mean adding a seed CLI option
+  to `bin/train`/`scripts/train.jl`/`train()`, a `src/`/`scripts/` change
+  outside today's scope.
+- **Every point in a sweep gets the same mlflow run name.** `run_name` is
+  set from the toml's `run_info.runid` (see the earlier "runid as a
+  column" fix), and — matching `parameter_sweep.jl` exactly — neither tool
+  touches `run_info` when generating a point's config, only
+  `model_settings.model_dir` (and the swept param). So every point in a
+  sweep shares one run name in the mlflow UI (e.g. all show as `surge_1yr`),
+  distinguishable only via params (e.g. `model_settings.nlags`) or the tag
+  in `model_dir`'s path — not at a glance the way single runs are. Worth a
+  follow-up decision: derive each point's `run_name` from its tag instead
+  (e.g. `surge_1yr/nlags=384_rep1`)?
+
 ## Follow-up tasks
 
 - ~~**Explicit `--continue`/`--overwrite` for existing runs.**~~ **Done.**

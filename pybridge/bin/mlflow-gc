@@ -1,0 +1,32 @@
+#!/usr/bin/env bash
+# pybridge/bin/mlflow-gc — permanently purge mlflow experiments/runs that are
+# already soft-deleted (e.g. via the mlflow UI's delete button)
+#
+# Usage:
+#   pybridge/bin/mlflow-gc [--older-than DURATION]
+#
+# Defaults to --older-than 1d, so anything deleted in the last day stays
+# recoverable -- mlflow's UI delete button is always a soft delete; this is
+# the only way to actually free the space/experiment name it was using.
+# Pass --older-than 0d to purge everything currently soft-deleted right now.
+
+BIN_DIR="$(cd "$(dirname "$0")" && pwd)"
+PYBRIDGE="$(dirname "$BIN_DIR")"
+TRACKING_URI="${MLFLOW_TRACKING_URI:-http://127.0.0.1:5000}"
+OLDER_THAN="1d"
+
+if [ "$1" = "--older-than" ]; then
+    OLDER_THAN="$2"
+elif [ -n "$1" ]; then
+    echo "Usage: mlflow-gc [--older-than DURATION]" >&2
+    exit 1
+fi
+
+if ! command -v pixi &>/dev/null; then
+    echo "Error: 'pixi' not found on PATH." >&2
+    exit 1
+fi
+
+exec pixi run --manifest-path "$PYBRIDGE/pixi.toml" mlflow gc \
+    --tracking-uri "$TRACKING_URI" \
+    --older-than "$OLDER_THAN"
