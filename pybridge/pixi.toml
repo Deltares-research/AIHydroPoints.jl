@@ -1,0 +1,13 @@
+[workspace]
+authors = ["robot144 <robot144@protonmail.com>"]
+channels = ["conda-forge"]
+name = "pybridge"
+platforms = ["linux-64"]
+version = "0.1.0"
+
+[tasks]
+
+[dependencies]
+python = "<3.14"
+toml = ">=0.10.2,<0.11"
+mlflow = ">=3.14.0,<4"

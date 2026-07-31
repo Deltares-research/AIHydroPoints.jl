@@ -1,0 +1,40 @@
+#!/usr/bin/env bash
+# pybridge/bin/mlflow-server-start — start an mlflow tracking server in the background
+#
+# Usage:
+#   pybridge/bin/mlflow-server-start [port]
+#
+# Defaults to port 5000. Logs to pybridge/run/mlflow-server.log,
+# PID (of the whole process group) in pybridge/run/mlflow-server.pid.
+# Stop it with pybridge/bin/mlflow-server-stop.
+
+set -euo pipefail
+
+BIN_DIR="$(cd "$(dirname "$0")" && pwd)"
+PYBRIDGE="$(dirname "$BIN_DIR")"
+RUN_DIR="$PYBRIDGE/run"
+PID_FILE="$RUN_DIR/mlflow-server.pid"
+LOG_FILE="$RUN_DIR/mlflow-server.log"
+PORT="${1:-5000}"
+
+mkdir -p "$RUN_DIR"
+
+if [ -f "$PID_FILE" ] && kill -0 -- "-$(cat "$PID_FILE")" 2>/dev/null; then
+    echo "mlflow server already running (PID $(cat "$PID_FILE")). Stop it first with mlflow-server-stop." >&2
+    exit 1
+fi
+
+if ! command -v pixi &>/dev/null; then
+    echo "Error: 'pixi' not found on PATH." >&2
+    exit 1
+fi
+
+# setsid makes the started process (pixi, and mlflow beneath it) its own
+# process group leader, so we can reliably stop the whole tree later by
+# signalling the negative PID (the group), rather than just the pixi shim.
+setsid pixi run --manifest-path "$PYBRIDGE/pixi.toml" mlflow server --port "$PORT" \
+    >"$LOG_FILE" 2>&1 <"/dev/null" &
+PID=$!
+echo "$PID" > "$PID_FILE"
+
+echo "mlflow server starting (PID $PID, port $PORT), logging to $LOG_FILE"

@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+# pybridge/bin/python — run Python inside the pybridge pixi environment
+#
+# Usage:
+#   pybridge/bin/python script.py [args...]
+
+BIN_DIR="$(cd "$(dirname "$0")" && pwd)"
+PYBRIDGE="$(dirname "$BIN_DIR")"
+
+if command -v pixi &>/dev/null; then
+    exec pixi run --manifest-path "$PYBRIDGE/pixi.toml" python "$@"
+else
+    echo "Error: 'pixi' not found on PATH." >&2
+    echo "Install pixi (https://pixi.sh) — pybridge's Python deps (mlflow, ray, ...) are pinned via pixi.lock, not available system-wide." >&2
+    exit 1
+fi

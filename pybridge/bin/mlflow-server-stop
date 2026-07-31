@@ -1,0 +1,41 @@
+#!/usr/bin/env bash
+# pybridge/bin/mlflow-server-stop — stop the mlflow tracking server started by
+# pybridge/bin/mlflow-server-start
+#
+# Usage:
+#   pybridge/bin/mlflow-server-stop
+
+set -euo pipefail
+
+BIN_DIR="$(cd "$(dirname "$0")" && pwd)"
+PYBRIDGE="$(dirname "$BIN_DIR")"
+RUN_DIR="$PYBRIDGE/run"
+PID_FILE="$RUN_DIR/mlflow-server.pid"
+
+if [ ! -f "$PID_FILE" ]; then
+    echo "No PID file at $PID_FILE — is the server running? (started outside mlflow-server-start?)" >&2
+    exit 1
+fi
+
+PID="$(cat "$PID_FILE")"
+
+if ! kill -0 -- "-$PID" 2>/dev/null; then
+    echo "No running process group $PID — removing stale PID file." >&2
+    rm -f "$PID_FILE"
+    exit 1
+fi
+
+kill -TERM -- "-$PID"
+
+for _ in $(seq 1 20); do
+    kill -0 -- "-$PID" 2>/dev/null || break
+    sleep 0.5
+done
+
+if kill -0 -- "-$PID" 2>/dev/null; then
+    echo "Process group $PID still alive after SIGTERM, sending SIGKILL." >&2
+    kill -KILL -- "-$PID"
+fi
+
+rm -f "$PID_FILE"
+echo "mlflow server (PID $PID) stopped."
