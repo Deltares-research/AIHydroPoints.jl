@@ -253,7 +253,11 @@ def main():
 
     RUN_LOG_DIR.mkdir(exist_ok=True)
 
-    with mlflow.start_run() as run:
+    # run_name surfaces as the default identifying column in the mlflow UI
+    # (replacing an auto-generated name like "resilient-crow-840"), unlike
+    # params, which are only shown in the runs table once manually toggled
+    # on via its column selector.
+    with mlflow.start_run(run_name=settings["run_info"]["runid"]) as run:
         mlflow.log_params(params)
         mlflow.set_tags({
             "model_name": settings["model_settings"]["model_name"],
