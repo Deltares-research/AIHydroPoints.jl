@@ -17,15 +17,15 @@ description = "LinearSurgeModel baseline: 5-year training (2015–2019), val 202
 
 [model_settings]
 model_name = "LinearSurgeModel"
-nlags      = 16
+nlags      = 48
 
 [train_settings]
-nepochs         = 20
-batch_size        = 64
+nepochs         = 50
+batch_size      = 128
 learning_rate   = 1.0e-3
-lr_decay_factor = 0.1
-lr_decay_epochs   = 10
-early_stopping_epochs        = 10
+lr_decay_factor = 0.4
+lr_decay_epochs = 15
+early_stopping_epochs = 10
 weight_decay      = 1.0e-4
 
 [data_settings.model_io]

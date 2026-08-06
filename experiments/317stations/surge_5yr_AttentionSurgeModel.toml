@@ -17,7 +17,7 @@ description = "AttentionSurgeModel baseline: 5-year training (2015–2019), val 
 
 [model_settings]
 model_name = "AttentionSurgeModel"
-nlags      = 16
+nlags      = 24
 
 [model_settings.model_pars]
 nembed         = 32
@@ -28,12 +28,13 @@ nlayers_trunk  = 2
 nhidden_trunk  = 32
 
 [train_settings]
-nepochs         = 20
-batch_size        = 64
+nepochs         = 50
+batch_size        = 128
 learning_rate   = 1.0e-3
-lr_decay_factor = 0.5
-lr_decay_epochs   = 10
+lr_decay_factor = 0.4
+lr_decay_epochs   = 15
 early_stopping_epochs        = 10
+weight_decay      = 1.0e-4
 
 [data_settings.model_io]
 input  = ["stress_x", "stress_y", "pressure"]

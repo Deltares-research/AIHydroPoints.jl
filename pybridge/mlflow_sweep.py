@@ -42,11 +42,11 @@ SWEEP_ROOT = REPO_DIR / "sweeps"
 METRICS = ["rmse_testing", "rmse_storm_eunice_2022"]
 
 # defaults, mirroring parameter_sweep.jl's
-BASE_TOML_DEFAULT = "experiments/5stations/surge_5yr_LinearSurgeModel.toml"
-PARAM_PATH_DEFAULT = ["model_settings", "nlags"]
-VALUES_DEFAULT = [24, 2*24, 3 * 24, 4 * 24, 5 * 24]  # 1,2,3,4,5 days
+BASE_TOML_DEFAULT = "experiments/5stations/surge_5yr_BiLinearSurgeInteractionModel.toml"
+PARAM_PATH_DEFAULT = ["train_settings", "batch_size"]
+VALUES_DEFAULT = [32,64,128,256]
 NREPEATS_DEFAULT = 3
-EXPERIMENT_DEFAULT = "surge_5s_5yr_nlags_sweep"
+EXPERIMENT_DEFAULT = "surge_5s_5yr_batchsize_sweep"
 PLOT_OUTPUTS_DEFAULT = False
 WRITE_SERIES_DEFAULT = False
 

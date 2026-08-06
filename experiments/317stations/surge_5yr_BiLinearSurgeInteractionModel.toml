@@ -29,12 +29,12 @@ mod_activation = "identity"   # "identity" (bilinear) or "tanh" (bounded)
 
 [train_settings]
 nepochs         = 50
-batch_size        = 64
+batch_size        = 128
 learning_rate   = 1.0e-3
-lr_decay_factor = 0.2
-lr_decay_epochs   = 10
+lr_decay_factor = 0.4
+lr_decay_epochs   = 15
 early_stopping_epochs = 25
-weight_decay    = 5.0e-5
+weight_decay    = 1.0e-4
 
 [data_settings.model_io]
 input  = ["stress_x", "stress_y", "pressure", "tide"]

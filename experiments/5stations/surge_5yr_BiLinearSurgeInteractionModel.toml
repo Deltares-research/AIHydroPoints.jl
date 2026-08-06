@@ -21,7 +21,7 @@ description = "BiLinearSurgeInteractionModel baseline: 5-year training (2015–2
 
 [model_settings]
 model_name = "BiLinearSurgeInteractionModel"
-nlags      = 16
+nlags      = 48
 
 [model_settings.model_pars]
 a              = 0.5          # fixed interaction-branch scale (not learnable)
@@ -29,9 +29,9 @@ mod_activation = "identity"   # "identity" (bilinear) or "tanh" (bounded)
 
 [train_settings]
 nepochs           = 50
-batch_size        = 64
+batch_size        = 128
 learning_rate     = 1.0e-3
-lr_decay_factor   = 0.1
+lr_decay_factor   = 0.4
 lr_decay_epochs   = 15
 early_stopping_epochs = 50
 weight_decay      = 1.0e-4

@@ -27,6 +27,15 @@ if ! command -v pixi &>/dev/null; then
     exit 1
 fi
 
-exec pixi run --manifest-path "$PYBRIDGE/pixi.toml" mlflow gc \
+# --backend-store-uri must point directly at the sqlite file: --tracking-uri
+# alone was observed to silently resolve against a fresh/empty store instead
+# of connecting to the real one (likely cwd-dependent internally), depending
+# on which directory this script was invoked from. --tracking-uri is still
+# passed too, since newer runs use proxied mlflow-artifacts:/N locations
+# that need the server (via MLFLOW_TRACKING_URI) to resolve for artifact
+# deletion -- mlflow's own docs call this out explicitly for gc.
+exec env MLFLOW_TRACKING_URI="$TRACKING_URI" \
+    pixi run --manifest-path "$PYBRIDGE/pixi.toml" mlflow gc \
+    --backend-store-uri "sqlite:///$PYBRIDGE/mlflow.db" \
     --tracking-uri "$TRACKING_URI" \
     --older-than "$OLDER_THAN"
