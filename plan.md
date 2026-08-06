@@ -124,13 +124,23 @@ Docs and comms
    **% RMSE reduction vs the unmodified baseline** (testing + storm). Validated on a
    5-station sweep. Deferred: multi-param grids, comparison **maps** (task-5 deferral),
    parallel execution, leaderboard integration.
-7. [ ] **Determine robust training settings for the existing experiments.** The 317
-   5yr/20yr runs are **undertrained** — more training data gave *worse* RMSE on every
-   split (incl. the Linear baseline; train RMSE rises too), because the configs use
-   `nepochs=20` with `lr_decay_factor=0.5, lr_decay_epochs=10` + early stopping, vs
-   `nepochs=50` at 1yr. Use the sweep script (6) + charts (5) to find `nepochs` / LR
-   schedule / `early_stopping_epochs` / `batch_size` that **converge consistently
-   across 1/5/20yr and 5/317 stations**, then apply them to the experiment configs.
+7. [x] **Determine robust training settings for the existing experiments.** **DONE.**
+   The 317 5yr/20yr runs were **undertrained** — more training data gave *worse*
+   RMSE on every split (incl. the Linear baseline; train RMSE rises too), because
+   the configs used `nepochs=20` with `lr_decay_factor=0.5, lr_decay_epochs=10` +
+   early stopping, vs `nepochs=50` at 1yr. Using the sweep script (6) +
+   mlflow-tracked sweeps (`pybridge/`), all 24 `surge_*.toml` (5/317 stations ×
+   1/5/20yr × Linear/Conv/Attention/BiLinear) were unified to a common,
+   evidence-based `[train_settings]`/`nlags` baseline (`nlags=48` for
+   Linear/Conv/BiLinear, `nlags=24` for Attention specifically; `batch_size=128`;
+   `nepochs=50`; `lr_decay_factor=0.4`/`lr_decay_epochs=15`; `weight_decay=1.0e-4`)
+   — see [surge hyperparameter consolidation] memory. **Deferred to task 22**: the
+   317-station/20yr `AttentionSurgeModel` run itself won't complete — it reliably
+   OOMs regardless of these settings, a pipeline scaling issue rather than a
+   hyperparameter one. Giving up on tuning around it; config renamed to
+   `experiments/317stations/surge_20yr_AttentionSurgeModel.toml_CRASHES` (non-`.toml`
+   extension, deliberately so it's skipped by any `*.toml` glob/loop) and left
+   out of scope until task 22 lands and it can be safely rerun.
 8. [ ] **Regenerate ConvSurgeModel baselines** (1yr/5yr/20yr). The existing Conv
    baselines are stale — trained before the reshape fix and before the strided
    Conv1D + `swish` activation changes. Linear (Dense is permutation-invariant)
@@ -175,6 +185,32 @@ Docs and comms
     (Global Tide and Surge Model) using this same ML approach, rather than the
     North Sea only. Likely depends on task 15 (DVC) for handling the much larger
     data volume.
+22. [ ] **Unbatched forward pass causes OOM at scale** — related to task 14.
+    `train_model!`'s epoch-end loss (`abstract_flux_model.jl:248,254`,
+    `flux_model(x)`/`flux_model(x_val)`) and the generic `predict()`
+    (`abstract_flux_model.jl:96`, used by `write_outputs` at lines 534 and 641,
+    and hence by both training-time output generation and standalone
+    `predict.jl`/`bin/predict`) all run the model on the **entire** input tensor
+    in a single unbatched call — only the training step itself is chunked, via
+    `Flux.DataLoader(...; batchsize=train_settings.batch_size)`. Confirmed as the
+    likely cause of a real crash: `surge_20yr_AttentionSurgeModel` at 317
+    stations was reliably `SIGKILL`ed (exit -9, i.e. OOM) even running alone —
+    the branch network embeds 951 wind/pressure channels down to `nembed=32`,
+    then **de-embeds back up to 951** per lag step, so the per-timestep
+    activation footprint is non-trivial and gets multiplied across the full
+    ~175,000-timestep training split in one shot (train tensor itself is
+    already ~16GB; the unbatched forward pass plausibly adds tens of GB more,
+    transiently, on top). `write_outputs` also calls `predict()` on the full
+    split **twice** per split touched (once for output generation, once again
+    in the summary block just for `rmse_<split>`) and does so even for
+    narrow-`timerange` entries (e.g. `storm_eunice_2022` forward-passes the
+    whole testing split before `select_timespan` narrows the result
+    afterward) — redundant and wasteful, not just unscaled. Likely fix: chunk
+    `predict()`/`forward()` (and the epoch-end loss calls) over the batch-time
+    axis the same way training already does, accumulating outputs/loss across
+    chunks — one change point that would benefit training, output-writing, and
+    standalone inference at once. Not yet scoped into a concrete implementation
+    plan; discuss approach before implementing.
 
 ## Checklist for each step:
 - all source should eventually be in src/ and all tests should be in test/ and test data should be in test_data/
