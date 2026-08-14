@@ -12,6 +12,7 @@ julia = "julia +1.12.5"
 quarto = ">=1.9,<2"
 juliaup = ">=1.19.9,<2"
 dvc = ">=3.67.1,<4"
+dvc-s3 = ">=3.3.0,<4"
 
 [target.linux-64.dependencies]
 parallel = ">=20260422,<20260423"

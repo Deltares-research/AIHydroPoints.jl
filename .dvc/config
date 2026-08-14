@@ -1,0 +1,5 @@
+[core]
+    remote = minio_deltares_ai-hydro
+['remote "minio_deltares_ai-hydro"']
+    url = s3://ai-hydro/dvc
+    endpointurl = https://s3.deltares.nl
