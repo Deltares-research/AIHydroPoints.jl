@@ -159,17 +159,55 @@ Docs and comms
 12. [ ] **Create an environment for online demos.**
 13. [ ] **Add experiments for waves.**
 14. [ ] **Scale surge model to a large number of stations.**
-15. [ ] **Add DVC for data storage.**
+15. [ ] **Add DVC for data storage, with a MinIO remote** — move larger
+    training datasets out of git (currently several `data/*`/`test_data/*`
+    files live directly in the working tree/git history) onto DVC-tracked
+    storage backed by MinIO (S3-compatible), rather than committing them.
+    Status: `dvc` is already in `pixi.toml` (`pixi run dvc` available,
+    commit "add dvc to pixi"), and a throwaway scratch repo
+    (`dvc_test.git/`, untracked, not part of this repo) already validated
+    the basic `dvc add`/`push`/`pull` flow end-to-end with a plain
+    local-filesystem remote (`.dvc/config` → `remote "myremote"` pointing
+    at a local `dvcstore/` dir) — next step is pointing a remote at actual
+    MinIO instead of a local dir. See `brainstorm_long_term_design.md`
+    (task × tool matrix) for the earlier DVC-vs-Airflow/Snakemake/Ray
+    reasoning behind choosing DVC in the first place.
+    Open questions to settle before implementing: MinIO endpoint/bucket/
+    credentials and how they're supplied (env vars vs. `.dvc/config.local`);
+    which directories actually move to DVC (`data/` and `test_data/` are the
+    obvious candidates — `test_data/` is small and used by CI-style unit
+    tests, so may be worth keeping in git for simplicity even if `data/`
+    moves); whether to rewrite git history to remove already-committed large
+    files or just stop adding new ones going forward (rewriting affects
+    every clone/collaborator, worth a deliberate decision rather than
+    default `git filter-repo`).
 16. [ ] **Deferred documentation follow-ups** (non-blocking): (a) the interaction
     models have no `background.md` writeup yet; (b) the DeepONet tide model is a
     one-line placeholder — its code merge is FiLM-style scale/shift, not a dot
     product; correct if/when needed.
-17. [ ] **Return the best model, not the last epoch.** After training with early
-    stopping, `train_model!` leaves the in-memory model at the *final* epoch, while
-    the best weights are saved only to `params_best.jld2`. So predicting straight
-    from the returned model can use worse-than-best weights. Reload `params_best`
-    before returning (or document the current behaviour). Pre-existing behaviour,
-    unchanged by the Phase B early-stopping work.
+17. [x] **Return the best model, not the last epoch.** **DONE.** After
+    training with validation data and a `model_dir`, `train_model!` now
+    reloads `params_best.jld2` into the model before returning (previously
+    it left the in-memory model at the *final* epoch, which for some model
+    families — notably `BiLinearSurgeInteractionModel` at 317 stations —
+    could be substantially worse than the best validation epoch found along
+    the way; `LinearSurgeModel` was accidentally immune since its training
+    converges cleanly, final ≈ best). No-op when there's no validation data
+    or no `model_dir` (nothing was ever persisted to reload). Two new tests
+    in `test/test_training_features.jl`: the reload actually happens and
+    matches `params_best.jld2` exactly, and the no-`model_dir` case still
+    runs without error. 679 unit + 12 smoke pass.
+
+    **Why this was bumped up:** task 23 found this wasn't a minor accuracy
+    nit — `summary.toml` (computed from the pre-fix final-epoch model) made
+    `BiLinearSurgeInteractionModel` at 317 stations look far worse than it
+    is, and manufactured a spurious −61% storm-RMSE "finding" for the `full`
+    modulation variant that vanished once re-evaluated on `params_best.jld2`.
+    Any *past* comparison that used `summary.toml`'s recorded RMSE rather
+    than `params_best.jld2` directly for a model where final ≠ best should
+    be treated with caution — this fix only prevents the issue going
+    forward, it doesn't retroactively correct old `summary.toml` files. See
+    `brainstorm_surge_model_status.md` items 4/8.
 18. [ ] **Stale `run_settings.toml` for pre-format-v2 baselines** (records only; not
     replayable against the new reader unless migrated).
 19. [ ] **Minor data-settings robustness (deferred):** (a) warn when a variable is
@@ -211,6 +249,53 @@ Docs and comms
     chunks — one change point that would benefit training, output-writing, and
     standalone inference at once. Not yet scoped into a concrete implementation
     plan; discuss approach before implementing.
+
+23. [x] **Full-breadth tide modulation** (`brainstorm_surge_model_status.md`
+    item 8). **DONE.** Added `model_pars["modulation_type"]` (`"local"`/`"full"`,
+    `FullTideModulation`) to `BiLinearSurgeInteractionModel`, plus a small
+    `scripts/parameter_sweep.jl` fix to sweep string-valued params. 5-station
+    pass (1/5/20yr) was a wash within noise. The decisive 317-station/5yr
+    pass initially found `full` a real loss on storm RMSE (−61%) — but that
+    number was computed from `summary.toml` (task 17's final-epoch model, not
+    `params_best.jld2`), and a same-checkpoint re-run showed `local` and
+    `full` are actually statistically tied on both `rmse_testing` and
+    `rmse_storm_eunice_2022`. **Verdict: no evidence *for* `full`, at either
+    scale — deprioritized.** Doesn't settle whether neighboring-station tide
+    genuinely carries physical information (no test here rules that out),
+    but there's a structural reason not to expect this specific approach to
+    find it even if so: `full`'s regressor stacks spatial collinearity on
+    top of `local`'s already-considerable temporal collinearity (tide's
+    harmonic-constituent structure), and a plain all-to-all weight matrix
+    under MSE + `weight_decay` responds to that by shrinking toward a bland,
+    near-zero solution rather than a sharper one — observed directly in both
+    the 5- and 317-station weight patterns. If the physical question is ever
+    revisited, replacing the raw 48-lag tide window with a handful of
+    harmonic-constituent features (the same sin/cos basis `ProductTideModel`
+    already uses) would remove the degeneracy by construction and give an
+    actually well-conditioned test — not a reason to retry this same
+    implementation at a different scale. Side findings along the way:
+    317-station BiLinear
+    has real run-to-run variance even under fixed settings (task-item 12 of
+    the brainstorm doc), most of which turned out to trace back to the same
+    checkpoint-selection issue (task 17) rather than a real architectural
+    problem — an explicit modulation-on/off ablation confirms the branch is
+    functionally beneficial despite noisy-looking weights, and tide's
+    harmonic-constituent collinearity explains why the weights look noisy in
+    the first place. Full tables/discussion in `brainstorm_surge_model_status.md`
+    (items 4, 8, 12). Task 17 (return best model, not last epoch) is now
+    fixed — see task 17 itself.
+
+    **On-disk artifacts patched to match.** All 4 sweeps (317-station 5yr,
+    5-station 1/5/20yr; 36 runs) had their `summary.toml` recomputed from
+    `params_best.jld2` in place and `results.csv` regenerated via
+    `parameter_sweep.jl --continue` (skips retraining, just re-aggregates),
+    so the on-disk record now matches what's logged in the brainstorm doc —
+    no more silent mismatch between the two. Checking the 5-station sweeps
+    this way (not previously checked) surfaced one more real correction:
+    the 20yr storm cell, originally flagged live as a "high-variance, one
+    repeat early-stopped" outlier at −6.87%, collapses to a noise-level
+    −0.74% once corrected — confirming that flag was right. No other
+    5-station cell moved enough to change a conclusion.
 
 ## Checklist for each step:
 - all source should eventually be in src/ and all tests should be in test/ and test data should be in test_data/

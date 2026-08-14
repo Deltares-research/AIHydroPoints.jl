@@ -1,0 +1,5 @@
+outs:
+- md5: a174e381069e31b469b636700182c356
+  size: 257299018
+  hash: md5
+  path: era5_2000_2022_317points_wind_stress_y.jld2
