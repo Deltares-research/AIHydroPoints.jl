@@ -44,7 +44,7 @@ export AbstractFluxModel, MyFluxModel
 export preprocess, forward, postprocess!, get_flux_model, predict
 
 include("models/AbstractSurgeModel.jl")
-export AbstractSurgeModel
+export AbstractSurgeModel, SurgeLagSource, nsamples, materialize_batch
 
 include("models/LinearSurgeModel.jl")
 export LinearSurgeModel

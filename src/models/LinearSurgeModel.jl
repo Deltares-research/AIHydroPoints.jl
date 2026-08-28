@@ -23,13 +23,12 @@ Required keys in `settings`: `"nlocations_output"`, `"nlocations_input"`, `"nlag
 
 ## Tensor layout
 
-`preprocess` returns a 1-tuple `(x_flat,)` with
-`x_flat :: (3*nlocations_input*nlags, ntimes_valid)` — a flat feature vector per
-batch-time step. The flux model is `Chain(only, Dense(...))`: `only` unwraps the
-1-tuple and `Dense` maps `x_flat` to `(nlocations_output, ntimes_valid)`.
-`Dense` is permutation-invariant on its input vector, so the exact interleaving of
-point/quantity/lag inside the flat vector is irrelevant as long as it is the same
-at train and predict time (it is — both go through this `preprocess`).
+`preprocess` returns a 1-tuple `(SurgeLagSource,)` — a lazy container over the
+aligned forcing matrices.  Each training/predict minibatch is materialised as
+`x_flat :: (3*nlocations_input*nlags, batchsize)` on demand, avoiding the
+full-series feature matrix at 317 stations × 20 years.  The flux model is
+`Chain(only, Dense(...))`: `only` unwraps the 1-tuple and `Dense` maps `x_flat`
+to `(nlocations_output, batchsize)`.
 """
 mutable struct LinearSurgeModel <: AbstractSurgeModel
     flux_model
@@ -60,20 +59,16 @@ get_settings(m::LinearSurgeModel)   = m.settings
     preprocess(model::LinearSurgeModel, input::Dict{String, TimeSeries})
         -> (Tuple, Dict{String, TimeSeries})
 
-Assemble the flat Dense-input tuple from the shared lag windows.
+Assemble the lazy Dense-input tuple from aligned forcing matrices.
 
-Returns `((x_flat,), output)` where `x_flat` has shape
-`(3*nlocations_input*nlags, ntimes_valid)`: the `(point, lag, batch-time)` stress
-and pressure windows stacked along features and flattened to one vector per
-batch-time step (batch-time is the last axis).
+Returns `((src::SurgeLagSource,), output)` where `src` holds raw stress/pressure
+matrices and valid time indices; `materialize_batch` builds the flat feature
+matrix per minibatch.
 
-`forward` and `postprocess!` are inherited from `AbstractSurgeModel`.
+`forward` and `postprocess!` are inherited from `AbstractSurgeModel`; `predict`
+and `train_model!` materialise batches automatically.
 """
 function preprocess(model::LinearSurgeModel, input::Dict{String, TimeSeries})
-    # sx, sy, pr :: (nwind, nlags, nvalid)   — shared extraction
-    sx, sy, pr, times_valid = _surge_lag_windows(model, input)
-    nvalid    = size(sx, 3)
-    x_stacked = vcat(sx, sy, pr)                 # (3*nwind, nlags, nvalid)
-    x_flat    = reshape(x_stacked, :, nvalid)    # (3*nwind*nlags, nvalid)
-    return (x_flat,), _alloc_surge_output(model, times_valid)
+    src, times_valid = _surge_lag_source(model, input)
+    return (src,), _alloc_surge_output(model, times_valid)
 end
