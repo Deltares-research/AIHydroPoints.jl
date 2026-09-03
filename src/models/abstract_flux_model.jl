@@ -77,6 +77,35 @@ by all subtypes without modification.
 """
 abstract type AbstractFluxModel <: AbstractModel end
 
+"""
+    LazyBatchInput
+
+Abstract supertype for preprocess outputs that keep raw forcing in memory and
+build model input batches on demand (see [`SurgeLagSource`](@ref)).  The generic
+`train_model!` and `predict` detect a 1-tuple `(src,)` where `src` subtypes
+`LazyBatchInput` and materialise only the current minibatch.
+"""
+abstract type LazyBatchInput end
+
+"""Number of batch-time samples in a lazy preprocess container."""
+nsamples(x::LazyBatchInput) = error("nsamples not implemented for $(typeof(x))")
+
+"""
+    materialize_batch(x::LazyBatchInput, cols) -> Matrix{Float32}
+
+Build a dense input matrix for 1-based sample indices `cols`.  Returns
+`(nfeatures, length(cols))`.
+"""
+materialize_batch(x::LazyBatchInput, cols::AbstractVector{Int}) =
+    error("materialize_batch not implemented for $(typeof(x))")
+
+"""Return a lazy input covering a subset of sample indices (train/val split)."""
+subset(x::LazyBatchInput, sample_idx) = error("subset not implemented for $(typeof(x))")
+
+_is_lazy_batch_input(x::Tuple) = length(x) == 1 && x[1] isa LazyBatchInput
+
+_lazy_tuple(src::LazyBatchInput, cols::AbstractVector{Int}) = (materialize_batch(src, cols),)
+
 # ──────────────────────────────────────────────────────────────────────────────
 # predict — implemented once for all AbstractFluxModel subtypes
 # ──────────────────────────────────────────────────────────────────────────────
@@ -93,9 +122,12 @@ correct metadata (times, station names, coordinates) and zero-initialised values
 `forward` runs the Flux model and returns a 2-D `(locations, time)` array.
 `postprocess!` fills the pre-allocated output values in-place.
 """
-function predict(model::AbstractFluxModel, input::Dict{String, TimeSeries})
+function predict(model::AbstractFluxModel, input::Dict{String, TimeSeries};
+                 batchsize::Int=1024)
     x, output = preprocess(model, input)
-    y = forward(model, x)
+    y = _is_lazy_batch_input(x) ?
+        _forward_batched(model, x; batchsize=batchsize) :
+        forward(model, x)
     postprocess!(output, model, y)
     return output
 end
@@ -112,6 +144,78 @@ Slice every tensor in `x` along its last (batch-time / sample) axis at indices
 preprocessed input tuple into train/validation portions.
 """
 _take_last_dim(x::Tuple, idx) = map(a -> copy(selectdim(a, ndims(a), idx)), x)
+
+"""
+    _forward_batched(model, x; batchsize) -> Matrix
+
+Run `forward` in batch-time chunks when `x` is a lazy 1-tuple, otherwise delegate
+to `forward`.
+"""
+function _forward_batched(model::AbstractFluxModel, x::Tuple; batchsize::Int)
+    src = x[1]
+    n   = nsamples(src)
+    nstations = get_settings(model)["nlocations_output"]
+    y = zeros(Float32, nstations, n)
+    for batch_start in 1:batchsize:n
+        cols = collect(batch_start:min(batch_start + batchsize - 1, n))
+        y[:, cols] .= forward(model, _lazy_tuple(src, cols))
+    end
+    return y
+end
+
+"""
+    _batched_rmse(flux_model, x, y; batchsize) -> Float32
+
+RMSE over the full `(x, y)` pair without one forward pass on every sample at
+once — accumulates SSE batch-wise to cap peak memory during evaluation.
+"""
+function _batched_rmse(flux_model, x::Tuple, y::AbstractMatrix; batchsize::Int)
+    if _is_lazy_batch_input(x)
+        return _batched_rmse_lazy(flux_model, x[1], y; batchsize=batchsize)
+    end
+    sse = 0.0f0
+    n = 0
+    for (xb, yb) in Flux.DataLoader((x, y); batchsize=batchsize, shuffle=false)
+        diff = flux_model(xb) .- yb
+        sse += sum(abs2, diff)
+        n += length(diff)
+    end
+    return sqrt(sse / n)
+end
+
+function _batched_rmse_lazy(flux_model, src::LazyBatchInput, y::AbstractMatrix; batchsize::Int)
+    sse = 0.0f0
+    n = 0
+    nfull = nsamples(src)
+    for batch_start in 1:batchsize:nfull
+        cols = collect(batch_start:min(batch_start + batchsize - 1, nfull))
+        diff = flux_model(_lazy_tuple(src, cols)) .- y[:, cols]
+        sse += sum(abs2, diff)
+        n += length(diff)
+    end
+    return sqrt(sse / n)
+end
+
+"""
+    _train_epoch_lazy!(flux_model, opt_state, src, y; batchsize, shuffle, noise_std)
+
+One training epoch over a lazy input source, materialising each minibatch on demand.
+"""
+function _train_epoch_lazy!(flux_model, opt_state, src::LazyBatchInput, y::AbstractMatrix;
+                            batchsize::Int, do_shuffle::Bool, noise_std::Float64)
+    n = nsamples(src)
+    for cols in Flux.DataLoader(collect(1:n); batchsize=batchsize, shuffle=do_shuffle)
+        cols = cols isa AbstractVector{Int} ? cols : collect(cols)
+        xb   = _lazy_tuple(src, cols)
+        yb   = y[:, cols]
+        xin  = noise_std > 0 ?
+               map(a -> a .+ eltype(a)(noise_std) .* randn(eltype(a), size(a)), xb) : xb
+        _, grads = Flux.withgradient(flux_model) do m
+            Flux.mse(m(xin), yb)
+        end
+        Flux.update!(opt_state, flux_model, grads[1])
+    end
+end
 
 """
     preprocess(model, input, target) -> (x::Tuple, y)
@@ -188,15 +292,27 @@ function train_model!(model::AbstractFluxModel, train_settings::TrainingSettings
         has_val = n_val > 0
         if has_val
             n_train = nfull - n_val
-            x       = _take_last_dim(x_full, 1:n_train)
-            y       = y_full[:, 1:n_train]
-            x_val   = _take_last_dim(x_full, n_train+1:nfull)
-            y_val   = y_full[:, n_train+1:end]
+            if _is_lazy_batch_input(x_full)
+                src   = x_full[1]
+                x     = (subset(src, 1:n_train),)
+                y     = @view y_full[:, 1:n_train]
+                x_val = (subset(src, n_train + 1:nfull),)
+                y_val = @view y_full[:, n_train + 1:end]
+            else
+                x       = _take_last_dim(x_full, 1:n_train)
+                y       = copy(@view y_full[:, 1:n_train])
+                x_val   = _take_last_dim(x_full, n_train + 1:nfull)
+                y_val   = copy(@view y_full[:, n_train + 1:end])
+                x_full  = nothing
+                y_full  = nothing
+            end
         else
             x, y  = x_full, y_full
             x_val = y_val = nothing
         end
     end
+
+    lazy_input = _is_lazy_batch_input(x)
 
     flux_model = get_flux_model(model)
     # Weight decay (L2) is opt-in: wrap Adam in an OptimiserChain only when the
@@ -209,10 +325,10 @@ function train_model!(model::AbstractFluxModel, train_settings::TrainingSettings
     opt_state  = Flux.setup(opt_rule, flux_model)
     current_lr = Float64(train_settings.learning_rate)
     noise_std  = Float64(train_settings.input_noise_std)
-    # DataLoader batches the nested tuple ((x1,…,xN), y) element-wise along the
-    # last axis, yielding (xb::Tuple, yb) each iteration. Flux model is called as
-    # m(xb) — every flux model is callable on its input tuple.
-    loader = Flux.DataLoader((x, y); batchsize=train_settings.batch_size, shuffle=true)
+    # Eager inputs: DataLoader batches along the last axis.  Lazy inputs (e.g.
+    # SurgeLagSource) materialise each minibatch inside _train_epoch_lazy!.
+    loader = lazy_input ? nothing :
+             Flux.DataLoader((x, y); batchsize=train_settings.batch_size, shuffle=true)
 
     checkpoint_dir = get(settings, "model_dir", nothing)
 
@@ -234,24 +350,30 @@ function train_model!(model::AbstractFluxModel, train_settings::TrainingSettings
     epochs_since_improve = 0
 
     for epoch in 1:train_settings.nepochs
-        for (xb, yb) in loader
-            # Input-noise augmentation (opt-in): perturb every input tensor with
-            # Gaussian noise of std `noise_std`. `xb` is the batched input tuple.
-            xin = noise_std > 0 ?
-                  map(a -> a .+ eltype(a)(noise_std) .* randn(eltype(a), size(a)), xb) : xb
-            _, grads = Flux.withgradient(flux_model) do m
-                Flux.mse(m(xin), yb)
+        if lazy_input
+            _train_epoch_lazy!(flux_model, opt_state, x[1], y;
+                               batchsize=train_settings.batch_size,
+                               do_shuffle=true, noise_std=noise_std)
+        else
+            for (xb, yb) in loader
+                # Input-noise augmentation (opt-in): perturb every input tensor with
+                # Gaussian noise of std `noise_std`. `xb` is the batched input tuple.
+                xin = noise_std > 0 ?
+                      map(a -> a .+ eltype(a)(noise_std) .* randn(eltype(a), size(a)), xb) : xb
+                _, grads = Flux.withgradient(flux_model) do m
+                    Flux.mse(m(xin), yb)
+                end
+                Flux.update!(opt_state, flux_model, grads[1])
             end
-            Flux.update!(opt_state, flux_model, grads[1])
         end
 
-        train_rmse = sqrt(Flux.mse(flux_model(x), y))
+        train_rmse = _batched_rmse(flux_model, x, y; batchsize=train_settings.batch_size)
         push!(train_losses, train_rmse)
 
         empty!(showvalues)
         push!(showvalues, "train RMSE" => @sprintf("%.4f", train_rmse))
         if has_val
-            val_rmse = sqrt(Flux.mse(flux_model(x_val), y_val))
+            val_rmse = _batched_rmse(flux_model, x_val, y_val; batchsize=train_settings.batch_size)
             push!(val_losses, val_rmse)
             push!(showvalues, "val RMSE  " => @sprintf("%.4f", val_rmse))
             if val_rmse < best_val_rmse

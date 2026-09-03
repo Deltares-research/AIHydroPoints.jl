@@ -79,8 +79,11 @@ end
 
     for use_wind_keys in (false, true)
         input = make_surge_input(nwind=nwind, ntimes=ntimes, use_wind_keys=use_wind_keys)
-        (x_flat,), output = preprocess(m, input)
+        (src,), output = preprocess(m, input)
 
+        @test src isa SurgeLagSource
+        @test nsamples(src) == nvalid
+        x_flat = materialize_batch(src, collect(1:nvalid))
         @test size(x_flat) == (3*nwind*nlags, nvalid)
         @test eltype(x_flat) == Float32
         @test haskey(output, "surge")
@@ -89,6 +92,16 @@ end
         @test length(get_times(output["surge"])) == nvalid
         @test get_names(output["surge"]) == m.settings["out_names"]
     end
+end
+
+@testset "SurgeLagSource matches _surge_lag_flat" begin
+    nwind = 3; ntimes = 30; nlags = 4
+    m = LinearSurgeModel(make_lsm_settings(nwind=nwind, nlags=nlags))
+    input = make_surge_input(nwind=nwind, ntimes=ntimes)
+    (src,), _ = preprocess(m, input)
+    x_lazy = materialize_batch(src, collect(1:nsamples(src)))
+    x_flat, _ = AIHydroPoints._surge_lag_flat(m, input)
+    @test x_lazy ≈ x_flat
 end
 
 # ──────────────────────────────────────────────────────────────────────────────

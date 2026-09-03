@@ -187,10 +187,11 @@ model = LinearSurgeModel(settings)
 ### Data flow
 
 ```
-preprocess → x = (x_flat,)  with x_flat (3*nwind*nlags, ntimes_valid)
+preprocess → x = (SurgeLagSource,)   # raw forcing + valid time indices (~MB, not GBs)
                 + output Dict("surge" => zeros TimeSeries)
-forward    → Chain(only, Dense(3*nwind*nlags => nstations))(x) → (nstations, ntimes_valid)   [generic, m(x)]
-postprocess! → output["surge"].values .= y   [generic, 2-D]
+train/predict materialise (3*nwind*nlags, batchsize) per minibatch via materialize_batch
+forward    → Chain(only, Dense(3*nwind*nlags => nstations))(x) → (nstations, batchsize)   [generic, m(x)]
+postprocess! → output["surge"].values .= y   [generic, 2-D; predict batches over time]
 ```
 
 ### train_model!
