@@ -13,6 +13,10 @@
 #   pixi run julia --project scripts/parameter_sweep.jl \
 #       [base.toml] [dotted.param.path] [v1,v2,v3] [nrepeats] [experiment] [--continue|--overwrite]
 #
+# [v1,v2,v3] values parse as Int, then Float64, then fall back to a raw string --
+# e.g. `local,full` sweeps a string-valued `model_pars` key (see
+# scripts/parameter_sweep.jl:_parseval).
+#
 # If `sweeps/<experiment>/` already exists, the script refuses to run without one of:
 #   --continue  — resume it: any run tag whose output dir already has a completed
 #                 `summary.toml` is skipped; everything else (never started, or
@@ -26,7 +30,9 @@
 using AIHydroPoints, Random, Statistics, Printf, CSV, DataFrames
 
 # ── configuration (edit defaults, or override via ARGS) ───────────────────────────
-_parsenum(s) = something(tryparse(Int, String(s)), parse(Float64, String(s)))
+# Int, then Float64, then raw string (e.g. "local"/"full" for a string-valued
+# model_pars key) -- so both numeric and string sweeps work through one code path.
+_parseval(s) = something(tryparse(Int, String(s)), tryparse(Float64, String(s)), String(s))
 
 # defaults
 base_toml_default = "experiments/317stations/surge_5yr_BiLinearSurgeInteractionModel.toml"
@@ -47,7 +53,7 @@ base_toml  = length(posargs) >= 1 ? posargs[1] :
              base_toml_default
 param_path = String.(length(posargs) >= 2 ? split(posargs[2], ".") :
              param_path_default)
-values     = length(posargs) >= 3 ? _parsenum.(split(posargs[3], ",")) : values_default
+values     = length(posargs) >= 3 ? _parseval.(split(posargs[3], ",")) : values_default
 nrepeats   = length(posargs) >= 4 ? parse(Int, posargs[4]) : nrepeats_default
 experiment = length(posargs) >= 5 ? posargs[5] : experiment_default
 

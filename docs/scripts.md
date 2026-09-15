@@ -70,6 +70,10 @@ arguments are optional and fall back to defaults defined at the top of the
 script — edit those for a sweep you'll reuse, or override positionally for a
 one-off.
 
+Each value in `v1,v2,v3` parses as `Int`, then `Float64`, then falls back to a
+raw string — so both numeric sweeps and string-valued `model_pars` keys (e.g.
+`local,full`) work through the same CLI argument.
+
 Output goes to `sweeps/<experiment>/`:
 
 - `<tag>/` — one `model_dir` per run (`baseline_rep<k>` and
