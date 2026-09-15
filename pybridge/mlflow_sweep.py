@@ -51,13 +51,19 @@ PLOT_OUTPUTS_DEFAULT = False
 WRITE_SERIES_DEFAULT = False
 
 
-def _parsenum(s):
-    """Parse a CLI value as an int if possible, else a float (mirrors Julia's
-    tryparse(Int, ...) / parse(Float64, ...) fallback)."""
+def _parseval(s):
+    """Parse a CLI value as an int if possible, else a float, else fall back to
+    the raw string (mirrors Julia's tryparse(Int, ...) / tryparse(Float64, ...)
+    / String(...) fallback) -- so both numeric sweeps and string-valued
+    model_pars keys (e.g. "local,full") work through the same CLI argument."""
     try:
         return int(s)
     except ValueError:
+        pass
+    try:
         return float(s)
+    except ValueError:
+        return s
 
 
 def _setpath(d, path, val):
@@ -255,7 +261,7 @@ def main():
     # wherever this script happens to be invoked from (e.g. pybridge/).
     base_toml = posargs[0] if len(posargs) >= 1 else str(REPO_DIR / BASE_TOML_DEFAULT)
     param_path = posargs[1].split(".") if len(posargs) >= 2 else PARAM_PATH_DEFAULT
-    values = ([_parsenum(v) for v in posargs[2].split(",")] if len(posargs) >= 3
+    values = ([_parseval(v) for v in posargs[2].split(",")] if len(posargs) >= 3
               else VALUES_DEFAULT)
     nrepeats = int(posargs[3]) if len(posargs) >= 4 else NREPEATS_DEFAULT
     experiment = posargs[4] if len(posargs) >= 5 else EXPERIMENT_DEFAULT
