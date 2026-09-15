@@ -34,18 +34,31 @@ println("Selecting time range from $(start_date) to $(end_date) and downloading 
 his_data_timesel = select_timespan(his_data, start_date, end_date)
 println("Time range selected.")
 # Select locations by names or ids
-station_names = ["VLISSGN","HOEKVHLD","DENHDR","HARLGN","DELFZL"] # or [] to use station_ids
 all_station_names = get_names(his_data_timesel)
-station_ids = find_location_index(station_names, all_station_names)
-his_data_selected = select_locations_by_ids(his_data_timesel, station_ids)
+#station_names = ["VLISSGN","HOEKVHLD","DENHDR","HARLGN","DELFZL"] # or [] to use station_ids
+#station_ids = find_location_index(station_names, all_station_names)
+#his_data_selected = select_locations_by_ids(his_data_timesel, station_ids)
+# Select all stations
+station_names=all_station_names
+nstations=length(station_names)
+station_ids=1:nstations
+his_data_selected=his_data_timesel
 
+# write locations to csv file as x,y,station_name
+station_file=joinpath("data","DCSM-FM_0_5nm_$(nstations)_stations.xyn")
+open(station_file, "w") do f
+    for (lon, lat, name) in zip(get_longitudes(his_data_selected), get_latitudes(his_data_selected), get_names(his_data_selected))
+        println(f, "$(lon),$(lat),$(name)")
+    end
+end
+println("Station locations written to $(station_file).")
 
 # Coarsen to hourly values (if needed)
 # Use function select_timerange_with_fill(ts::AbstractTimeSeries, time_range::StepRange{DateTime, <:TimePeriod}; fill_value=nothing)
 his_data_selected = select_timerange_with_fill(his_data_selected, DateTime(2000,1,1):Hour(1):DateTime(2023,1,1); fill_value=0.0)
 
 # Save to local file
-output_file = joinpath("data","DCSM-FM_0_5nm_2000_2022_5stations_his.jld2")
+output_file = joinpath("data","DCSM-FM_0_5nm_2000_2022_$(nstations)stations_his.jld2")
 if isfile(output_file)
     rm(output_file)
     # error("Output file $(output_file) already exists. Please remove it before running this script.")
