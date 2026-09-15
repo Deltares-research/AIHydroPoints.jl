@@ -300,6 +300,25 @@ Docs and comms
     −0.74% once corrected — confirming that flag was right. No other
     5-station cell moved enough to change a conclusion.
 
+24. [ ] **Re-enable `--nv` GPU passthrough in `bash_claude.sh` once fixed upstream.**
+    Currently disabled (`gpu_args=()`, unconditionally) because Apptainer's `--nv`
+    injects a polluted `LD_LIBRARY_PATH` (`/usr/local/lib:/lib/x86_64-linux-gnu:/lib`
+    ahead of `/.singularity.d/libs`) that shadows the container's own JLL-artifact
+    libs — reproduced as a `Glib_jll`/`libgobject-2.0.so` "undefined symbol:
+    g_string_copy" crash on `using AIHydroPoints` (confirmed via `nm -D`: the
+    container's system `libglib-2.0.so.0` is 2.80, missing the symbol; the JLL
+    artifact ships 2.86.3). Confirmed via direct host-side `apptainer exec` tests
+    that `--nv` alone (not `--cleanenv`'s host-leakage case, already handled) is
+    the source: `LD_LIBRARY_PATH` is polluted with `--nv`, clean without it.
+    `--nvccli` (nvidia-container-toolkit-based passthrough) was tried as a
+    cleaner alternative but isn't usable on this host —
+    `nvidia-container-cli: executable file not found in $PATH`. Not needed right
+    now since this repo isn't using CUDA. When GPU training is needed again:
+    retest whether `--nv` still pollutes `LD_LIBRARY_PATH` (newer Apptainer may
+    have fixed it), or install `nvidia-container-toolkit` and use `--nvccli`, or
+    (fallback) filter `LD_LIBRARY_PATH` down to `/.singularity.d/libs` right
+    before the final `exec /bin/bash -i` in `bash_claude.sh`.
+
 ## Checklist for each step:
 - all source should eventually be in src/ and all tests should be in test/ and test data should be in test_data/
 - make code compilable and runnable
