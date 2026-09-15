@@ -61,3 +61,36 @@ end
     tl, _ = train_model!(_ft_model(), ts, input, target)
     @test length(tl) == 8
 end
+
+@testset "train_model! returns best-epoch weights, not final-epoch (task 17)" begin
+    model_dir = joinpath(temp_dir, "train_model_best_epoch_test")
+    mkpath(model_dir)
+    input, target = _ft_input(ntimes=80), _ft_target(ntimes=80)
+    model = LinearSurgeModel(Dict{String,Any}(
+        "nlocations_output" => 2, "nlocations_input" => 3, "nlags" => 4,
+        "model_dir" => model_dir))
+    # Random target is unlearnable, so val RMSE wanders rather than converging
+    # monotonically -- a realistic case where final != best.
+    ts = TrainingSettings(nepochs=30, batch_size=16, learning_rate=5.0e-3,
+                          validation_split=0.3, early_stopping_epochs=nothing)
+    train_model!(model, ts, input, target)
+
+    best_path = joinpath(model_dir, "params_best.jld2")
+    @test isfile(best_path)
+    # The model handle train_model! mutated in place must already match
+    # params_best.jld2 -- reloading it independently should be a no-op.
+    returned_weight = copy(get_flux_model(model)[2].weight)
+    load_params!(model, best_path)
+    @test get_flux_model(model)[2].weight ≈ returned_weight
+end
+
+@testset "train_model! without model_dir still returns final-epoch (no best to reload)" begin
+    input, target = _ft_input(), _ft_target()
+    ts = TrainingSettings(nepochs=3, batch_size=16, learning_rate=1.0e-3,
+                          validation_split=0.3)
+    # No model_dir in settings -> no params_best.jld2 is ever written, so
+    # train_model! has nothing to reload and must not error.
+    tl, vl = train_model!(_ft_model(), ts, input, target)
+    @test length(tl) == 3
+    @test length(vl) == 3
+end

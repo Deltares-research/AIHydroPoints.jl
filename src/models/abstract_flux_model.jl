@@ -154,6 +154,14 @@ On first call, `"out_names"`, `"out_lons"`, `"out_lats"`, and `"out_quantity"`
 are populated from the first `TimeSeries` in `target`.  Returns
 `(train_losses, val_losses)` per epoch; `val_losses` is empty when there is no
 validation data.
+
+If validation data is present and a `model_dir` checkpoint directory is
+configured, `model` is reloaded from `params_best.jld2` before returning, so
+it (and the caller's handle to it) end up holding the best-validation-epoch
+weights rather than whatever the final epoch happened to be — the two can
+differ substantially when training doesn't converge monotonically. With no
+validation data, or no `model_dir`, there is no persisted "best" to reload
+and `model` is left at its final-epoch state, as before.
 """
 function train_model!(model::AbstractFluxModel, train_settings::TrainingSettings,
                       input::Dict{String, TimeSeries}, target::Dict{String, TimeSeries};
@@ -231,6 +239,7 @@ function train_model!(model::AbstractFluxModel, train_settings::TrainingSettings
     progress      = Progress(train_settings.nepochs; desc="Training: ", showspeed=true)
     log_every     = max(1, train_settings.nepochs ÷ 10)
     best_val_rmse        = Inf32
+    best_epoch           = 0
     epochs_since_improve = 0
 
     for epoch in 1:train_settings.nepochs
@@ -256,6 +265,7 @@ function train_model!(model::AbstractFluxModel, train_settings::TrainingSettings
             push!(showvalues, "val RMSE  " => @sprintf("%.4f", val_rmse))
             if val_rmse < best_val_rmse
                 best_val_rmse        = val_rmse
+                best_epoch           = epoch
                 epochs_since_improve = 0
                 if !isnothing(checkpoint_dir)
                     save_params(model, joinpath(checkpoint_dir, "params_best.jld2"); overwrite=true)
@@ -305,6 +315,19 @@ function train_model!(model::AbstractFluxModel, train_settings::TrainingSettings
             @info @sprintf("Early stopping at epoch %d/%d: no val improvement for %d epochs.",
                            epoch, train_settings.nepochs, train_settings.early_stopping_epochs)
             break
+        end
+    end
+
+    # Return the best-validation-epoch weights, not whatever the final epoch
+    # happened to be (task 17 / plan.md) -- the two can differ substantially
+    # when training doesn't converge monotonically. Only possible when we
+    # actually persisted a best checkpoint (has_val + a configured model_dir).
+    if has_val && !isnothing(checkpoint_dir)
+        best_path = joinpath(checkpoint_dir, "params_best.jld2")
+        if isfile(best_path)
+            load_params!(model, best_path)
+            @info @sprintf("Reloaded best-epoch (%d) weights (val RMSE %.4f) before returning.",
+                           best_epoch, best_val_rmse)
         end
     end
 
