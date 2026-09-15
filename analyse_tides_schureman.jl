@@ -109,8 +109,9 @@ CSV.write(joinpath(output_dir, "constituents_$(method).csv"), tc_df)
 # ──────────────────────────────────────────────
 # Write JLD2 data files to data/
 # ──────────────────────────────────────────────
-tides_jld2 = joinpath("data", "tides_schureman_2000_2022_5stations.jld2")
-surge_jld2 = joinpath("data", "surge_schureman_2000_2022_5stations.jld2")
+input_stem = replace(basename(input_file), r"^DCSM-FM_0_5nm_" => "", ".jld2" => "")
+tides_jld2 = joinpath(dirname(input_file), "tides_schureman_$(input_stem).jld2")
+surge_jld2 = joinpath(dirname(input_file), "surge_schureman_$(input_stem).jld2")
 
 @info "Writing $tides_jld2"
 write_to_jld2(ts_tides, tides_jld2)
