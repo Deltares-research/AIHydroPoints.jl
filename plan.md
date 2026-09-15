@@ -251,9 +251,12 @@ Docs and comms
     plan; discuss approach before implementing.
 
 23. [x] **Full-breadth tide modulation** (`brainstorm_surge_model_status.md`
-    item 8). **DONE.** Added `model_pars["modulation_type"]` (`"local"`/`"full"`,
-    `FullTideModulation`) to `BiLinearSurgeInteractionModel`, plus a small
-    `scripts/parameter_sweep.jl` fix to sweep string-valued params. 5-station
+    item 8). **DONE, then reverted.** Added `model_pars["modulation_type"]`
+    (`"local"`/`"full"`, `FullTideModulation`) to `BiLinearSurgeInteractionModel`,
+    plus a small `scripts/parameter_sweep.jl` fix to sweep string-valued params.
+    Given the "no evidence for `full`" verdict below, `FullTideModulation` and
+    `modulation_type` were deleted from `BiLinearSurgeInteractionModel.jl` and
+    its exports/tests — no longer needed. 5-station
     pass (1/5/20yr) was a wash within noise. The decisive 317-station/5yr
     pass initially found `full` a real loss on storm RMSE (−61%) — but that
     number was computed from `summary.toml` (task 17's final-epoch model, not
