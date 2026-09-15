@@ -99,6 +99,36 @@ values trained fully from scratch.
 
 ---
 
+## pybridge (mlflow experiment area)
+
+`pybridge/` is a standalone experiment area for mlflow/ray tracking, with its
+own `pixi.toml`/`pixi.lock` independent of the top-level project — see
+`pybridge/CLAUDE.md` for the full picture. It wraps the same training/sweep
+workflow with mlflow logging on top.
+
+Both scripts below log to `MLFLOW_TRACKING_URI` (defaults to
+`http://127.0.0.1:5000`), so an mlflow server needs to be running first:
+
+```bash
+pybridge/bin/mlflow-server-start [port]   # background, logs to pybridge/run/
+```
+
+```bash
+pybridge/bin/python pybridge/mlflow_train.py path/to/settings.toml
+pybridge/bin/python pybridge/mlflow_sweep.py \
+    [base.toml] [dotted.param.path] [v1,v2,v3] [nrepeats] [experiment] [--continue|--overwrite]
+```
+
+`mlflow_train.py` runs `bin/train` under the hood and logs the result to
+mlflow. `mlflow_sweep.py` mirrors `scripts/parameter_sweep.jl`'s orchestration
+exactly — same CLI shape, same tag naming, same `sweeps/<experiment>/` output
+layout and `results.csv` — so a sweep is resumable interchangeably by either
+tool, and each point's training is delegated to `mlflow_train.py` rather than
+duplicated. Always invoke Python here via `pybridge/bin/python`, never a bare
+`python`/`python3` — it resolves to pybridge's own pixi environment.
+
+---
+
 ## Smoke-testing everything
 
 ```bash

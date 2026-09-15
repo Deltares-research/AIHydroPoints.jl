@@ -15,59 +15,54 @@ Pkg.activate(joinpath(@__DIR__, ".."))
 using AIHydroPoints
 using DataFrames
 using PrettyTables
-```
 
-## Surge Leaderboard
+function show_leaderboard(root_dir, quantities; sort_by="rmse_testing", ascending=true)
+    lb = load_leaderboard(root_dir; quantities=quantities)
 
-```{julia}
-#| echo: false
-settings = Dict(
-    "root_dirs"  => joinpath(@__DIR__, "training_output"),
-    "quantities" => ["surge"],
-    "sort_by"    => "rmse_testing",
-    "ascending"  => true,
-)
+    if isempty(lb)
+        @warn "No runs found for $(quantities) in $(root_dir)."
+        return
+    end
 
-lb = load_leaderboard(settings["root_dirs"]; quantities=settings["quantities"])
-
-if isempty(lb)
-    @warn "No runs found."
-else
-    lb = sort_leaderboard(lb, settings["sort_by"]; ascending=settings["ascending"])
+    lb = sort_leaderboard(lb, sort_by; ascending=ascending)
     lb[!, :rank] = 1:nrow(lb)
     select!(lb, :rank, :)
-end
 
-display_cols = [:rank, :runid, :model_name, :out_quantities, :rmse_testing,
-                :n_params, :train_time_s]
-available = [c for c in display_cols if c in propertynames(lb)]
-pretty_table(lb[!, available]; backend=:html, stand_alone=false, column_labels=string.(available))
+    display_cols = [:rank, :runid, :model_name, :out_quantities, :rmse_testing,
+                    :n_params, :train_time_s]
+    available = [c for c in display_cols if c in propertynames(lb)]
+    pretty_table(lb[!, available]; backend=:html, stand_alone=false, column_labels=string.(available))
+end
 ```
 
-## Tide Leaderboard
+## 5 Stations
+
+### Surge Leaderboard
 
 ```{julia}
 #| echo: false
-settings_tide = Dict(
-    "root_dirs"  => joinpath(@__DIR__, "training_output"),
-    "quantities" => ["waterlevel"],
-    "sort_by"    => "rmse_testing",
-    "ascending"  => true,
-)
-
-lb_tide = load_leaderboard(settings_tide["root_dirs"]; quantities=settings_tide["quantities"])
-
-if isempty(lb_tide)
-    @warn "No tide runs found."
-else
-    lb_tide = sort_leaderboard(lb_tide, settings_tide["sort_by"]; ascending=settings_tide["ascending"])
-    lb_tide[!, :rank] = 1:nrow(lb_tide)
-    select!(lb_tide, :rank, :)
-end
-
-display_cols = [:rank, :runid, :model_name, :out_quantities, :rmse_testing,
-                :n_params, :train_time_s]
-available = [c for c in display_cols if c in propertynames(lb_tide)]
-pretty_table(lb_tide[!, available]; backend=:html, stand_alone=false, column_labels=string.(available))
+show_leaderboard(joinpath(@__DIR__, "5stations", "training_output"), ["surge"])
 ```
 
+### Tide Leaderboard
+
+```{julia}
+#| echo: false
+show_leaderboard(joinpath(@__DIR__, "5stations", "training_output"), ["waterlevel"])
+```
+
+## 317 Stations
+
+### Surge Leaderboard
+
+```{julia}
+#| echo: false
+show_leaderboard(joinpath(@__DIR__, "317stations", "training_output"), ["surge"])
+```
+
+### Tide Leaderboard
+
+```{julia}
+#| echo: false
+show_leaderboard(joinpath(@__DIR__, "317stations", "training_output"), ["waterlevel"])
+```
