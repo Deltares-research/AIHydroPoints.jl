@@ -50,11 +50,27 @@ zarr_data = RasterStack(zarr_url; lazy=true)
 # time range
 tstart=DateTime(2000,1,1)
 tend=DateTime(2023,1,1)
-# points coordinates
-x_points = [ 3.0, 3.75, 4.25, 5.25, 6.5, 0.0,  5.0, 0.0, 0.0]
-y_points = [51.5,52.0 ,53.0 ,53.25,53.75,56.0,56.0,60.0,50.25]
+
+# points coordinates — read from an .xyn file (lon,lat,name) or use hardcoded 9-point selection
+xyn_file = length(ARGS) >= 1 ? ARGS[1] : ""
+if !isempty(xyn_file)
+    rows = [split(line, ",") for line in readlines(xyn_file) if !isempty(strip(line))]
+    x_points = parse.(Float64, getindex.(rows, 1))
+    y_points = parse.(Float64, getindex.(rows, 2))
+    npoints  = length(x_points)
+    tag      = "$(npoints)points"
+    output_dir = joinpath("data", "era_2000_2022_$(tag)")
+    mkpath(output_dir)
+else
+    x_points = [ 3.0, 3.75, 4.25, 5.25, 6.5, 0.0,  5.0, 0.0, 0.0]
+    y_points = [51.5,52.0 ,53.0 ,53.25,53.75,56.0,56.0,60.0,50.25]
+    npoints  = length(x_points)
+    tag      = "9points"
+    output_dir = joinpath("data", "era_2000_2022_$(tag)")
+end
+
 # filenames for output
-output_files = [joinpath("data","era5_2000_2022_9points_$(quantity).jld2") for quantity in ["wind_stress_x","wind_stress_y","mean_sea_level_pressure"]]
+output_files = [joinpath(output_dir, "era5_2000_2022_$(tag)_$(quantity).jld2") for quantity in ["wind_stress_x","wind_stress_y","mean_sea_level_pressure"]]
 
 function download_points_from_maps(dataset,variable_name,start_time::DateTime,end_time::DateTime,x_points,y_points,source,time_chunksize=240)
     println("Downloading variable $(variable_name) for points and time range...")
