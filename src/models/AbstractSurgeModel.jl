@@ -121,25 +121,104 @@ ending at that step.  `times_valid` is the `Vector{DateTime}` of valid steps.
 (used directly) or `"wind_x"`/`"wind_y"` (converted via `uv_to_stress_xy`);
 pressure is scaled by `2e-4*(p - 1e5)`.
 """
-function _surge_lag_windows(model::AbstractSurgeModel, input::Dict{String, TimeSeries})
+function _aligned_surge_forcing(model::AbstractSurgeModel, input::Dict{String, TimeSeries})
     settings = get_settings(model)
     nwind    = settings["nlocations_input"]
     nlags    = settings["nlags"]
 
-    # Align input locations to training-time order (errors on missing, drops extras)
     if haskey(settings, "in_names")
         in_names = settings["in_names"]
         input = Dict(k => _check_and_align_locations(v, in_names, "input[\"$k\"]")
                      for (k, v) in input)
     end
 
-    stress_x, stress_y = _get_stress(input)                          # (nwind, ntimes)
-    press = Float32.(2e-4 .* (get_values(input["pressure"]) .- 1e5)) # (nwind, ntimes)
-
+    stress_x, stress_y = _get_stress(input)
+    press = Float32.(2e-4 .* (get_values(input["pressure"]) .- 1e5))
     times       = get_times(input[_wind_key(input)])
     ntimes      = length(times)
     valid_range = nlags:ntimes
-    nvalid      = length(valid_range)
+    return stress_x, stress_y, press, times, nwind, nlags, valid_range
+end
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Lazy batch input — raw forcing kept in memory, lags built per minibatch
+# ──────────────────────────────────────────────────────────────────────────────
+
+"""
+    SurgeLagSource <: LazyBatchInput
+
+Holds aligned wind-stress and scaled-pressure matrices plus the valid time indices.
+Used by [`LinearSurgeModel`](@ref) preprocess so training never materialises the
+full `(3*nlocations_input*nlags, ntimes_valid)` feature matrix (~32 GB at
+317 stations × 20 years); batches are built on demand via [`materialize_batch`](@ref).
+"""
+struct SurgeLagSource <: LazyBatchInput
+    stress_x     :: Matrix{Float32}
+    stress_y     :: Matrix{Float32}
+    press        :: Matrix{Float32}
+    nwind        :: Int
+    nlags        :: Int
+    valid_range  :: UnitRange{Int}
+end
+
+nsamples(src::SurgeLagSource) = length(src.valid_range)
+
+function subset(src::SurgeLagSource, sample_idx)
+    return SurgeLagSource(src.stress_x, src.stress_y, src.press,
+                          src.nwind, src.nlags, src.valid_range[sample_idx])
+end
+
+"""
+    materialize_batch(src::SurgeLagSource, sample_cols) -> Matrix{Float32}
+
+Build `(3*nwind*nlags, length(sample_cols))` for 1-based sample indices into
+`valid_range`.  Layout matches [`_surge_lag_flat`](@ref).
+"""
+function materialize_batch(src::SurgeLagSource, sample_cols::AbstractVector{Int})
+    n         = length(sample_cols)
+    nfeatures = 3 * src.nwind * src.nlags
+    x         = zeros(Float32, nfeatures, n)
+    for (j, s) in enumerate(sample_cols)
+        t = src.valid_range[s]
+        col = view(x, :, j)
+        offset = 0
+        for mat in (src.stress_x, src.stress_y, src.press)
+            for lag in 1:src.nlags
+                col[offset + 1:offset + src.nwind] .= mat[:, t - src.nlags + lag]
+                offset += src.nwind
+            end
+        end
+    end
+    return x
+end
+
+"""
+    _surge_lag_source(model, input) -> (SurgeLagSource, times_valid)
+"""
+function _surge_lag_source(model::AbstractSurgeModel, input::Dict{String, TimeSeries})
+    stress_x, stress_y, press, times, nwind, nlags, valid_range =
+        _aligned_surge_forcing(model, input)
+    src = SurgeLagSource(stress_x, stress_y, press, nwind, nlags, valid_range)
+    return src, times[valid_range]
+end
+
+"""
+    _surge_lag_flat(model::AbstractSurgeModel, input)
+        -> (x_flat, times_valid)
+
+Build the flat Dense input `(3*nlocations_input*nlags, ntimes_valid)` directly,
+without materialising the intermediate `(nwind, nlags, nvalid)` lag-window
+arrays.  Layout matches `vcat` + `reshape` in [`LinearSurgeModel`](@ref) preprocess.
+Used by tests and callers that need the full matrix; training uses [`SurgeLagSource`](@ref).
+"""
+function _surge_lag_flat(model::AbstractSurgeModel, input::Dict{String, TimeSeries})
+    src, times_valid = _surge_lag_source(model, input)
+    return materialize_batch(src, collect(1:nsamples(src))), times_valid
+end
+
+function _surge_lag_windows(model::AbstractSurgeModel, input::Dict{String, TimeSeries})
+    stress_x, stress_y, press, times, nwind, nlags, valid_range = _aligned_surge_forcing(model, input)
+    nvalid = length(valid_range)
 
     # Slice each forcing field into (point, lag, batch-time) = (nwind, nlags, nvalid).
     sx = zeros(Float32, nwind, nlags, nvalid)

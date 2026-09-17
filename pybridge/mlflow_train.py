@@ -235,14 +235,16 @@ def main():
 
     tracking_uri = os.environ.get("MLFLOW_TRACKING_URI", "http://127.0.0.1:5000")
     mlflow.set_tracking_uri(tracking_uri)
+    existing_run_id = os.environ.get("MLFLOW_RUN_ID")
     # One mlflow experiment per settings.toml directory (e.g. "5stations",
     # "317stations"), mirroring the grouping already used by
     # experiments/leaderboard.qmd -- unless a caller (e.g. mlflow_sweep.py,
     # to group every point of one sweep together) has already set
     # MLFLOW_EXPERIMENT_NAME, mlflow's own standard override for this;
     # mlflow.start_run() picks that up on its own, so nothing further to do
-    # here in that case.
-    if "MLFLOW_EXPERIMENT_NAME" not in os.environ:
+    # here in that case. Platform callers (Airflow/Ray) pre-create the run
+    # via MLFLOW_RUN_ID — skip inferring experiment from the work-dir path.
+    if "MLFLOW_EXPERIMENT_NAME" not in os.environ and not existing_run_id:
         mlflow.set_experiment(settings_toml.parent.name)
 
     # Flatten just the sections worth logging as params. data_settings.files
@@ -268,7 +270,11 @@ def main():
     # isn't an mlflow-recognized variable, just our own convention, since
     # mlflow has no automatic env-var pickup for run_name.
     run_name = os.environ.get("MLFLOW_RUN_NAME", settings["run_info"]["runid"])
-    with mlflow.start_run(run_name=run_name) as run:
+    if existing_run_id:
+        run_ctx = mlflow.start_run(run_id=existing_run_id)
+    else:
+        run_ctx = mlflow.start_run(run_name=run_name)
+    with run_ctx as run:
         mlflow.log_params(params)
         mlflow.set_tags({
             "model_name": settings["model_settings"]["model_name"],
