@@ -111,6 +111,7 @@ run_group() {
 run_group \
     "train LinearSurgeModel:::bin/train examples/LinearSurgeModel.toml --overwrite" \
     "train ConvSurgeModel:::bin/train examples/ConvSurgeModel.toml --overwrite" \
+    "train DenseSurgeModel:::bin/train examples/DenseSurgeModel.toml --overwrite" \
     "train AttentionSurgeModel:::bin/train examples/AttentionSurgeModel.toml --overwrite" \
     "train DeepONetTideModel:::bin/train examples/DeepONetTideModel.toml --overwrite" \
     "train ProductTideModel:::bin/train examples/ProductTideModel.toml --overwrite" \
@@ -118,7 +119,8 @@ run_group \
     "train DeepONetWaveModel:::bin/train examples/DeepONetWaveModel.toml --overwrite" \
     "train ConvInteractionModel:::bin/train examples/ConvInteractionModel.toml --overwrite" \
     "train ProductInteractionModel:::bin/train examples/ProductInteractionModel.toml --overwrite" \
-    "train BiLinearSurgeInteractionModel:::bin/train examples/BiLinearSurgeInteractionModel.toml --overwrite"
+    "train BiLinearSurgeInteractionModel:::bin/train examples/BiLinearSurgeInteractionModel.toml --overwrite" \
+    "train DenseSurgeInteractionModel:::bin/train examples/DenseSurgeInteractionModel.toml --overwrite"
 
 run_group \
     "predict ConvSurgeModel:::bin/predict examples/predict_ConvSurgeModel.toml" \

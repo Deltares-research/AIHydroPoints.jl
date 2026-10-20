@@ -33,6 +33,7 @@ end
 @testset "get_model_type happy path" begin
     @test get_model_type(Dict("model_name" => "LinearSurgeModel"))    === LinearSurgeModel
     @test get_model_type(Dict("model_name" => "ConvSurgeModel"))      === ConvSurgeModel
+    @test get_model_type(Dict("model_name" => "DenseSurgeModel"))     === DenseSurgeModel
     @test get_model_type(Dict("model_name" => "AttentionSurgeModel")) === AttentionSurgeModel
     @test get_model_type(Dict("model_name" => "DeepONetTideModel"))   === DeepONetTideModel
     @test get_model_type(Dict("model_name" => "ProductTideModel"))    === ProductTideModel
@@ -40,6 +41,8 @@ end
     @test get_model_type(Dict("model_name" => "DeepONetWaveModel"))   === DeepONetWaveModel
     @test get_model_type(Dict("model_name" => "ConvInteractionModel"))    === ConvInteractionModel
     @test get_model_type(Dict("model_name" => "ProductInteractionModel")) === ProductInteractionModel
+    @test get_model_type(Dict("model_name" => "BiLinearSurgeInteractionModel")) === BiLinearSurgeInteractionModel
+    @test get_model_type(Dict("model_name" => "DenseSurgeInteractionModel"))    === DenseSurgeInteractionModel
 end
 
 @testset "get_model_type errors" begin
@@ -73,6 +76,20 @@ end
     ms["model_pars"] = Dict{String,Any}("channels" => [16, 1], "filtersize" => 3)
     model = create_model(ms, Dict{String,TimeSeries}())
     @test model isa ConvSurgeModel
+end
+
+@testset "create_model DenseSurgeModel" begin
+    ms = mr_augmented_settings("DenseSurgeModel")
+    ms["model_pars"] = Dict{String,Any}("hidden_dims" => [8], "activation" => "relu")
+    model = create_model(ms, Dict{String,TimeSeries}())
+    @test model isa DenseSurgeModel
+end
+
+@testset "create_model DenseSurgeInteractionModel" begin
+    ms = mr_augmented_settings("DenseSurgeInteractionModel")
+    ms["model_pars"] = Dict{String,Any}("hidden_dims" => [8], "activation" => "relu")
+    model = create_model(ms, Dict{String,TimeSeries}())
+    @test model isa DenseSurgeInteractionModel
 end
 
 @testset "create_model AttentionSurgeModel builds GraphNetwork from settings" begin

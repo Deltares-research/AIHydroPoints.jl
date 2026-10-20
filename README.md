@@ -84,7 +84,11 @@ directly after `using AIHydroPoints`.
 | `models/AbstractSurgeModel.jl` | Shared surge `preprocess` (wind-stress lags), `postprocess!`, `train_model!` |
 | `models/LinearSurgeModel.jl` | Single Dense layer surge baseline |
 | `models/ConvSurgeModel.jl` | Conv1D over lag dimension |
+| `models/DenseSurgeModel.jl` | Unstructured deep MLP (multiple Dense layers) |
 | `models/AttentionSurgeModel.jl` | Transformer branch + dense trunk + graph adjacency |
+| `models/AbstractSurgeInteractionModel.jl` | Shared surge-interaction `preprocess` (adds tide lags at output stations) |
+| `models/BiLinearSurgeInteractionModel.jl` | Linear surge × per-station tide modulation gate |
+| `models/DenseSurgeInteractionModel.jl` | Unstructured deep MLP over concatenated forcing + tide |
 | `models/AbstractTideModel.jl` | Shared tide `preprocess` (Doodson phases), `postprocess!`, `train_model!` |
 | `models/DeepONetTideModel.jl` | DeepONet branch/trunk architecture |
 | `models/ProductTideModel.jl` | Station×Doodson product + residual gating |

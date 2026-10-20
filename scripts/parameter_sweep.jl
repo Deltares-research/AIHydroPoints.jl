@@ -35,11 +35,11 @@ using AIHydroPoints, Random, Statistics, Printf, CSV, DataFrames
 _parseval(s) = something(tryparse(Int, String(s)), tryparse(Float64, String(s)), String(s))
 
 # defaults
-base_toml_default = "experiments/317stations/surge_5yr_BiLinearSurgeInteractionModel.toml"
-param_path_default = ["model_settings", "nlags"]
-values_default = Any[3*24, 4*24, 5*24, 6*24]   # 3,4,5,6 days
-nrepeats_default = 1
-experiment_default = "surge_317s_5yr_nlags48plus_sweep"
+base_toml_default = "experiments/5stations/surge_20yr_DenseSurgeInteractionModel.toml"
+param_path_default = ["model_settings", "model_pars", "hidden_dims"]
+values_default = Any[[64, 64, 32], [64, 64, 64, 32]]   # baseline = [64, 32]
+nrepeats_default = 3
+experiment_default = "surge_5s_20yr_DenseSurgeInteractionModel_deeper_hidden_dims_sweep"
 plot_outputs_default = false    # keep plots per run; set false for large sweeps (speed)
 write_series_default = false   # write full output series per run; off by default (bulky)
 

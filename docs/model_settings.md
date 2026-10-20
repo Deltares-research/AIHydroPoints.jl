@@ -9,7 +9,7 @@ infrastructure.  For inference, `[model_settings]` only requires `model_dir`.
 The surge model takes lagged wind stress and pressure at `nlocations_input` forcing locations
 and predicts storm surge at `nlocations_output` output stations.
 
-Concrete models: `LinearSurgeModel`, `ConvSurgeModel`, `AttentionSurgeModel`.
+Concrete models: `LinearSurgeModel`, `ConvSurgeModel`, `DenseSurgeModel`, `AttentionSurgeModel`.
 
 ### Required keys at construction
 
@@ -52,6 +52,37 @@ Concrete models: `LinearSurgeModel`, `ConvSurgeModel`, `AttentionSurgeModel`.
 | `"nlayers_branch"` | `2` | Number of transformer layers. |
 | `"nlayers_trunk"` | `2` | Hidden layers in the trunk network. |
 | `"nhidden_trunk"` | `32` | Width of the trunk network. |
+
+### `model_pars` for `DenseSurgeModel`
+
+| Key | Default | Description |
+|---|---|---|
+| `"hidden_dims"` | `[64, 32]` | Sizes of the hidden `Dense` layers; an empty vector reduces the model to `LinearSurgeModel`. |
+| `"activation"` | `"relu"` | Hidden-layer activation (`"relu"`, `"tanh"`, or `"swish"`). |
+
+---
+
+## Surge interaction model settings
+
+Surge-interaction models extend the surge models with a `"tide"` input at the output
+stations, folding a tide–surge interaction into the surge prediction. They share the surge
+models' required/optional keys above, plus a `"tide"` entry in `input` at construction time.
+
+Concrete models: `BiLinearSurgeInteractionModel`, `DenseSurgeInteractionModel`.
+
+### `model_pars` for `BiLinearSurgeInteractionModel`
+
+| Key | Default | Description |
+|---|---|---|
+| `"a"` | `0.1` | Fixed interaction-branch scale (not learnable). |
+| `"mod_activation"` | `"identity"` | Modulation activation (`"identity"` or `"tanh"`). |
+
+### `model_pars` for `DenseSurgeInteractionModel`
+
+| Key | Default | Description |
+|---|---|---|
+| `"hidden_dims"` | `[64, 32]` | Sizes of the hidden `Dense` layers, applied to the concatenated forcing + tide feature vector. |
+| `"activation"` | `"relu"` | Hidden-layer activation (`"relu"`, `"tanh"`, or `"swish"`). |
 
 ---
 

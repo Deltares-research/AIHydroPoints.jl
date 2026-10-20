@@ -92,6 +92,10 @@ mkdir(temp_dir) # create a new empty temp directory
       include("models/test_ConvSurgeModel.jl")
    end
 
+   @testset "DenseSurgeModel" begin
+      include("models/test_DenseSurgeModel.jl")
+   end
+
    @testset "DeepONetTideModel" begin
       include("models/test_DeepONetTideModel.jl")
    end
@@ -118,5 +122,9 @@ mkdir(temp_dir) # create a new empty temp directory
 
    @testset "BiLinearSurgeInteractionModel" begin
       include("models/test_BiLinearSurgeInteractionModel.jl")
+   end
+
+   @testset "DenseSurgeInteractionModel" begin
+      include("models/test_DenseSurgeInteractionModel.jl")
    end
 end

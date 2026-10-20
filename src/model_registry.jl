@@ -6,6 +6,7 @@
 const MODEL_REGISTRY = Dict{String,Type}(
     "LinearSurgeModel"     => LinearSurgeModel,
     "ConvSurgeModel"       => ConvSurgeModel,
+    "DenseSurgeModel"      => DenseSurgeModel,
     "AttentionSurgeModel"  => AttentionSurgeModel,
     "DeepONetTideModel"    => DeepONetTideModel,
     "ProductTideModel"     => ProductTideModel,
@@ -13,7 +14,8 @@ const MODEL_REGISTRY = Dict{String,Type}(
     "DeepONetWaveModel"    => DeepONetWaveModel,
     "ConvInteractionModel"    => ConvInteractionModel,
     "ProductInteractionModel" => ProductInteractionModel,
-    "BiLinearSurgeInteractionModel" => BiLinearSurgeInteractionModel,
+    "BiLinearSurgeInteractionModel"  => BiLinearSurgeInteractionModel,
+    "DenseSurgeInteractionModel"     => DenseSurgeInteractionModel,
 )
 
 """
@@ -53,6 +55,7 @@ create_model(ms::Dict, train_input::Dict{String,TimeSeries}) =
 
 create_model(::Type{LinearSurgeModel},    ms, _) = LinearSurgeModel(ms)
 create_model(::Type{ConvSurgeModel},      ms, _) = ConvSurgeModel(ms)
+create_model(::Type{DenseSurgeModel},     ms, _) = DenseSurgeModel(ms)
 create_model(::Type{DeepONetTideModel},   ms, _) = DeepONetTideModel(ms)
 create_model(::Type{ProductTideModel},    ms, _) = ProductTideModel(ms)
 create_model(::Type{ConvWaveModel},       ms, _) = ConvWaveModel(ms)
@@ -60,6 +63,7 @@ create_model(::Type{DeepONetWaveModel},   ms, _) = DeepONetWaveModel(ms)
 create_model(::Type{ConvInteractionModel},   ms, _) = ConvInteractionModel(ms)
 create_model(::Type{ProductInteractionModel},ms, _) = ProductInteractionModel(ms)
 create_model(::Type{BiLinearSurgeInteractionModel}, ms, _) = BiLinearSurgeInteractionModel(ms)
+create_model(::Type{DenseSurgeInteractionModel},    ms, _) = DenseSurgeInteractionModel(ms)
 
 function create_model(::Type{AttentionSurgeModel}, ms, _)
     in_points  = collect(zip(ms["in_lats"],  ms["in_lons"]))

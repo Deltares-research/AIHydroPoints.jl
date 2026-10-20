@@ -52,11 +52,17 @@ export LinearSurgeModel
 include("models/ConvSurgeModel.jl")
 export ConvSurgeModel
 
+include("models/DenseSurgeModel.jl")
+export DenseSurgeModel
+
 include("models/AbstractSurgeInteractionModel.jl")
 export AbstractSurgeInteractionModel
 
 include("models/BiLinearSurgeInteractionModel.jl")
 export BiLinearSurgeInteractionModel, BiLinearSurgeInteractionFlux, StationTideModulation
+
+include("models/DenseSurgeInteractionModel.jl")
+export DenseSurgeInteractionModel, DenseSurgeInteractionFlux
 
 include("models/AbstractTideModel.jl")
 export AbstractTideModel

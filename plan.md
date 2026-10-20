@@ -48,6 +48,10 @@ Models and refactors
   baselines across 1yr/5yr/20yr spans; data from Deltares S3; training switched to
   `Flux.DataLoader` full-epoch shuffling.
   *(ConvSurgeModel surge baselines still need regenerating — see Open task 1.)*
+- **DenseSurgeModel / DenseSurgeInteractionModel** — unstructured deep-MLP surge
+  baselines (wind+pressure-only, and +tide via concatenation instead of
+  `BiLinearSurgeInteractionModel`'s gate); 5-station 1/5/20yr baselines in the
+  leaderboard. See Open task 25 and `brainstorm_surge_model_status.md` item 2.
 
 Docs and comms
 - **Presentation** — first draft plus refined methods/results.
@@ -318,6 +322,61 @@ Docs and comms
     have fixed it), or install `nvidia-container-toolkit` and use `--nvccli`, or
     (fallback) filter `LD_LIBRARY_PATH` down to `/.singularity.d/libs` right
     before the final `exec /bin/bash -i` in `bash_claude.sh`.
+
+25. [x] **DenseSurgeModel / DenseSurgeInteractionModel — unstructured-MLP surge
+    baselines** (`brainstorm_surge_model_status.md` item 2). **DONE.** Two new
+    `AbstractFluxModel` families: `DenseSurgeModel` (`<: AbstractSurgeModel`,
+    wind+pressure-only — a multi-layer `Dense` MLP replacing `LinearSurgeModel`'s
+    single layer) and `DenseSurgeInteractionModel` (`<: AbstractSurgeInteractionModel`,
+    same idea but concatenating flattened tide lag windows onto the forcing
+    before the MLP, instead of `BiLinearSurgeInteractionModel`'s multiplicative
+    gate). Registered in `MODEL_REGISTRY`, `model_pars` documented in
+    `docs/model_settings.md`, example TOMLs added, unit tests added (751 unit
+    pass), 5-station baselines (`experiments/5stations/surge_{1,5,20}yr_*.toml`)
+    wired into the leaderboard.
+
+    **Wind+pressure-only (`DenseSurgeModel`):** no signal that inductive bias
+    (Conv's structure, or presumably Linear's/Attention's/BiLinear's) is what
+    caps accuracy — tracks `ConvSurgeModel` within ~0.5–2.5% at every timespan,
+    in both directions, well inside run-to-run noise.
+
+    **+tide (`DenseSurgeInteractionModel`): the single largest gain found in the
+    whole brainstorm exercise.** Beats both the no-tide model and
+    `BiLinearSurgeInteractionModel`'s gate at every timespan, ~15–22% on
+    `rmse_testing` at 20yr — and, unusually, the storm-specific metric improves
+    *with* the overall metric rather than decoupling from it. Complicates the
+    earlier "full-breadth tide modulation doesn't help" verdict (task 23): the
+    problem there wasn't that tide information is useless, it's that BiLinear's
+    multiplicative gate is a comparatively weak way to use it.
+
+    Architecture search (`scripts/parameter_sweep.jl`, 3 seeds/setting, 20yr)
+    converged cleanly: too narrow (`hidden_dims=[16]`) hurts, width alone
+    (`[64]`/`[128]`) doesn't help, a second layer (`[64,32]`/`[128,64]`) buys a
+    real ~3%, and going deeper still (3–4 layers) plateaus/mildly reverses it —
+    `[64,32]` adopted as production (tied with `[128,64]`, half the params). A
+    `nepochs` 50→100 check found a small (+1.2%, real but modest) further gain
+    from more patience; a detailed loss-curve read confirmed clean, non-overfit
+    convergence (stable train–val gap, genuine plateau, early stopping firing
+    correctly), not another training-budget artifact.
+
+    Along the way, fixed a real confound in an early sweep: with
+    `early_stopping_epochs=10` and `lr_decay_epochs=15`, about half that
+    sweep's runs were killed by early stopping *before* the first scheduled LR
+    decay ever fired (a noisy early-epoch dip mistaken for "best," purely
+    seed-dependent) — inflating apparent `hidden_dims` noise well past the
+    real effect size. Re-run with `early_stopping_epochs=25` (past all decay
+    steps) fixed it; worth remembering for any future sweep on a config with
+    this decay schedule.
+
+    **Result: a reasonably well-characterized `rmse_testing` floor for the
+    5-station case at ≈0.082–0.083 (20yr)**, given the current input
+    configuration (9-point ERA5 wind/pressure + one-to-one output-station
+    tide, 48 lags) — repeat-run std ~0.6% relative, width/depth/patience all
+    swept past their optimum without further gain. Explicit caveat: floor
+    *for this input set*, not an absolute one — items 9 (literature), 2a/2b
+    (input density), and 17 (Charnock) all bear on whether a richer or
+    corrected input could move it further. Full tables and discussion in
+    `brainstorm_surge_model_status.md`, item 2.
 
 ## Checklist for each step:
 - all source should eventually be in src/ and all tests should be in test/ and test data should be in test_data/
