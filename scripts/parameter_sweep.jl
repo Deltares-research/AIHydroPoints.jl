@@ -35,7 +35,7 @@ using AIHydroPoints, Random, Statistics, Printf, CSV, DataFrames
 _parseval(s) = something(tryparse(Int, String(s)), tryparse(Float64, String(s)), String(s))
 
 # defaults
-base_toml_default = "experiments/5stations/surge_20yr_DenseSurgeInteractionModel.toml"
+base_toml_default = "experiments/5outputs9inputs/surge_20yr_DenseSurgeInteractionModel.toml"
 param_path_default = ["model_settings", "model_pars", "hidden_dims"]
 values_default = Any[[64, 64, 32], [64, 64, 64, 32]]   # baseline = [64, 32]
 nrepeats_default = 3

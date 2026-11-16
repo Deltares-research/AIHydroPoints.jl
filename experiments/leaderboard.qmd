@@ -35,20 +35,29 @@ function show_leaderboard(root_dir, quantities; sort_by="rmse_testing", ascendin
 end
 ```
 
-## 5 Stations
+## 5 Outputs, 9 Inputs
 
 ### Surge Leaderboard
 
 ```{julia}
 #| echo: false
-show_leaderboard(joinpath(@__DIR__, "5stations", "training_output"), ["surge"])
+show_leaderboard(joinpath(@__DIR__, "5outputs9inputs", "training_output"), ["surge"])
 ```
 
 ### Tide Leaderboard
 
 ```{julia}
 #| echo: false
-show_leaderboard(joinpath(@__DIR__, "5stations", "training_output"), ["waterlevel"])
+show_leaderboard(joinpath(@__DIR__, "5outputs9inputs", "training_output"), ["waterlevel"])
+```
+
+## 5 Outputs, 30 Inputs
+
+### Surge Leaderboard
+
+```{julia}
+#| echo: false
+show_leaderboard(joinpath(@__DIR__, "5outputs30inputs", "training_output"), ["surge"])
 ```
 
 ## 317 Stations
