@@ -2205,8 +2205,8 @@ var requirejs,require,define;(function(global,setTimeout){var req,s,head,baseEle
 </header>
 
 
-<section id="stations" class="level2">
-<h2 class="anchored" data-anchor-id="stations">5 Stations</h2>
+<section id="outputs-9-inputs" class="level2">
+<h2 class="anchored" data-anchor-id="outputs-9-inputs">5 Outputs, 9 Inputs</h2>
 <section id="surge-leaderboard" class="level3">
 <h3 class="anchored" data-anchor-id="surge-leaderboard">Surge Leaderboard</h3>
 <div id="4" class="cell" data-execution_count="1">
@@ -2219,6 +2219,7 @@ var requirejs,require,define;(function(global,setTimeout){var req,s,head,baseEle
 <th data-quarto-table-cell-role="th" style="text-align: right; font-weight: bold;">model_name</th>
 <th data-quarto-table-cell-role="th" style="text-align: right; font-weight: bold;">out_quantities</th>
 <th data-quarto-table-cell-role="th" style="text-align: right; font-weight: bold;">rmse_testing</th>
+<th data-quarto-table-cell-role="th" style="text-align: right; font-weight: bold;">rmse_storm_eunice_2022</th>
 <th data-quarto-table-cell-role="th" style="text-align: right; font-weight: bold;">n_params</th>
 <th data-quarto-table-cell-role="th" style="text-align: right; font-weight: bold;">train_time_s</th>
 </tr>
@@ -2230,6 +2231,7 @@ var requirejs,require,define;(function(global,setTimeout){var req,s,head,baseEle
 <td style="text-align: right;">DenseSurgeInteractionModel</td>
 <td style="text-align: right;">surge</td>
 <td style="text-align: right;">0.082612</td>
+<td style="text-align: right;">0.16243</td>
 <td style="text-align: right;">100613</td>
 <td style="text-align: right;">313.6</td>
 </tr>
@@ -2239,6 +2241,7 @@ var requirejs,require,define;(function(global,setTimeout){var req,s,head,baseEle
 <td style="text-align: right;">DenseSurgeInteractionModel</td>
 <td style="text-align: right;">surge</td>
 <td style="text-align: right;">0.091936</td>
+<td style="text-align: right;">0.21097</td>
 <td style="text-align: right;">100613</td>
 <td style="text-align: right;">84.1</td>
 </tr>
@@ -2248,6 +2251,7 @@ var requirejs,require,define;(function(global,setTimeout){var req,s,head,baseEle
 <td style="text-align: right;">DenseSurgeModel</td>
 <td style="text-align: right;">surge</td>
 <td style="text-align: right;">0.103097</td>
+<td style="text-align: right;">0.198433</td>
 <td style="text-align: right;">41669</td>
 <td style="text-align: right;">61.8</td>
 </tr>
@@ -2256,9 +2260,10 @@ var requirejs,require,define;(function(global,setTimeout){var req,s,head,baseEle
 <td style="text-align: right;">surge_20yr</td>
 <td style="text-align: right;">ConvSurgeModel</td>
 <td style="text-align: right;">surge</td>
-<td style="text-align: right;">0.103625</td>
+<td style="text-align: right;">0.103828</td>
+<td style="text-align: right;">0.202967</td>
 <td style="text-align: right;">4661</td>
-<td style="text-align: right;">322.3</td>
+<td style="text-align: right;">337.1</td>
 </tr>
 <tr class="dataRow odd">
 <td style="text-align: right;">5</td>
@@ -2266,6 +2271,7 @@ var requirejs,require,define;(function(global,setTimeout){var req,s,head,baseEle
 <td style="text-align: right;">ConvSurgeModel</td>
 <td style="text-align: right;">surge</td>
 <td style="text-align: right;">0.104767</td>
+<td style="text-align: right;">0.20235</td>
 <td style="text-align: right;">4661</td>
 <td style="text-align: right;">94.9</td>
 </tr>
@@ -2275,6 +2281,7 @@ var requirejs,require,define;(function(global,setTimeout){var req,s,head,baseEle
 <td style="text-align: right;">DenseSurgeModel</td>
 <td style="text-align: right;">surge</td>
 <td style="text-align: right;">0.105322</td>
+<td style="text-align: right;">0.20191</td>
 <td style="text-align: right;">41669</td>
 <td style="text-align: right;">26.0</td>
 </tr>
@@ -2283,9 +2290,10 @@ var requirejs,require,define;(function(global,setTimeout){var req,s,head,baseEle
 <td style="text-align: right;">surge_20yr</td>
 <td style="text-align: right;">BiLinearSurgeInteractionModel</td>
 <td style="text-align: right;">surge</td>
-<td style="text-align: right;">0.106382</td>
+<td style="text-align: right;">0.105741</td>
+<td style="text-align: right;">0.191963</td>
 <td style="text-align: right;">6725</td>
-<td style="text-align: right;">48.6</td>
+<td style="text-align: right;">50.8</td>
 </tr>
 <tr class="dataRow even">
 <td style="text-align: right;">8</td>
@@ -2293,98 +2301,109 @@ var requirejs,require,define;(function(global,setTimeout){var req,s,head,baseEle
 <td style="text-align: right;">BiLinearSurgeInteractionModel</td>
 <td style="text-align: right;">surge</td>
 <td style="text-align: right;">0.107122</td>
+<td style="text-align: right;">0.192934</td>
 <td style="text-align: right;">6725</td>
 <td style="text-align: right;">22.6</td>
 </tr>
 <tr class="dataRow odd">
 <td style="text-align: right;">9</td>
-<td style="text-align: right;">surge_5yr</td>
+<td style="text-align: right;">surge_20yr</td>
 <td style="text-align: right;">AttentionSurgeModel</td>
 <td style="text-align: right;">surge</td>
-<td style="text-align: right;">0.108094</td>
+<td style="text-align: right;">0.10772</td>
+<td style="text-align: right;">0.218178</td>
 <td style="text-align: right;">15873</td>
-<td style="text-align: right;">1093.1</td>
+<td style="text-align: right;">6577.2</td>
 </tr>
 <tr class="dataRow even">
 <td style="text-align: right;">10</td>
 <td style="text-align: right;">surge_20yr</td>
-<td style="text-align: right;">AttentionSurgeModel</td>
+<td style="text-align: right;">LinearSurgeModel</td>
 <td style="text-align: right;">surge</td>
-<td style="text-align: right;">0.108435</td>
-<td style="text-align: right;">15873</td>
-<td style="text-align: right;">5204.4</td>
+<td style="text-align: right;">0.109272</td>
+<td style="text-align: right;">0.206356</td>
+<td style="text-align: right;">6485</td>
+<td style="text-align: right;">37.4</td>
 </tr>
 <tr class="dataRow odd">
 <td style="text-align: right;">11</td>
-<td style="text-align: right;">surge_20yr</td>
-<td style="text-align: right;">LinearSurgeModel</td>
+<td style="text-align: right;">surge_5yr</td>
+<td style="text-align: right;">AttentionSurgeModel</td>
 <td style="text-align: right;">surge</td>
-<td style="text-align: right;">0.114649</td>
-<td style="text-align: right;">6485</td>
-<td style="text-align: right;">19.4</td>
+<td style="text-align: right;">0.10966</td>
+<td style="text-align: right;">0.218169</td>
+<td style="text-align: right;">15873</td>
+<td style="text-align: right;">1617.7</td>
 </tr>
 <tr class="dataRow even">
 <td style="text-align: right;">12</td>
-<td style="text-align: right;">surge_1yr</td>
-<td style="text-align: right;">DenseSurgeInteractionModel</td>
+<td style="text-align: right;">surge_5yr</td>
+<td style="text-align: right;">LinearSurgeModel</td>
 <td style="text-align: right;">surge</td>
-<td style="text-align: right;">0.115054</td>
-<td style="text-align: right;">100613</td>
-<td style="text-align: right;">21.5</td>
+<td style="text-align: right;">0.110098</td>
+<td style="text-align: right;">0.206255</td>
+<td style="text-align: right;">6485</td>
+<td style="text-align: right;">19.3</td>
 </tr>
 <tr class="dataRow odd">
 <td style="text-align: right;">13</td>
 <td style="text-align: right;">surge_1yr</td>
 <td style="text-align: right;">BiLinearSurgeInteractionModel</td>
 <td style="text-align: right;">surge</td>
-<td style="text-align: right;">0.116519</td>
+<td style="text-align: right;">0.114038</td>
+<td style="text-align: right;">0.215058</td>
 <td style="text-align: right;">6725</td>
-<td style="text-align: right;">15.6</td>
+<td style="text-align: right;">17.3</td>
 </tr>
 <tr class="dataRow even">
 <td style="text-align: right;">14</td>
 <td style="text-align: right;">surge_1yr</td>
-<td style="text-align: right;">LinearSurgeModel</td>
+<td style="text-align: right;">DenseSurgeInteractionModel</td>
 <td style="text-align: right;">surge</td>
-<td style="text-align: right;">0.118891</td>
-<td style="text-align: right;">6485</td>
-<td style="text-align: right;">13.4</td>
+<td style="text-align: right;">0.115054</td>
+<td style="text-align: right;">0.212682</td>
+<td style="text-align: right;">100613</td>
+<td style="text-align: right;">21.5</td>
 </tr>
 <tr class="dataRow odd">
 <td style="text-align: right;">15</td>
 <td style="text-align: right;">surge_1yr</td>
-<td style="text-align: right;">AttentionSurgeModel</td>
+<td style="text-align: right;">LinearSurgeModel</td>
 <td style="text-align: right;">surge</td>
-<td style="text-align: right;">0.11922</td>
-<td style="text-align: right;">15873</td>
-<td style="text-align: right;">318.7</td>
+<td style="text-align: right;">0.11654</td>
+<td style="text-align: right;">0.230237</td>
+<td style="text-align: right;">6485</td>
+<td style="text-align: right;">14.6</td>
 </tr>
 <tr class="dataRow even">
 <td style="text-align: right;">16</td>
-<td style="text-align: right;">surge_5yr</td>
-<td style="text-align: right;">LinearSurgeModel</td>
+<td style="text-align: right;">surge_1yr</td>
+<td style="text-align: right;">ConvSurgeModel</td>
 <td style="text-align: right;">surge</td>
-<td style="text-align: right;">0.120545</td>
-<td style="text-align: right;">6485</td>
-<td style="text-align: right;">15.6</td>
+<td style="text-align: right;">0.119756</td>
+<td style="text-align: right;">0.224126</td>
+<td style="text-align: right;">4661</td>
+<td style="text-align: right;">31.0</td>
 </tr>
 <tr class="dataRow odd">
 <td style="text-align: right;">17</td>
 <td style="text-align: right;">surge_1yr</td>
-<td style="text-align: right;">ConvSurgeModel</td>
+<td style="text-align: right;">DenseSurgeModel</td>
 <td style="text-align: right;">surge</td>
-<td style="text-align: right;">0.122474</td>
-<td style="text-align: right;">4661</td>
-<td style="text-align: right;">24.5</td>
+<td style="text-align: right;">0.125515</td>
+<td style="text-align: right;">0.240396</td>
+<td style="text-align: right;">41669</td>
+<td style="text-align: right;">15.9</td>
 </tr>
 <tr class="dataRow even">
 <td style="text-align: right;">18</td>
 <td style="text-align: right;">surge_1yr</td>
-<td style="text-align: right;">DenseSurgeModel</td>
+<td style="text-align: right;">AttentionSurgeModel</td>
 <td style="text-align: right;">surge</td>
-<td style="text-align: right;">0.125515</td>
-<td style="text-align: right;">41669</td>
-<td style="text-align: right;">15.9</td>
+<td style="text-align: right;">0.129988</td>
+<td style="text-align: right;">0.260028</td>
+<td style="text-align: right;">15873</td>
+<td style="text-align: right;">339.3</td>
 </tr>
 </tbody>
 </table>
@@ -2394,18 +2413,49 @@ var requirejs,require,define;(function(global,setTimeout){var req,s,head,baseEle
 <section id="tide-leaderboard" class="level3">
 <h3 class="anchored" data-anchor-id="tide-leaderboard">Tide Leaderboard</h3>
 <div id="6" class="cell" data-execution_count="1">
-<div class="cell-output cell-output-stdout">
-<div class="ansi-escaped-output">
-<pre><span class="ansi-yellow-fg ansi-bold">┌ </span><span class="ansi-yellow-fg ansi-bold">Warning: </span>No runs found for [&quot;waterlevel&quot;] in /home/verlaan/deepblack/src/AIHydroPoints.jl.git_claude/experiments/5stations/training_output.
-<span class="ansi-yellow-fg ansi-bold">└ </span><span class="ansi-bright-black-fg">@ Main.Notebook /home/verlaan/deepblack/src/AIHydroPoints.jl.git_claude/experiments/leaderboard.qmd:23</span>
-</pre>
-</div>
+<div class="cell-output cell-output-display">
+<table class="caption-top table table-sm table-striped small">
+<thead>
+<tr class="columnLabelRow header">
+<th data-quarto-table-cell-role="th" style="text-align: right; font-weight: bold;">rank</th>
+<th data-quarto-table-cell-role="th" style="text-align: right; font-weight: bold;">runid</th>
+<th data-quarto-table-cell-role="th" style="text-align: right; font-weight: bold;">model_name</th>
+<th data-quarto-table-cell-role="th" style="text-align: right; font-weight: bold;">out_quantities</th>
+<th data-quarto-table-cell-role="th" style="text-align: right; font-weight: bold;">rmse_testing</th>
+<th data-quarto-table-cell-role="th" style="text-align: right; font-weight: bold;">rmse_storm_eunice_2022</th>
+<th data-quarto-table-cell-role="th" style="text-align: right; font-weight: bold;">n_params</th>
+<th data-quarto-table-cell-role="th" style="text-align: right; font-weight: bold;">train_time_s</th>
+</tr>
+</thead>
+<tbody>
+<tr class="dataRow odd">
+<td style="text-align: right;">1</td>
+<td style="text-align: right;">tide_20yr</td>
+<td style="text-align: right;">ProductTideModel</td>
+<td style="text-align: right;">waterlevel</td>
+<td style="text-align: right;">0.019585</td>
+<td style="text-align: right;">0.020807</td>
+<td style="text-align: right;">18369</td>
+<td style="text-align: right;">138.7</td>
+</tr>
+<tr class="dataRow even">
+<td style="text-align: right;">2</td>
+<td style="text-align: right;">tide_20yr_candidate</td>
+<td style="text-align: right;">ProductTideModel</td>
+<td style="text-align: right;">waterlevel</td>
+<td style="text-align: right;">0.101869</td>
+<td style="text-align: right;">0.196599</td>
+<td style="text-align: right;">18369</td>
+<td style="text-align: right;">143.5</td>
+</tr>
+</tbody>
+</table>
 </div>
 </div>
 </section>
 </section>
-<section id="stations-1" class="level2">
-<h2 class="anchored" data-anchor-id="stations-1">317 Stations</h2>
+<section id="outputs-30-inputs" class="level2">
+<h2 class="anchored" data-anchor-id="outputs-30-inputs">5 Outputs, 30 Inputs</h2>
 <section id="surge-leaderboard-1" class="level3">
 <h3 class="anchored" data-anchor-id="surge-leaderboard-1">Surge Leaderboard</h3>
 <div id="8" class="cell" data-execution_count="1">
@@ -2418,6 +2468,153 @@ var requirejs,require,define;(function(global,setTimeout){var req,s,head,baseEle
 <th data-quarto-table-cell-role="th" style="text-align: right; font-weight: bold;">model_name</th>
 <th data-quarto-table-cell-role="th" style="text-align: right; font-weight: bold;">out_quantities</th>
 <th data-quarto-table-cell-role="th" style="text-align: right; font-weight: bold;">rmse_testing</th>
+<th data-quarto-table-cell-role="th" style="text-align: right; font-weight: bold;">rmse_storm_eunice_2022</th>
+<th data-quarto-table-cell-role="th" style="text-align: right; font-weight: bold;">n_params</th>
+<th data-quarto-table-cell-role="th" style="text-align: right; font-weight: bold;">train_time_s</th>
+</tr>
+</thead>
+<tbody>
+<tr class="dataRow odd">
+<td style="text-align: right;">1</td>
+<td style="text-align: right;">surge_20yr</td>
+<td style="text-align: right;">DenseSurgeInteractionModel</td>
+<td style="text-align: right;">surge</td>
+<td style="text-align: right;">0.077819</td>
+<td style="text-align: right;">0.152024</td>
+<td style="text-align: right;">294149</td>
+<td style="text-align: right;">668.2</td>
+</tr>
+<tr class="dataRow even">
+<td style="text-align: right;">2</td>
+<td style="text-align: right;">surge_5yr</td>
+<td style="text-align: right;">DenseSurgeInteractionModel</td>
+<td style="text-align: right;">surge</td>
+<td style="text-align: right;">0.092789</td>
+<td style="text-align: right;">0.190552</td>
+<td style="text-align: right;">294149</td>
+<td style="text-align: right;">128.8</td>
+</tr>
+<tr class="dataRow odd">
+<td style="text-align: right;">3</td>
+<td style="text-align: right;">surge_20yr</td>
+<td style="text-align: right;">BiLinearSurgeInteractionModel</td>
+<td style="text-align: right;">surge</td>
+<td style="text-align: right;">0.098369</td>
+<td style="text-align: right;">0.186763</td>
+<td style="text-align: right;">21845</td>
+<td style="text-align: right;">80.9</td>
+</tr>
+<tr class="dataRow even">
+<td style="text-align: right;">4</td>
+<td style="text-align: right;">surge_20yr</td>
+<td style="text-align: right;">ConvSurgeModel</td>
+<td style="text-align: right;">surge</td>
+<td style="text-align: right;">0.099983</td>
+<td style="text-align: right;">0.185404</td>
+<td style="text-align: right;">10709</td>
+<td style="text-align: right;">507.5</td>
+</tr>
+<tr class="dataRow odd">
+<td style="text-align: right;">5</td>
+<td style="text-align: right;">surge_5yr</td>
+<td style="text-align: right;">BiLinearSurgeInteractionModel</td>
+<td style="text-align: right;">surge</td>
+<td style="text-align: right;">0.10119</td>
+<td style="text-align: right;">0.190752</td>
+<td style="text-align: right;">21845</td>
+<td style="text-align: right;">31.7</td>
+</tr>
+<tr class="dataRow even">
+<td style="text-align: right;">6</td>
+<td style="text-align: right;">surge_5yr</td>
+<td style="text-align: right;">ConvSurgeModel</td>
+<td style="text-align: right;">surge</td>
+<td style="text-align: right;">0.10204</td>
+<td style="text-align: right;">0.20516</td>
+<td style="text-align: right;">10709</td>
+<td style="text-align: right;">148.3</td>
+</tr>
+<tr class="dataRow odd">
+<td style="text-align: right;">7</td>
+<td style="text-align: right;">surge_20yr</td>
+<td style="text-align: right;">LinearSurgeModel</td>
+<td style="text-align: right;">surge</td>
+<td style="text-align: right;">0.102546</td>
+<td style="text-align: right;">0.204135</td>
+<td style="text-align: right;">21605</td>
+<td style="text-align: right;">3120.2</td>
+</tr>
+<tr class="dataRow even">
+<td style="text-align: right;">8</td>
+<td style="text-align: right;">surge_5yr</td>
+<td style="text-align: right;">LinearSurgeModel</td>
+<td style="text-align: right;">surge</td>
+<td style="text-align: right;">0.10585</td>
+<td style="text-align: right;">0.209065</td>
+<td style="text-align: right;">21605</td>
+<td style="text-align: right;">27.0</td>
+</tr>
+<tr class="dataRow odd">
+<td style="text-align: right;">9</td>
+<td style="text-align: right;">surge_1yr</td>
+<td style="text-align: right;">BiLinearSurgeInteractionModel</td>
+<td style="text-align: right;">surge</td>
+<td style="text-align: right;">0.112698</td>
+<td style="text-align: right;">0.230313</td>
+<td style="text-align: right;">21845</td>
+<td style="text-align: right;">19.2</td>
+</tr>
+<tr class="dataRow even">
+<td style="text-align: right;">10</td>
+<td style="text-align: right;">surge_1yr</td>
+<td style="text-align: right;">LinearSurgeModel</td>
+<td style="text-align: right;">surge</td>
+<td style="text-align: right;">0.11484</td>
+<td style="text-align: right;">0.24021</td>
+<td style="text-align: right;">21605</td>
+<td style="text-align: right;">16.6</td>
+</tr>
+<tr class="dataRow odd">
+<td style="text-align: right;">11</td>
+<td style="text-align: right;">surge_1yr</td>
+<td style="text-align: right;">ConvSurgeModel</td>
+<td style="text-align: right;">surge</td>
+<td style="text-align: right;">0.115027</td>
+<td style="text-align: right;">0.226334</td>
+<td style="text-align: right;">10709</td>
+<td style="text-align: right;">41.5</td>
+</tr>
+<tr class="dataRow even">
+<td style="text-align: right;">12</td>
+<td style="text-align: right;">surge_1yr</td>
+<td style="text-align: right;">DenseSurgeInteractionModel</td>
+<td style="text-align: right;">surge</td>
+<td style="text-align: right;">0.118937</td>
+<td style="text-align: right;">0.195226</td>
+<td style="text-align: right;">294149</td>
+<td style="text-align: right;">34.2</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+</section>
+</section>
+<section id="stations" class="level2">
+<h2 class="anchored" data-anchor-id="stations">317 Stations</h2>
+<section id="surge-leaderboard-2" class="level3">
+<h3 class="anchored" data-anchor-id="surge-leaderboard-2">Surge Leaderboard</h3>
+<div id="10" class="cell" data-execution_count="1">
+<div class="cell-output cell-output-display">
+<table class="caption-top table table-sm table-striped small">
+<thead>
+<tr class="columnLabelRow header">
+<th data-quarto-table-cell-role="th" style="text-align: right; font-weight: bold;">rank</th>
+<th data-quarto-table-cell-role="th" style="text-align: right; font-weight: bold;">runid</th>
+<th data-quarto-table-cell-role="th" style="text-align: right; font-weight: bold;">model_name</th>
+<th data-quarto-table-cell-role="th" style="text-align: right; font-weight: bold;">out_quantities</th>
+<th data-quarto-table-cell-role="th" style="text-align: right; font-weight: bold;">rmse_testing</th>
+<th data-quarto-table-cell-role="th" style="text-align: right; font-weight: bold;">rmse_storm_eunice_2022</th>
 <th data-quarto-table-cell-role="th" style="text-align: right; font-weight: bold;">n_params</th>
 <th data-quarto-table-cell-role="th" style="text-align: right; font-weight: bold;">train_time_s</th>
 </tr>
@@ -2429,6 +2626,7 @@ var requirejs,require,define;(function(global,setTimeout){var req,s,head,baseEle
 <td style="text-align: right;">LinearSurgeModel</td>
 <td style="text-align: right;">surge</td>
 <td style="text-align: right;">0.083858</td>
+<td style="text-align: right;">0.149844</td>
 <td style="text-align: right;">14470733</td>
 <td style="text-align: right;">4507.0</td>
 </tr>
@@ -2438,6 +2636,7 @@ var requirejs,require,define;(function(global,setTimeout){var req,s,head,baseEle
 <td style="text-align: right;">AttentionSurgeModel</td>
 <td style="text-align: right;">surge</td>
 <td style="text-align: right;">0.096114</td>
+<td style="text-align: right;">0.1795</td>
 <td style="text-align: right;">55605</td>
 <td style="text-align: right;">11428.8</td>
 </tr>
@@ -2447,6 +2646,7 @@ var requirejs,require,define;(function(global,setTimeout){var req,s,head,baseEle
 <td style="text-align: right;">AttentionSurgeModel</td>
 <td style="text-align: right;">surge</td>
 <td style="text-align: right;">0.107274</td>
+<td style="text-align: right;">0.20217</td>
 <td style="text-align: right;">55605</td>
 <td style="text-align: right;">1716.3</td>
 </tr>
@@ -2456,6 +2656,7 @@ var requirejs,require,define;(function(global,setTimeout){var req,s,head,baseEle
 <td style="text-align: right;">BiLinearSurgeInteractionModel</td>
 <td style="text-align: right;">surge</td>
 <td style="text-align: right;">0.1199</td>
+<td style="text-align: right;">0.217603</td>
 <td style="text-align: right;">4828861</td>
 <td style="text-align: right;">384.0</td>
 </tr>
@@ -2465,6 +2666,7 @@ var requirejs,require,define;(function(global,setTimeout){var req,s,head,baseEle
 <td style="text-align: right;">LinearSurgeModel</td>
 <td style="text-align: right;">surge</td>
 <td style="text-align: right;">0.133816</td>
+<td style="text-align: right;">0.23055</td>
 <td style="text-align: right;">4823789</td>
 <td style="text-align: right;">1426.3</td>
 </tr>
@@ -2474,6 +2676,7 @@ var requirejs,require,define;(function(global,setTimeout){var req,s,head,baseEle
 <td style="text-align: right;">BiLinearSurgeInteractionModel</td>
 <td style="text-align: right;">surge</td>
 <td style="text-align: right;">0.136484</td>
+<td style="text-align: right;">0.22771</td>
 <td style="text-align: right;">4828861</td>
 <td style="text-align: right;">1494.9</td>
 </tr>
@@ -2484,7 +2687,7 @@ var requirejs,require,define;(function(global,setTimeout){var req,s,head,baseEle
 </section>
 <section id="tide-leaderboard-1" class="level3">
 <h3 class="anchored" data-anchor-id="tide-leaderboard-1">Tide Leaderboard</h3>
-<div id="10" class="cell" data-execution_count="1">
+<div id="12" class="cell" data-execution_count="1">
 <div class="cell-output cell-output-stdout">
 <div class="ansi-escaped-output">
 <pre><span class="ansi-yellow-fg ansi-bold">┌ </span><span class="ansi-yellow-fg ansi-bold">Warning: </span>No runs found for [&quot;waterlevel&quot;] in /home/verlaan/deepblack/src/AIHydroPoints.jl.git_claude/experiments/317stations/training_output.

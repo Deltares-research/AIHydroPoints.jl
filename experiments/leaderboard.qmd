@@ -29,7 +29,7 @@ function show_leaderboard(root_dir, quantities; sort_by="rmse_testing", ascendin
     select!(lb, :rank, :)
 
     display_cols = [:rank, :runid, :model_name, :out_quantities, :rmse_testing,
-                    :n_params, :train_time_s]
+                    :rmse_storm_eunice_2022, :n_params, :train_time_s]
     available = [c for c in display_cols if c in propertynames(lb)]
     pretty_table(lb[!, available]; backend=:html, stand_alone=false, column_labels=string.(available))
 end
